@@ -14,6 +14,21 @@ Estos archivos son los oficiales y **ya están aplicados en Supabase**.
 
 Orden: `schema.sql` → `seed.sql` → (Django `python manage.py migrate`) → `rls_todas_las_tablas.sql`.
 
+## Rol de conexión y RLS
+
+- Spring Boot y Django se conectan con el rol **`boticompara_app`** (en el pooler de Supabase el
+  usuario es `boticompara_app.<ref-del-proyecto>`). La contraseña la comparte Guillermo por privado
+  y va solo en el `.env`, nunca en el repositorio.
+- `usuario`, `botica` y `producto` pertenecen a `postgres`. Tienen RLS activado y una política
+  `app_acceso_total` (`for all`) **solo para `boticompara_app`**. Es intencional: esa política no está en
+  `schema.sql` y se administra en Supabase.
+- Las tablas internas de Django (`auth_*`, `django_*`) las crea `migrate` y **pertenecen a
+  `boticompara_app`**, por eso las puede usar sin políticas aunque tengan RLS.
+- `anon` y `authenticated` (la API automática de Supabase) no tienen acceso a ninguna tabla ni a la vista.
+- `rls_todas_las_tablas.sql` debe ejecutarlo alguien con permisos sobre **todas** las tablas (por
+  ejemplo `postgres` desde el SQL Editor de Supabase). Con `boticompara_app` falla, porque ese rol no
+  es dueño de `usuario`, `botica` ni `producto`.
+
 Comprobación rápida después del seed:
 
 ```sql
