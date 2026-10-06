@@ -46,7 +46,7 @@ function Contenido() {
           <p>{error}</p>
         </Alerta>
         <div>
-          <button type="button" className="btn btn-secundario" onClick={() => recargar().catch(() => {})}>
+          <button type="button" className="btn btn-secundario" onClick={recargar}>
             <Icono nombre="actualizar" /> Reintentar
           </button>
         </div>
