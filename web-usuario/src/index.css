@@ -607,6 +607,11 @@ a {
   color: var(--aviso);
 }
 
+.bloqueado .icono-grande.icono-info {
+  background: var(--info-fondo);
+  color: var(--info);
+}
+
 .bloqueado .icono-grande .icono {
   width: 30px;
   height: 30px;
