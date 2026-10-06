@@ -589,6 +589,11 @@ a {
   margin-left: 0.4rem;
 }
 
+.boton-eliminar:hover:not(:disabled) {
+  border-color: var(--error);
+  color: var(--error);
+}
+
 .sin-stock {
   color: var(--error);
   font-weight: 700;

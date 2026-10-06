@@ -2,10 +2,12 @@
 // H13 - Ver el catálogo de mi botica (GET /boticas/mia/productos)
 // H14 - Buscar en mi catálogo por nombre comercial o principio activo (?q=)
 // H8 / H9 - Agregar y editar productos (ver ProductoFormModal)
+// H10 - Eliminar producto con confirmación (ver ConfirmarEliminarModal)
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Cargando from '../components/Cargando.jsx'
+import ConfirmarEliminarModal from '../components/ConfirmarEliminarModal.jsx'
 import EstadoBadge from '../components/EstadoBadge.jsx'
 import Icono from '../components/Icono.jsx'
 import ProductoFormModal from '../components/ProductoFormModal.jsx'
@@ -37,7 +39,7 @@ function CatalogoBloqueado({ estado }) {
   )
 }
 
-function TablaProductos({ productos, onEditar }) {
+function TablaProductos({ productos, onEditar, onEliminar }) {
   return (
     <table className="tabla">
       <thead>
@@ -73,6 +75,14 @@ function TablaProductos({ productos, onEditar }) {
               >
                 <Icono nombre="editar" /> Editar
               </button>
+              <button
+                type="button"
+                className="btn btn-secundario btn-icono boton-eliminar"
+                onClick={() => onEliminar(p)}
+                aria-label={`Eliminar ${p.nombreComercial}`}
+              >
+                <Icono nombre="borrar" /> Eliminar
+              </button>
             </td>
           </tr>
         ))}
@@ -91,6 +101,7 @@ export default function CatalogoPage() {
   const [error, setError] = useState('')
   const [recarga, setRecarga] = useState(0)
   const [editando, setEditando] = useState(null) // null | {} (nuevo) | producto
+  const [eliminando, setEliminando] = useState(null)
 
   // Busca en el servidor con una pequeña espera mientras se escribe
   useEffect(() => {
@@ -118,6 +129,12 @@ export default function CatalogoPage() {
     setEditando(null)
     setRecarga((n) => n + 1)
     toast(eraEdicion ? `Se actualizó "${producto.nombreComercial}".` : `Se agregó "${producto.nombreComercial}" al catálogo.`)
+  }
+
+  function alEliminar(producto) {
+    setEliminando(null)
+    setRecarga((n) => n + 1)
+    toast(`Se eliminó "${producto.nombreComercial}" del catálogo.`)
   }
 
   return (
@@ -159,12 +176,19 @@ export default function CatalogoPage() {
               : 'Todavía no tienes productos en tu catálogo.'}
           </p>
         ) : (
-          <TablaProductos productos={productos} onEditar={setEditando} />
+          <TablaProductos productos={productos} onEditar={setEditando} onEliminar={setEliminando} />
         )}
       </section>
 
       {editando && (
         <ProductoFormModal producto={editando} onCerrar={() => setEditando(null)} onGuardado={alGuardar} />
+      )}
+      {eliminando && (
+        <ConfirmarEliminarModal
+          producto={eliminando}
+          onCerrar={() => setEliminando(null)}
+          onEliminado={alEliminar}
+        />
       )}
     </>
   )
