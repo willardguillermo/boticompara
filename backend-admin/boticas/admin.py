@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 
+from .forms import BoticaRevisionForm
 from .models import Botica, Producto, Usuario
 
 admin.site.site_header = 'BotiCompara - Administración'
@@ -55,6 +56,7 @@ class ProductoInline(admin.TabularInline):
 
 @admin.register(Botica)
 class BoticaAdmin(admin.ModelAdmin):
+    form = BoticaRevisionForm
     list_display = ('nombre_comercial', 'ruc', 'correo_dueno', 'distrito', 'estado', 'creado_en')
     list_filter = ('estado', 'distrito')
     search_fields = ('nombre_comercial', 'ruc', 'usuario__correo')
