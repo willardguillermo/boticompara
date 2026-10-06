@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .models import Botica, Producto, Usuario
 
@@ -60,6 +60,7 @@ class BoticaAdmin(admin.ModelAdmin):
     search_fields = ('nombre_comercial', 'ruc', 'usuario__correo')
     list_select_related = ('usuario',)
     inlines = [ProductoInline]
+    actions = ['aprobar_boticas']
 
     # Los datos los registra el dueño desde la web: aquí solo se revisan
     readonly_fields = ('usuario', 'correo_dueno', 'nombre_comercial', 'ruc', 'razon_social',
@@ -78,6 +79,12 @@ class BoticaAdmin(admin.ModelAdmin):
     @admin.display(description='correo del dueño', ordering='usuario__correo')
     def correo_dueno(self, obj):
         return obj.usuario.correo
+
+    @admin.action(description='Aprobar boticas seleccionadas', permissions=['change'])
+    def aprobar_boticas(self, request, queryset):
+        actualizadas = (queryset.exclude(estado=Botica.Estado.APROBADO)
+                        .update(estado=Botica.Estado.APROBADO, motivo_rechazo=None))
+        self.message_user(request, f'{actualizadas} botica(s) aprobada(s).', messages.SUCCESS)
 
     def has_add_permission(self, request):
         return False
