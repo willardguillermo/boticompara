@@ -8,58 +8,92 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
-data class Medicine(val name: String, val pharmacy: String, val price: String)
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 
 @Composable
-fun SearchScreen() {
-    var searchQuery by remember { mutableStateOf("") }
+fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel = viewModel()) {
 
-    val allMedicines = listOf(
-        Medicine("Paracetamol 500mg", "InkaFarma", "S/ 12.50"),
-        Medicine("Paracetamol 500mg", "Mifarma", "S/ 10.00"),
-        Medicine("Ibuprofeno 400mg", "Boticas Perú", "S/ 15.00"),
-        Medicine("Amoxicilina 500mg", "InkaFarma", "S/ 25.40"),
-        Medicine("Aspirina 100mg", "Mifarma", "S/ 8.50")
-    )
-
-    val filteredMedicines = allMedicines.filter {
-        it.name.contains(searchQuery, ignoreCase = true)
+    // Si el token venció, volver al login
+    LaunchedEffect(searchViewModel.sesionVencida) {
+        if (searchViewModel.sesionVencida) {
+            navController.navigate("login") { popUpTo(0) }
+        }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp)
-    ) {
-        Text(text = "Buscar Medicamentos", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Buscar medicamentos", style = MaterialTheme.typography.headlineSmall)
+            TextButton(onClick = { navController.navigate("perfil") }) { Text("Mi perfil") }
+        }
+        Spacer(Modifier.height(8.dp))
 
         OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            label = { Text("Escribe el nombre del medicamento...") },
+            value = searchViewModel.searchQuery,
+            onValueChange = { searchViewModel.searchQuery = it },
+            label = {
+                Text(if (searchViewModel.searchType == "nombre") "Nombre comercial (ej. Panadol)"
+                else "Principio activo (ej. Paracetamol)")
+            },
+            singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
-        Spacer(modifier = Modifier.height(16.dp))
 
-        if (filteredMedicines.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "No se encontraron medicamentos", style = MaterialTheme.typography.bodyLarge)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(filteredMedicines) { med ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(text = med.name, style = MaterialTheme.typography.titleMedium)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = "Farmacia: ${med.pharmacy}", style = MaterialTheme.typography.bodyMedium)
-                            Text(text = "Precio: ${med.price}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+        // Selector de criterio (H22 / H23): el elegido queda marcado
+        Row(modifier = Modifier.padding(vertical = 8.dp)) {
+            FilterChip(
+                selected = searchViewModel.searchType == "nombre",
+                onClick = { searchViewModel.searchType = "nombre" },
+                label = { Text("Por nombre") }
+            )
+            Spacer(Modifier.width(8.dp))
+            FilterChip(
+                selected = searchViewModel.searchType == "principio",
+                onClick = { searchViewModel.searchType = "principio" },
+                label = { Text("Por principio activo") }
+            )
+        }
+
+        Button(
+            onClick = { searchViewModel.buscarProductos() },
+            enabled = !searchViewModel.isLoading,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Buscar") }
+
+        Spacer(Modifier.height(16.dp))
+
+        when {
+            searchViewModel.isLoading ->
+                CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+
+            searchViewModel.mensaje != null ->
+                Text(searchViewModel.mensaje!!, style = MaterialTheme.typography.bodyLarge)
+
+            searchViewModel.productos.isNotEmpty() -> {
+                Text(
+                    "${searchViewModel.productos.size} resultados, del más barato al más caro",
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(searchViewModel.productos) { producto ->
+                        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(producto.nombreComercial, style = MaterialTheme.typography.titleMedium)
+                                Text("Principio activo: ${producto.principioActivo}")
+                                Text("Presentación: ${producto.presentacion}")
+                                Text(
+                                    "S/ ${"%.2f".format(producto.precio)}",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text("Stock: ${producto.stock}")
+                                Text("${producto.boticaNombre} · ${producto.boticaDireccion}, ${producto.boticaDistrito}")
+                            }
                         }
                     }
                 }
