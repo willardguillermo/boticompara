@@ -8,19 +8,19 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const navigate = useNavigate()
   const [usuario, setUsuario] = useState(() => (obtenerToken() ? obtenerUsuario() : null))
+  // Aviso para el login. Va en el contexto (no en el state de la ruta) porque
+  // RutaProtegida es quien redirige al login cuando el usuario queda en null.
+  const [aviso, setAviso] = useState('')
 
   // Cualquier 401 de la API (token vencido o inválido) cierra la sesión
   useEffect(() => {
     const alExpirar = () => {
+      setAviso('Tu sesión expiró. Inicia sesión nuevamente.')
       setUsuario(null)
-      navigate('/login', {
-        replace: true,
-        state: { aviso: 'Tu sesión expiró. Inicia sesión nuevamente.' },
-      })
     }
     window.addEventListener(EVENTO_SESION_EXPIRADA, alExpirar)
     return () => window.removeEventListener(EVENTO_SESION_EXPIRADA, alExpirar)
-  }, [navigate])
+  }, [])
 
   /**
    * H18. Un COMPRADOR no puede usar esta web: no se guarda su sesión
@@ -30,6 +30,7 @@ export function AuthProvider({ children }) {
     const { token, usuario: datos } = await api.login({ correo: correo.trim(), password })
     if (datos.rol !== 'DUENO_BOTICA') return { esComprador: true, usuario: datos }
     guardarSesion(token, datos)
+    setAviso('')
     setUsuario(datos)
     return { esComprador: false, usuario: datos }
   }, [])
@@ -51,13 +52,14 @@ export function AuthProvider({ children }) {
 
   const cerrarSesion = useCallback(() => {
     borrarSesion()
+    setAviso('')
     setUsuario(null)
     navigate('/login', { replace: true })
   }, [navigate])
 
   const valor = useMemo(
-    () => ({ usuario, iniciarSesion, registrarDueno, cerrarSesion }),
-    [usuario, iniciarSesion, registrarDueno, cerrarSesion],
+    () => ({ usuario, aviso, iniciarSesion, registrarDueno, cerrarSesion }),
+    [usuario, aviso, iniciarSesion, registrarDueno, cerrarSesion],
   )
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>
 }

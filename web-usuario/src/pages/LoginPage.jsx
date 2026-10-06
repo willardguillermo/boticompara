@@ -10,7 +10,7 @@ import { MODO_SIMULADO } from '../services/index.js'
 import { propsError } from '../utils/validacion.js'
 
 export default function LoginPage() {
-  const { iniciarSesion } = useAuth()
+  const { iniciarSesion, aviso } = useAuth()
   const navigate = useNavigate()
   const { state } = useLocation()
 
@@ -58,9 +58,9 @@ export default function LoginPage() {
             <p className="texto-suave">Ingresa para gestionar tu botica y tu catálogo.</p>
 
             <form className="formulario" onSubmit={enviar} noValidate>
-              {state?.aviso && (
+              {aviso && (
                 <Alerta tipo="aviso">
-                  <p>{state.aviso}</p>
+                  <p>{aviso}</p>
                 </Alerta>
               )}
               <Alerta tipo="error">{error && <p>{error}</p>}</Alerta>
