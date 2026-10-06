@@ -1,4 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { ConBotica, InicioPanel, SinBotica } from './components/GuardiasBotica.jsx'
+import PanelLayout from './components/PanelLayout.jsx'
 import RutaProtegida from './components/RutaProtegida.jsx'
 import RutaPublica from './components/RutaPublica.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
@@ -17,7 +19,15 @@ export default function App() {
               <Route path="/registro" element={<RegistroPage />} />
             </Route>
             <Route element={<RutaProtegida />}>
-              <Route path="/panel/*" element={<main className="contenido"><h1>Panel</h1></main>} />
+              <Route path="/panel" element={<PanelLayout />}>
+                <Route index element={<InicioPanel />} />
+                <Route
+                  path="botica/registro"
+                  element={<SinBotica><h1>Registro de botica</h1></SinBotica>}
+                />
+                <Route path="estado" element={<ConBotica><h1>Estado</h1></ConBotica>} />
+                <Route path="catalogo" element={<ConBotica><h1>Catálogo</h1></ConBotica>} />
+              </Route>
             </Route>
             <Route path="*" element={<Navigate to="/panel" replace />} />
           </Routes>
