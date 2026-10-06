@@ -2,38 +2,27 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
+import EstadoBadge from '../components/EstadoBadge.jsx'
 import Icono from '../components/Icono.jsx'
 import { useBotica } from '../context/BoticaContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 
-const ESTADOS = {
+const TEXTOS = {
   PENDIENTE: {
-    etiqueta: 'Pendiente de revisión',
-    icono: 'reloj',
+    cambio: 'pendiente de revisión',
     titulo: 'Estamos revisando tu solicitud',
     texto: 'Un administrador de BotiCompara está validando los datos de tu botica. Mientras tanto, el catálogo está bloqueado.',
   },
   APROBADO: {
-    etiqueta: 'Aprobada',
-    icono: 'check',
+    cambio: 'aprobada',
     titulo: '¡Tu botica está aprobada!',
     texto: 'Ya puedes publicar tus productos. Los compradores los verán al buscar medicamentos en la app.',
   },
   RECHAZADO: {
-    etiqueta: 'Rechazada',
-    icono: 'equis',
+    cambio: 'rechazada',
     titulo: 'Tu solicitud fue rechazada',
     texto: 'Revisa el motivo y comunícate con el administrador de BotiCompara para corregir tus datos.',
   },
-}
-
-export function EstadoBadge({ estado }) {
-  const info = ESTADOS[estado]
-  return (
-    <span className={`estado estado-${estado}`}>
-      <Icono nombre={info?.icono ?? 'alerta'} /> {info?.etiqueta ?? estado}
-    </span>
-  )
 }
 
 export default function EstadoPage() {
@@ -41,7 +30,7 @@ export default function EstadoPage() {
   const toast = useToast()
   const [actualizando, setActualizando] = useState(false)
 
-  const info = ESTADOS[botica.estado]
+  const info = TEXTOS[botica.estado]
 
   async function actualizar() {
     setActualizando(true)
@@ -52,7 +41,7 @@ export default function EstadoPage() {
     toast(
       nueva.estado === anterior
         ? 'Estado actualizado: sin cambios por ahora.'
-        : `Tu botica ahora está ${ESTADOS[nueva.estado]?.etiqueta.toLowerCase() ?? nueva.estado}.`,
+        : `Tu botica ahora está ${TEXTOS[nueva.estado]?.cambio ?? nueva.estado}.`,
       nueva.estado === 'RECHAZADO' ? 'error' : 'exito',
     )
   }

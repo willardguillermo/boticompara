@@ -5,6 +5,7 @@ import RutaProtegida from './components/RutaProtegida.jsx'
 import RutaPublica from './components/RutaPublica.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
+import CatalogoPage from './pages/CatalogoPage.jsx'
 import EstadoPage from './pages/EstadoPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegistroBoticaPage from './pages/RegistroBoticaPage.jsx'
@@ -28,7 +29,7 @@ export default function App() {
                   element={<SinBotica><RegistroBoticaPage /></SinBotica>}
                 />
                 <Route path="estado" element={<ConBotica><EstadoPage /></ConBotica>} />
-                <Route path="catalogo" element={<ConBotica><h1>Catálogo</h1></ConBotica>} />
+                <Route path="catalogo" element={<ConBotica><CatalogoPage /></ConBotica>} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/panel" replace />} />
