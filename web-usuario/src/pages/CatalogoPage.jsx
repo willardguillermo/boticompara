@@ -1,13 +1,16 @@
 // Catálogo de la botica del dueño
 // H13 - Ver el catálogo de mi botica (GET /boticas/mia/productos)
 // H14 - Buscar en mi catálogo por nombre comercial o principio activo (?q=)
+// H8 / H9 - Agregar y editar productos (ver ProductoFormModal)
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Cargando from '../components/Cargando.jsx'
 import EstadoBadge from '../components/EstadoBadge.jsx'
 import Icono from '../components/Icono.jsx'
+import ProductoFormModal from '../components/ProductoFormModal.jsx'
 import { useBotica } from '../context/BoticaContext.jsx'
+import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../services/index.js'
 import { formatoSoles } from '../utils/formato.js'
 
@@ -34,7 +37,7 @@ function CatalogoBloqueado({ estado }) {
   )
 }
 
-function TablaProductos({ productos }) {
+function TablaProductos({ productos, onEditar }) {
   return (
     <table className="tabla">
       <thead>
@@ -44,6 +47,9 @@ function TablaProductos({ productos }) {
           <th scope="col">Presentación</th>
           <th scope="col" className="numero">Precio</th>
           <th scope="col" className="numero">Stock</th>
+          <th scope="col" className="acciones">
+            <span className="sr-only">Acciones</span>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -58,6 +64,16 @@ function TablaProductos({ productos }) {
             <td data-etiqueta="Stock" className="numero">
               {p.stock === 0 ? <span className="sin-stock">Agotado</span> : p.stock}
             </td>
+            <td className="acciones">
+              <button
+                type="button"
+                className="btn btn-secundario btn-icono"
+                onClick={() => onEditar(p)}
+                aria-label={`Editar ${p.nombreComercial}`}
+              >
+                <Icono nombre="editar" /> Editar
+              </button>
+            </td>
           </tr>
         ))}
       </tbody>
@@ -67,11 +83,14 @@ function TablaProductos({ productos }) {
 
 export default function CatalogoPage() {
   const { botica } = useBotica()
+  const toast = useToast()
   const aprobada = botica.estado === 'APROBADO'
 
   const [busqueda, setBusqueda] = useState('')
   const [productos, setProductos] = useState(null)
   const [error, setError] = useState('')
+  const [recarga, setRecarga] = useState(0)
+  const [editando, setEditando] = useState(null) // null | {} (nuevo) | producto
 
   // Busca en el servidor con una pequeña espera mientras se escribe
   useEffect(() => {
@@ -91,9 +110,15 @@ export default function CatalogoPage() {
       activo = false
       clearTimeout(espera)
     }
-  }, [aprobada, busqueda])
+  }, [aprobada, busqueda, recarga])
 
   if (!aprobada) return <CatalogoBloqueado estado={botica.estado} />
+
+  function alGuardar(producto, eraEdicion) {
+    setEditando(null)
+    setRecarga((n) => n + 1)
+    toast(eraEdicion ? `Se actualizó "${producto.nombreComercial}".` : `Se agregó "${producto.nombreComercial}" al catálogo.`)
+  }
 
   return (
     <>
@@ -117,6 +142,9 @@ export default function CatalogoPage() {
             onChange={(e) => setBusqueda(e.target.value)}
           />
         </div>
+        <button type="button" className="btn btn-primario" onClick={() => setEditando({})}>
+          <Icono nombre="mas" /> Agregar producto
+        </button>
       </div>
 
       <Alerta tipo="error">{error && <p>{error}</p>}</Alerta>
@@ -131,9 +159,13 @@ export default function CatalogoPage() {
               : 'Todavía no tienes productos en tu catálogo.'}
           </p>
         ) : (
-          <TablaProductos productos={productos} />
+          <TablaProductos productos={productos} onEditar={setEditando} />
         )}
       </section>
+
+      {editando && (
+        <ProductoFormModal producto={editando} onCerrar={() => setEditando(null)} onGuardado={alGuardar} />
+      )}
     </>
   )
 }
