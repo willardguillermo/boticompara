@@ -15,7 +15,7 @@ class AuthInterceptor(private val context: Context) : Interceptor {
         val token = runBlocking { tokenManager.tokenFlow.first() }
         val requestBuilder = chain.request().newBuilder()
         if (!token.isNullOrEmpty()) {
-            requestBuilder.addHeader("Authorization", "Bearer $token")
+            requestBuilder.header("Authorization", "Bearer $token")
         }
         return chain.proceed(requestBuilder.build())
     }
