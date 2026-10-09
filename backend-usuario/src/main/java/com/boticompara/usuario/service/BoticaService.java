@@ -17,13 +17,14 @@ public class BoticaService {
 
     private final BoticaRepository boticas;
 
-    /** H1, H2: la botica queda PENDIENTE hasta que el admin la apruebe en Django. */
+    /** H1, H2, H3: la botica queda PENDIENTE hasta que el admin la apruebe en Django. */
     @Transactional
     public BoticaCreadaResponse registrar(Long usuarioId, BoticaRequest r) {
         String ruc = r.ruc().trim();
         if (!RucValidator.esValido(ruc)) {
             throw ApiException.badRequest("El RUC no es válido");
         }
+        validarUbicacion(r);
         if (boticas.existsByUsuarioId(usuarioId)) {
             throw ApiException.conflict("Ya tienes una botica registrada");
         }
@@ -38,6 +39,8 @@ public class BoticaService {
         b.setDireccion(r.direccion().trim());
         b.setDistrito(r.distrito().trim());
         b.setTelefono(r.telefono() == null || r.telefono().isBlank() ? null : r.telefono().trim());
+        b.setLatitud(r.latitud());
+        b.setLongitud(r.longitud());
         b.setEstado("PENDIENTE");
         return BoticaCreadaResponse.from(boticas.save(b));
     }
@@ -52,5 +55,12 @@ public class BoticaService {
     public Botica obtenerMia(Long usuarioId) {
         return boticas.findByUsuarioId(usuarioId)
                 .orElseThrow(() -> ApiException.notFound("Aún no registraste tu botica"));
+    }
+
+    /** H3: latitud y longitud son opcionales, pero van juntas. */
+    private void validarUbicacion(BoticaRequest r) {
+        if ((r.latitud() == null) != (r.longitud() == null)) {
+            throw ApiException.badRequest("Debes enviar latitud y longitud juntas");
+        }
     }
 }

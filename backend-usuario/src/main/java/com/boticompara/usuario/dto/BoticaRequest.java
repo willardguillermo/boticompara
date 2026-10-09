@@ -1,7 +1,12 @@
 package com.boticompara.usuario.dto;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+
+import java.math.BigDecimal;
 
 public record BoticaRequest(
         @NotBlank(message = "El nombre comercial es obligatorio")
@@ -24,6 +29,16 @@ public record BoticaRequest(
         String distrito,
 
         @Size(max = 20, message = "El teléfono admite máximo 20 caracteres")
-        String telefono
+        String telefono,
+
+        @DecimalMin(value = "-90.0", message = "La latitud debe estar entre -90 y 90")
+        @DecimalMax(value = "90.0", message = "La latitud debe estar entre -90 y 90")
+        @Digits(integer = 2, fraction = 6, message = "La latitud admite hasta 6 decimales")
+        BigDecimal latitud,
+
+        @DecimalMin(value = "-180.0", message = "La longitud debe estar entre -180 y 180")
+        @DecimalMax(value = "180.0", message = "La longitud debe estar entre -180 y 180")
+        @Digits(integer = 3, fraction = 6, message = "La longitud admite hasta 6 decimales")
+        BigDecimal longitud
 ) {
 }
