@@ -29,4 +29,11 @@ public class BoticaController {
     public BoticaDetalleResponse mia(@AuthenticationPrincipal UsuarioAutenticado yo) {
         return boticas.detalleMia(yo.id());
     }
+
+    /** H7: solo permitido si la botica está RECHAZADA. */
+    @PutMapping("/mia")
+    public BoticaDetalleResponse corregir(@AuthenticationPrincipal UsuarioAutenticado yo,
+                                          @Valid @RequestBody BoticaRequest request) {
+        return boticas.corregir(yo.id(), request);
+    }
 }

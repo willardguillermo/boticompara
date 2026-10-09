@@ -33,16 +33,35 @@ public class BoticaService {
         }
         Botica b = new Botica();
         b.setUsuarioId(usuarioId);
-        b.setNombreComercial(r.nombreComercial().trim());
-        b.setRuc(ruc);
-        b.setRazonSocial(r.razonSocial().trim());
-        b.setDireccion(r.direccion().trim());
-        b.setDistrito(r.distrito().trim());
-        b.setTelefono(r.telefono() == null || r.telefono().isBlank() ? null : r.telefono().trim());
-        b.setLatitud(r.latitud());
-        b.setLongitud(r.longitud());
+        aplicar(b, r, ruc);
         b.setEstado("PENDIENTE");
         return BoticaCreadaResponse.from(boticas.save(b));
+    }
+
+    /**
+     * H7: corrige y reenvía una solicitud rechazada. Solo si el estado es RECHAZADO;
+     * la botica vuelve a PENDIENTE y se borra el motivo de rechazo.
+     */
+    @Transactional
+    public BoticaDetalleResponse corregir(Long usuarioId, BoticaRequest r) {
+        Botica b = obtenerMia(usuarioId);
+        if (!"RECHAZADO".equals(b.getEstado())) {
+            throw ApiException.forbidden(
+                    "Solo puedes corregir una botica rechazada (estado actual: " + b.getEstado() + ")");
+        }
+        String ruc = r.ruc().trim();
+        if (!RucValidator.esValido(ruc)) {
+            throw ApiException.badRequest("El RUC no es válido");
+        }
+        validarUbicacion(r);
+        // Conservar su propio RUC no es un duplicado; solo importa si cambió
+        if (!ruc.equals(b.getRuc()) && boticas.existsByRuc(ruc)) {
+            throw ApiException.conflict("El RUC ya está registrado");
+        }
+        aplicar(b, r, ruc);
+        b.setEstado("PENDIENTE");
+        b.setMotivoRechazo(null);
+        return BoticaDetalleResponse.from(boticas.save(b));
     }
 
     /** H5 */
@@ -55,6 +74,17 @@ public class BoticaService {
     public Botica obtenerMia(Long usuarioId) {
         return boticas.findByUsuarioId(usuarioId)
                 .orElseThrow(() -> ApiException.notFound("Aún no registraste tu botica"));
+    }
+
+    private void aplicar(Botica b, BoticaRequest r, String ruc) {
+        b.setNombreComercial(r.nombreComercial().trim());
+        b.setRuc(ruc);
+        b.setRazonSocial(r.razonSocial().trim());
+        b.setDireccion(r.direccion().trim());
+        b.setDistrito(r.distrito().trim());
+        b.setTelefono(r.telefono() == null || r.telefono().isBlank() ? null : r.telefono().trim());
+        b.setLatitud(r.latitud());
+        b.setLongitud(r.longitud());
     }
 
     /** H3: latitud y longitud son opcionales, pero van juntas. */
