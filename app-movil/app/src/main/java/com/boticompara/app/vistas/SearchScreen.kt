@@ -14,10 +14,12 @@ import androidx.navigation.NavController
 @Composable
 fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel = viewModel()) {
 
-    // Si el token venció, volver al login
+    // Si el token venció, volver al login limpiando la navegación
     LaunchedEffect(searchViewModel.sesionVencida) {
         if (searchViewModel.sesionVencida) {
-            navController.navigate("login") { popUpTo(0) }
+            navController.navigate("login") {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
         }
     }
 

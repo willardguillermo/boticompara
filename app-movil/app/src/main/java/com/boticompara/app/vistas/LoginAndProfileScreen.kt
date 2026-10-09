@@ -138,7 +138,11 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 @Composable
 fun ProfileScreen(navController: NavController, vm: ProfileViewModel = viewModel()) {
     LaunchedEffect(vm.sesionVencida) {
-        if (vm.sesionVencida) navController.navigate("login") { popUpTo(0) }
+        if (vm.sesionVencida) {
+            navController.navigate("login") {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
+        }
     }
 
     Column(
@@ -171,7 +175,11 @@ fun ProfileScreen(navController: NavController, vm: ProfileViewModel = viewModel
         Spacer(Modifier.height(8.dp))
         TextButton(onClick = { navController.popBackStack() }) { Text("Volver a la búsqueda") }
         TextButton(onClick = {
-            vm.cerrarSesion { navController.navigate("login") { popUpTo(0) } }
+            vm.cerrarSesion {
+                navController.navigate("login") {
+                    popUpTo(navController.graph.id) { inclusive = true }
+                }
+            }
         }) { Text("Cerrar sesión", color = MaterialTheme.colorScheme.error) }
     }
 }
