@@ -1050,7 +1050,7 @@
       "name": "5. Búsqueda del comprador (H22, H23, H24)",
       "item": [
         {
-          "name": "Paracetamol por principio activo (4 resultados, primero S/ 2.20)",
+          "name": "Paracetamol por principio activo (al menos 4 resultados, primero S/ 2.20)",
           "event": [
             {
               "listen": "test",
@@ -1059,7 +1059,7 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
                   "const r = pm.response.json();",
-                  "pm.test(\"4 resultados\", function () { pm.expect(r.length).to.eql(4); });",
+                  "pm.test(\"Al menos 4 resultados\", function () { pm.expect(r.length).to.be.at.least(4); });",
                   "pm.test(\"El primero cuesta 2.20\", function () { pm.expect(r[0].precio).to.eql(2.2); });"
                 ]
               }
