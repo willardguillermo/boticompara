@@ -2,6 +2,7 @@
 // con los usuarios, boticas y productos de prueba de database/seed.sql.
 // Los datos se reinician al recargar la página.
 import { validarRuc } from '../utils/ruc.js'
+import { validarArchivoLicencia } from '../utils/validacion.js'
 import { crearError } from './ApiError.js'
 import { obtenerToken } from './sesion.js'
 
@@ -62,6 +63,18 @@ function validarCoordenadas({ latitud, longitud }) {
   if (!(Math.abs(latitud) <= 90) || !(Math.abs(longitud) <= 180)) {
     throw crearError(400, 'Las coordenadas están fuera de rango.')
   }
+}
+
+// H4: igual que el backend, revisa el contenido (firma del archivo), no solo la extensión
+const FIRMAS_LICENCIA = [
+  [0x25, 0x50, 0x44, 0x46], // %PDF
+  [0x89, 0x50, 0x4e, 0x47], // PNG
+  [0xff, 0xd8, 0xff], // JPEG
+]
+
+async function contenidoPermitido(archivo) {
+  const bytes = new Uint8Array(await archivo.slice(0, 4).arrayBuffer())
+  return FIRMAS_LICENCIA.some((firma) => firma.every((b, i) => bytes[i] === b))
 }
 
 // ---------- Autenticación simulada ----------
@@ -180,6 +193,18 @@ export const apiMock = {
   async obtenerMiBotica() {
     await esperar()
     return copia(boticaDto(boticaActual()))
+  },
+
+  async subirLicencia(archivo) {
+    await esperar()
+    const botica = boticaActual()
+    const error = validarArchivoLicencia(archivo)
+    if (error) throw crearError(400, error)
+    if (!(await contenidoPermitido(archivo))) {
+      throw crearError(400, 'El contenido del archivo no corresponde a un PDF, JPG o PNG.')
+    }
+    botica.tieneLicencia = true
+    return { tieneLicencia: true, mensaje: 'Licencia cargada correctamente' }
   },
 
   // ---------- 4. Catálogo ----------

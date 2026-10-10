@@ -4,8 +4,10 @@ import { ApiError } from './ApiError.js'
 import { obtenerToken } from './sesion.js'
 
 async function solicitar(metodo, ruta, cuerpo) {
+  // Con FormData el navegador arma el Content-Type multipart con su boundary
+  const esFormData = cuerpo instanceof FormData
   const headers = { Accept: 'application/json' }
-  if (cuerpo !== undefined) headers['Content-Type'] = 'application/json'
+  if (cuerpo !== undefined && !esFormData) headers['Content-Type'] = 'application/json'
   const token = obtenerToken()
   if (token) headers.Authorization = `Bearer ${token}`
 
@@ -14,7 +16,7 @@ async function solicitar(metodo, ruta, cuerpo) {
     respuesta = await fetch(`${API_URL}${ruta}`, {
       method: metodo,
       headers,
-      body: cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined,
+      body: cuerpo === undefined || esFormData ? cuerpo : JSON.stringify(cuerpo),
     })
   } catch {
     throw new ApiError({
@@ -50,6 +52,11 @@ export const apiReal = {
   validarRuc: (ruc) => solicitar('GET', `/boticas/validar-ruc/${encodeURIComponent(ruc)}`),
   registrarBotica: (datos) => solicitar('POST', '/boticas', datos),
   obtenerMiBotica: () => solicitar('GET', '/boticas/mia'),
+  subirLicencia: (archivo) => {
+    const formulario = new FormData()
+    formulario.append('archivo', archivo)
+    return solicitar('POST', '/boticas/mia/licencia', formulario)
+  },
 
   // 4. Catálogo
   listarMisProductos: (q = '') =>

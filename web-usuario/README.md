@@ -73,7 +73,7 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
 | `/login` | Inicio de sesión del dueño | H18 |
 | `/registro` | Crear cuenta de dueño (rol `DUENO_BOTICA`) | H1 |
 | `/panel/botica/registro` | Registro de botica con validación de RUC en vivo y confirmación con `GET /boticas/validar-ruc/{ruc}` | H1, H2 |
-| `/panel/estado` | Estado de la solicitud (pendiente, aprobada o rechazada con motivo) y botón para actualizar | H5 |
+| `/panel/estado` | Estado de la solicitud (pendiente, aprobada o rechazada con motivo), botón para actualizar y carga o reemplazo de la licencia de funcionamiento (PDF, JPG o PNG, máx. 5 MB) | H4, H5 |
 | `/panel/catalogo` | Catálogo: tabla, buscador, agregar, editar y eliminar con confirmación. Se bloquea si la botica no está aprobada | H8, H9, H10, H13, H14 |
 
 Navegación:

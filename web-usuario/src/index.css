@@ -595,6 +595,29 @@ a {
   font-weight: 600;
 }
 
+/* ---------- Licencia de funcionamiento (H4) ---------- */
+.seccion-licencia {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.seccion-licencia h2 {
+  margin: 0;
+}
+
+.licencia-cargada {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.campo input[type='file'] {
+  cursor: pointer;
+}
+
 /* ---------- Catálogo ---------- */
 .barra-catalogo {
   display: flex;
