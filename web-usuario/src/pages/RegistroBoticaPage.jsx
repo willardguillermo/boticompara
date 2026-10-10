@@ -64,6 +64,12 @@ export default function RegistroBoticaPage() {
     setErrores((er) => ({ ...er, [campo]: undefined }))
   }
 
+  // H3: completa dirección y distrito con lo que devuelve el mapa (solo los campos que vengan)
+  function usarDireccionDelMapa({ direccion, distrito }) {
+    setDatos((d) => ({ ...d, ...(direccion && { direccion }), ...(distrito && { distrito }) }))
+    setErrores((er) => ({ ...er, direccion: undefined, distrito: undefined }))
+  }
+
   async function enviar(e) {
     e.preventDefault()
     const nuevos = validar(datos)
@@ -189,7 +195,7 @@ export default function RegistroBoticaPage() {
           <span className="etiqueta-campo">
             Ubicación en el mapa <span className="opcional">(opcional)</span>
           </span>
-          <MapaUbicacion valor={ubicacion} onCambio={setUbicacion} />
+          <MapaUbicacion valor={ubicacion} onCambio={setUbicacion} onUsarDireccion={usarDireccionDelMapa} />
         </div>
 
         <div className="acciones-form">
