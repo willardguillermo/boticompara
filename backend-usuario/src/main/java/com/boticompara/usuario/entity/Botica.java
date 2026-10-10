@@ -50,4 +50,9 @@ public class Botica {
 
     @Column(name = "motivo_rechazo", columnDefinition = "text")
     private String motivoRechazo;
+
+
+    /** H4: ruta del archivo en Supabase Storage (bucket privado), no una URL pública */
+    @Column(name = "licencia_url", columnDefinition = "text")
+    private String licenciaUrl;
 }
