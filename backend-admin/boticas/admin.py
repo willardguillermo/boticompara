@@ -1,8 +1,10 @@
 from django.contrib import admin, messages
+from django.db import transaction
 from django.utils.html import format_html
 
 from .forms import BoticaRevisionForm
 from .models import Botica, Producto, Usuario
+from .notificaciones import notificar_revision
 from .storage import StorageError, url_firmada_licencia
 
 admin.site.site_header = 'BotiCompara - Administración'
@@ -123,9 +125,24 @@ class BoticaAdmin(admin.ModelAdmin):
 
     @admin.action(description='Aprobar boticas seleccionadas', permissions=['change'])
     def aprobar_boticas(self, request, queryset):
-        actualizadas = (queryset.exclude(estado=Botica.Estado.APROBADO)
+        # Solo las que realmente cambian de estado reciben el correo (H6)
+        por_aprobar = list(queryset.exclude(estado=Botica.Estado.APROBADO).select_related('usuario'))
+        actualizadas = (Botica.objects.filter(pk__in=[b.pk for b in por_aprobar])
+                        .exclude(estado=Botica.Estado.APROBADO)
                         .update(estado=Botica.Estado.APROBADO, motivo_rechazo=None))
         self.message_user(request, f'{actualizadas} botica(s) aprobada(s).', messages.SUCCESS)
+        for botica in por_aprobar:
+            botica.estado, botica.motivo_rechazo = Botica.Estado.APROBADO, None
+            transaction.on_commit(lambda b=botica: self._notificar(request, b))
+
+    def _notificar(self, request, botica):
+        if not notificar_revision(botica):
+            self.message_user(
+                request,
+                f'No se pudo enviar el correo a {botica.usuario.correo} ({botica.nombre_comercial}). '
+                'La revisión sí se guardó.',
+                messages.WARNING,
+            )
 
     def has_add_permission(self, request):
         return False
@@ -134,6 +151,11 @@ class BoticaAdmin(admin.ModelAdmin):
         return False
 
     def save_model(self, request, obj, form, change):
+        # Estado guardado en la BD justo antes de escribir, para avisar solo si cambia (H6)
+        anterior = Botica.objects.filter(pk=obj.pk).values_list('estado', flat=True).first()
         # Solo se escribe la revisión, para no pisar datos que el dueño
         # haya cambiado desde la web mientras el admin tenía el formulario abierto
         obj.save(update_fields=['estado', 'motivo_rechazo'])
+        if obj.estado != anterior and obj.estado in (Botica.Estado.APROBADO, Botica.Estado.RECHAZADO):
+            # Después del commit: si algo falla al guardar, no se avisa de un cambio que no ocurrió
+            transaction.on_commit(lambda: self._notificar(request, obj))

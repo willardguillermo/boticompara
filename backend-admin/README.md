@@ -11,7 +11,7 @@ Panel de administración de BotiCompara: revisión de boticas pendientes (aproba
 
 | Sección | Permite |
 |---|---|
-| **Boticas** | Listar con filtros por estado y distrito, con columna **Licencia** (✓/✗); buscar por nombre, RUC o correo del dueño; acción en lote **"Aprobar boticas seleccionadas"**; rechazar desde el formulario (estado `RECHAZADO` + motivo obligatorio). En la ficha, **"Evidencia para la aprobación"**: enlace **"Ver licencia"** (URL firmada de Supabase Storage que vence en 5 minutos) y ubicación con enlace y mapa de OpenStreetMap. Los datos de la botica y sus productos se ven en solo lectura. No se pueden crear ni borrar boticas. |
+| **Boticas** | Listar con filtros por estado y distrito, con columna **Licencia** (✓/✗); buscar por nombre, RUC o correo del dueño; acción en lote **"Aprobar boticas seleccionadas"**; rechazar desde el formulario (estado `RECHAZADO` + motivo obligatorio). En la ficha, **"Evidencia para la aprobación"**: enlace **"Ver licencia"** (URL firmada de Supabase Storage que vence en 5 minutos) y ubicación con enlace y mapa de OpenStreetMap. Los datos de la botica y sus productos se ven en solo lectura. No se pueden crear ni borrar boticas. Al aprobar o rechazar se envía un **correo al dueño** (solo si el estado cambió); si el envío falla, la revisión igual se guarda y se muestra un aviso. |
 | **Usuarios** | Solo lectura. Nunca se muestra `password_hash`. |
 | **Productos** | Solo lectura, con filtros por botica y estado. |
 
@@ -24,6 +24,7 @@ entran con el login propio de Django (`createsuperuser`), no con la tabla `usuar
 Requisito: el archivo `.env` en la **raíz del repo** (copia de [`.env.example`](../.env.example))
 con los datos de Supabase: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE`.
 Para ver las licencias: `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_BUCKET_LICENCIAS` (por defecto `licencias`).
+Para los correos al dueño: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD` (sandbox de Mailtrap, con TLS) y opcionalmente `MAIL_FROM`.
 Opcionales: `DJANGO_SECRET_KEY` (obligatoria fuera de desarrollo) y `DJANGO_DEBUG` (`True` por defecto).
 
 Desde la carpeta `backend-admin/`:

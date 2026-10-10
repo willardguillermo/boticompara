@@ -138,3 +138,15 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Correo (H6): aviso al dueño cuando su botica se aprueba o se rechaza.
+# En desarrollo se usa el sandbox de Mailtrap (MAIL_* en el .env de la raíz).
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.getenv('MAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('MAIL_PORT') or 587)
+EMAIL_HOST_USER = os.getenv('MAIL_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('MAIL_PASSWORD', '')
+EMAIL_USE_TLS = True
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.getenv('MAIL_FROM', 'BotiCompara <no-responder@boticompara.pe>')
