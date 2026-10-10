@@ -10,9 +10,10 @@ Estos archivos son los oficiales y **ya están aplicados en Supabase**.
 |---|---|
 | `schema.sql` | Tablas `usuario`, `botica` y `producto`, restricciones (RUC, estado, motivo de rechazo, precio y stock), índices, trigger de `actualizado_en`, vista `v_producto_busqueda` (`security_invoker`) y RLS. Se ejecuta **una sola vez** sobre una BD vacía: si se repite, falla al crear los triggers. |
 | `seed.sql` | Datos de prueba: 4 usuarios, 3 boticas y 14 productos. Se puede re-ejecutar (hace `truncate ... restart identity` al inicio). Contraseña de todos: `Boti2026!` (BCrypt `$2a$`, compatible con Spring Security). |
+| `v2_segunda_mitad.sql` | Cambios de la 2da mitad del Sprint 1: tabla `token_usuario` (H17, H20) con RLS y política para `boticompara_app`, y bucket privado `licencias` en Storage (H4). Se puede re-ejecutar. |
 | `rls_todas_las_tablas.sql` | Activa RLS en todas las tablas de `public`, incluidas las que crea Django. Se puede ejecutar varias veces. |
 
-Orden: `schema.sql` → `seed.sql` → (Django `python manage.py migrate`) → `rls_todas_las_tablas.sql`.
+Orden: `schema.sql` → `v2_segunda_mitad.sql` → `seed.sql` → (Django `python manage.py migrate`) → `rls_todas_las_tablas.sql`.
 
 ## Rol de conexión y RLS
 
