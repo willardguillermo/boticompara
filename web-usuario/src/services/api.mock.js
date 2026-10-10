@@ -15,9 +15,9 @@ const db = {
     { id: 4, nombre: 'Carlos Ramírez', correo: 'carlos@correo.com', password: PASSWORD_PRUEBA, telefono: '954321098', direccion: 'Av. Lima 123, Chosica', rol: 'COMPRADOR' },
   ],
   boticas: [
-    { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', estado: 'APROBADO', motivoRechazo: null },
-    { id: 2, usuarioId: 2, nombreComercial: 'FarmaVida', ruc: '20549871233', razonSocial: 'FarmaVida Perú E.I.R.L.', direccion: 'Jr. Trujillo 210', distrito: 'Lurigancho-Chosica', telefono: '014561234', estado: 'APROBADO', motivoRechazo: null },
-    { id: 3, usuarioId: 3, nombreComercial: 'Botica Nueva Era', ruc: '20712345676', razonSocial: 'Nueva Era Salud S.A.C.', direccion: 'Av. Nicolás Ayllón 980', distrito: 'Ate', telefono: '013459876', estado: 'PENDIENTE', motivoRechazo: null },
+    { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', latitud: -11.942500, longitud: -76.699000, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
+    { id: 2, usuarioId: 2, nombreComercial: 'FarmaVida', ruc: '20549871233', razonSocial: 'FarmaVida Perú E.I.R.L.', direccion: 'Jr. Trujillo 210', distrito: 'Lurigancho-Chosica', telefono: '014561234', latitud: -11.935100, longitud: -76.694300, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
+    { id: 3, usuarioId: 3, nombreComercial: 'Botica Nueva Era', ruc: '20712345676', razonSocial: 'Nueva Era Salud S.A.C.', direccion: 'Av. Nicolás Ayllón 980', distrito: 'Ate', telefono: '013459876', latitud: null, longitud: null, tieneLicencia: false, estado: 'PENDIENTE', motivoRechazo: null },
   ],
   productos: [
     [1, 'Panadol', 'Paracetamol', 'Tableta 500 mg x 10', 8.5, 40],
@@ -52,6 +52,17 @@ const perfil = ({ id, nombre, correo, telefono, direccion, rol }) => ({ id, nomb
 const boticaDto = ({ usuarioId, ...botica }) => botica
 const productoDto = ({ id, nombreComercial, principioActivo, presentacion, precio, stock }) =>
   ({ id, nombreComercial, principioActivo, presentacion, precio, stock })
+
+// H3: igual que el backend, ambas coordenadas o ninguna, dentro de rango
+function validarCoordenadas({ latitud, longitud }) {
+  const hayLat = latitud !== undefined && latitud !== null
+  const hayLng = longitud !== undefined && longitud !== null
+  if (hayLat !== hayLng) throw crearError(400, 'Envía latitud y longitud juntas.')
+  if (!hayLat) return
+  if (!(Math.abs(latitud) <= 90) || !(Math.abs(longitud) <= 180)) {
+    throw crearError(400, 'Las coordenadas están fuera de rango.')
+  }
+}
 
 // ---------- Autenticación simulada ----------
 function usuarioActual() {
@@ -149,6 +160,7 @@ export const apiMock = {
       throw crearError(400, 'Completa todos los datos obligatorios de la botica.')
     }
     if (!validarRuc(datos.ruc).valido) throw crearError(400, 'El RUC no es válido.')
+    validarCoordenadas(datos)
     if (db.boticas.some((b) => b.usuarioId === dueno.id)) throw crearError(409, 'Ya registraste una botica con esta cuenta.')
     if (db.boticas.some((b) => b.ruc === datos.ruc)) throw crearError(409, 'El RUC ya está registrado.')
 
@@ -157,6 +169,7 @@ export const apiMock = {
       nombreComercial: datos.nombreComercial.trim(), ruc: datos.ruc,
       razonSocial: datos.razonSocial.trim(), direccion: datos.direccion.trim(),
       distrito: datos.distrito.trim(), telefono: datos.telefono?.trim() || null,
+      latitud: datos.latitud ?? null, longitud: datos.longitud ?? null, tieneLicencia: false,
       estado: 'PENDIENTE', motivoRechazo: null,
     }
     db.boticas.push(botica)

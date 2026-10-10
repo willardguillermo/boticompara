@@ -1,10 +1,12 @@
 // H1 - Registro de la botica del dueño (queda PENDIENTE hasta que el admin la aprueba)
 // H2 - Validación del RUC: en vivo con el dígito verificador y confirmada con
 //      GET /boticas/validar-ruc/{ruc} antes de enviar
+// H3 - Ubicación de la botica marcada en un mapa (latitud y longitud opcionales)
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Campo from '../components/Campo.jsx'
+import MapaUbicacion from '../components/MapaUbicacion.jsx'
 import { useBotica } from '../context/BoticaContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../services/index.js'
@@ -51,6 +53,7 @@ export default function RegistroBoticaPage() {
   const navigate = useNavigate()
 
   const [datos, setDatos] = useState(VACIO)
+  const [ubicacion, setUbicacion] = useState(null)
   const [errores, setErrores] = useState({})
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState('')
@@ -84,6 +87,8 @@ export default function RegistroBoticaPage() {
         direccion: datos.direccion.trim(),
         distrito: datos.distrito.trim(),
         telefono: datos.telefono.trim() || null,
+        // H3: el backend exige ambas coordenadas o ninguna
+        ...(ubicacion && { latitud: ubicacion.latitud, longitud: ubicacion.longitud }),
       })
       await recargar()
       toast('Botica registrada. Quedó pendiente de aprobación.')
@@ -178,6 +183,13 @@ export default function RegistroBoticaPage() {
               placeholder="014567890"
             />
           </Campo>
+        </div>
+
+        <div className="campo">
+          <span className="etiqueta-campo">
+            Ubicación en el mapa <span className="opcional">(opcional)</span>
+          </span>
+          <MapaUbicacion valor={ubicacion} onCambio={setUbicacion} />
         </div>
 
         <div className="acciones-form">
