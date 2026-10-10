@@ -7,18 +7,28 @@
 -- ---------------------------------------------------------------------
 -- TOKEN_USUARIO (H17, H20): recuperación de contraseña y verificación
 -- de correo. Cada token sirve una sola vez y tiene fecha de vencimiento.
+-- RECUPERACION: código de 6 dígitos (fácil de escribir en el móvil), vence a
+--   los 15 min y se invalida tras 5 intentos fallidos (columna intentos).
+-- VERIFICACION: token largo que viaja en el enlace del correo (48 h).
 -- ---------------------------------------------------------------------
 create table if not exists public.token_usuario (
   id         bigserial primary key,
   usuario_id bigint       not null references public.usuario(id) on delete cascade,
-  token      varchar(255) not null unique,
+  token      varchar(255) not null,
   tipo       varchar(20)  not null check (tipo in ('VERIFICACION', 'RECUPERACION')),
   expira_en  timestamptz  not null,
   usado      boolean      not null default false,
+  intentos   smallint     not null default 0 check (intentos >= 0),
   creado_en  timestamptz  not null default now()
 );
 
+-- Por si la tabla se creó con la primera versión de este script
+alter table public.token_usuario
+  add column if not exists intentos smallint not null default 0 check (intentos >= 0);
+
 create index if not exists idx_token_usuario_usuario on public.token_usuario(usuario_id);
+-- El código de 6 dígitos no es único globalmente: se busca por usuario + tipo
+create index if not exists idx_token_usuario_busqueda on public.token_usuario(usuario_id, tipo, usado);
 
 -- Mismo esquema de seguridad que usuario, botica y producto
 alter table public.token_usuario enable row level security;
