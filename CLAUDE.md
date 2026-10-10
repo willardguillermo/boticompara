@@ -16,7 +16,7 @@ Todas las aplicaciones comparten **una sola base PostgreSQL en Supabase**.
 | `backend-admin/` | Panel para aprobar/rechazar boticas (`/admin`, puerto 8000) | Django 5.2, modelos `managed = False` | Guillermo |
 | `web-usuario/` | Panel del dueño de botica (puerto 5173) | React 19 + Vite + React Router | Guillermo |
 | `backend-usuario/` | API REST `/api` (puerto 8080), JWT, `ddl-auto=validate` | Spring Boot (Maven) | Alexander |
-| `movil/` | App del comprador | Kotlin + Jetpack Compose | Mijael |
+| `movil/` y `app-movil/` | App del comprador (`app-movil/` llegará con el PR de Mijael, con el código Kotlin) | Kotlin + Jetpack Compose | Mijael |
 | `docs/` | Contrato de la API (`API.md`) y colección Postman | Markdown | Guillermo |
 
 - La web y el móvil **solo** hablan con Spring Boot. El administrador no usa la API, usa Django.
@@ -29,7 +29,7 @@ Todas las aplicaciones comparten **una sola base PostgreSQL en Supabase**.
 ## Reglas
 
 - **Yo soy Guillermo: trabajo SOLO en `database/`, `backend-admin/` y `web-usuario/`.**
-  No modificar `backend-usuario/` (Alexander) ni `movil/` (Mijael).
+  No modificar `backend-usuario/` (Alexander) ni `movil/` ni `app-movil/` (Mijael).
 - Ninguna tabla se crea o modifica fuera de `database/schema.sql`.
 - El contrato de la API es `docs/API.md`; la web debe seguirlo **exactamente** (rutas, campos en
   camelCase, códigos y formato de error). Si un endpoint cambia, primero se actualiza `API.md`.
