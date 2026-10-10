@@ -37,4 +37,8 @@ public class Producto {
     /** Baja lógica: false = eliminado */
     @Column(nullable = false)
     private boolean activo = true;
+
+    /** H12: umbral de alerta de stock bajo. Por defecto 5, igual que la base de datos. */
+    @Column(name = "stock_minimo", nullable = false)
+    private Integer stockMinimo = 5;
 }
