@@ -1,0 +1,2006 @@
+{
+  "info": {
+    "name": "BotiCompara API (backend-usuario)",
+    "description": "Pruebas del contrato docs/API.md. Importa este archivo en Postman, ejecuta primero los 3 logins de la carpeta 1 (guardan los tokens) y luego el resto. Los requests con ⚠ escriben datos en la base compartida.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api"
+    },
+    {
+      "key": "tokenCarlos",
+      "value": ""
+    },
+    {
+      "key": "tokenRosa",
+      "value": ""
+    },
+    {
+      "key": "tokenLucia",
+      "value": ""
+    },
+    {
+      "key": "tokenDesechable",
+      "value": ""
+    },
+    {
+      "key": "productoId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Autenticación (H1, H15, H18)",
+      "item": [
+        {
+          "name": "Login Carlos (COMPRADOR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"tokenCarlos\", j.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"carlos@correo.com\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login Rosa (DUENO, APROBADO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"tokenRosa\", j.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"rosa@boticasalud.pe\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login Lucía (DUENO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"tokenLucia\", j.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"lucia@boticanueva.pe\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login con clave incorrecta (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"carlos@correo.com\",\n  \"password\": \"mala\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Registro con correo repetido (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"X\",\n  \"correo\": \"carlos@correo.com\",\n  \"password\": \"Boti2026!\",\n  \"rol\": \"COMPRADOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Registro con contraseña corta (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"X\",\n  \"correo\": \"nuevo@correo.com\",\n  \"password\": \"123\",\n  \"rol\": \"COMPRADOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Registro con rol inválido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"X\",\n  \"correo\": \"nuevo@correo.com\",\n  \"password\": \"Boti2026!\",\n  \"rol\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "⚠ Registro exitoso (crea un usuario permanente)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Devuelve id y rol\", function () { const j = pm.response.json(); pm.expect(j.id).to.be.a(\"number\"); pm.expect(j.rol).to.eql(\"COMPRADOR\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Usuario Prueba\",\n  \"correo\": \"prueba+{{$timestamp}}@correo.com\",\n  \"password\": \"Boti2026!\",\n  \"rol\": \"COMPRADOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Crea una fila permanente en la base compartida. Úsalo solo cuando haga falta (por ejemplo, para obtener un usuario desechable para H19)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Perfil (H16)",
+      "item": [
+        {
+          "name": "Ver perfil de Carlos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Es Carlos\", function () { pm.expect(pm.response.json().correo).to.eql(\"carlos@correo.com\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Perfil sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "⚠ Editar perfil de Carlos (modifica datos compartidos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Carlos Ramírez\",\n  \"telefono\": \"954321098\",\n  \"direccion\": \"Av. Lima 123, Chosica\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Envía los valores originales de Carlos, así que no cambia nada visible. Si editas los valores, restáuralos después."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Botica (H1, H2, H5)",
+      "item": [
+        {
+          "name": "Validar RUC válido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"valido = true\", function () { pm.expect(pm.response.json().valido).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/validar-ruc/20601234565",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "validar-ruc",
+                "20601234565"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Validar RUC con dígito incorrecto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"valido = false\", function () { pm.expect(pm.response.json().valido).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/validar-ruc/20601234566",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "validar-ruc",
+                "20601234566"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ver mi botica (Rosa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Botica de Rosa aprobada\", function () { pm.expect(pm.response.json().estado).to.eql(\"APROBADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ver mi botica como COMPRADOR (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Registrar segunda botica (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Catálogo (H8, H9, H10, H13, H14)",
+      "item": [
+        {
+          "name": "Listar mi catálogo (Rosa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Es una lista\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar en mi catálogo (?q=panad)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=panad",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "panad"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear producto (Rosa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"productoId\", pm.response.json().id);",
+                  "pm.test(\"Devuelve id\", function () { pm.expect(pm.response.json().id).to.be.a(\"number\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba Postman\",\n  \"principioActivo\": \"Ibuprofeno\",\n  \"presentacion\": \"Tableta 400 mg x 10\",\n  \"precio\": 5.5,\n  \"stock\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Editar producto (Rosa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Precio actualizado\", function () { pm.expect(pm.response.json().precio).to.eql(6); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{productoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{productoId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba Postman\",\n  \"principioActivo\": \"Ibuprofeno\",\n  \"presentacion\": \"Tableta 400 mg x 10\",\n  \"precio\": 6.0,\n  \"stock\": 15\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Eliminar producto (baja lógica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{productoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{productoId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear producto como COMPRADOR (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba Postman\",\n  \"principioActivo\": \"Ibuprofeno\",\n  \"presentacion\": \"Tableta 400 mg x 10\",\n  \"precio\": 5.5,\n  \"stock\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear producto con precio 0 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba Postman\",\n  \"principioActivo\": \"Ibuprofeno\",\n  \"presentacion\": \"Tableta 400 mg x 10\",\n  \"precio\": 0,\n  \"stock\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Búsqueda del comprador (H22, H23, H24)",
+      "item": [
+        {
+          "name": "Paracetamol por principio activo (al menos 4 resultados, primero S/ 2.20)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Al menos 4 resultados\", function () { pm.expect(r.length).to.be.at.least(4); });",
+                  "pm.test(\"El primero cuesta 2.20\", function () { pm.expect(r[0].precio).to.eql(2.2); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&orden=precio_asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "orden",
+                  "value": "precio_asc"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Panadol por nombre",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=panadol&tipo=nombre",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "panadol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "nombre"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Paracetamol, precio descendente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Orden descendente\", function () { for (let i = 1; i < r.length; i++) { pm.expect(r[i-1].precio).to.be.at.least(r[i].precio); } });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&orden=precio_desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "orden",
+                  "value": "precio_desc"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Texto de 1 carácter (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=a",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "a"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Búsqueda sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Segunda mitad del sprint (se activan al implementarlos)",
+      "description": "Estos requests siguen el contrato de docs/API.md. Fallan con 404 o 405 hasta que cada endpoint exista. Los que usan {{tokenDesechable}} necesitan un usuario creado solo para pruebas: nunca uses una cuenta del seed.",
+      "item": [
+        {
+          "name": "H3 · Registrar botica con ubicación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\",\n  \"latitud\": -11.9425,\n  \"longitud\": -76.699\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Requiere un dueño sin botica (tokenDesechable)."
+          }
+        },
+        {
+          "name": "H3 · Coordenadas incompletas (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\",\n  \"latitud\": -11.9425\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H3 · Ver ubicación en mi botica",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Trae latitud y longitud\", function () { const j = pm.response.json(); pm.expect(j).to.have.property(\"latitud\"); pm.expect(j).to.have.property(\"longitud\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente."
+          }
+        },
+        {
+          "name": "H7 · Corregir botica que NO está rechazada (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\",\n  \"latitud\": -11.9425,\n  \"longitud\": -76.699\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Rosa está APROBADO, así que debe dar 403 y no modifica nada."
+          }
+        },
+        {
+          "name": "H7 · Corregir y reenviar botica rechazada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Vuelve a PENDIENTE\", function () { const j = pm.response.json(); pm.expect(j.estado).to.eql(\"PENDIENTE\"); pm.expect(j.motivoRechazo).to.eql(null); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\",\n  \"latitud\": -11.9425,\n  \"longitud\": -76.699\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Requiere que Guillermo haya rechazado la botica del usuario desechable desde Django."
+          }
+        },
+        {
+          "name": "H4 · Subir licencia (PDF, JPG o PNG)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"tieneLicencia = true\", function () { pm.expect(pm.response.json().tieneLicencia).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/licencia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "licencia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Selecciona un archivo en el campo 'archivo' antes de enviar."
+          }
+        },
+        {
+          "name": "H4 · Licencia con formato no permitido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/licencia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "licencia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Selecciona un archivo .txt o .exe."
+          }
+        },
+        {
+          "name": "H11 · Carga masiva de productos (CSV)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Reporte completo\", function () { pm.expect(j).to.have.keys(\"creados\",\"actualizados\",\"errores\"); pm.expect(j.errores).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/carga-masiva",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "carga-masiva"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Escribe filas reales en el catálogo de Rosa: usa un CSV con productos ZZ de prueba y bórralos después."
+          }
+        },
+        {
+          "name": "H11 · Carga masiva como COMPRADOR (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/carga-masiva",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "carga-masiva"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente."
+          }
+        },
+        {
+          "name": "H12 · Productos con stock bajo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Todos con stock <= stockMinimo\", function () { pm.response.json().forEach(p => pm.expect(p.stock).to.be.at.most(p.stockMinimo)); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?stockBajo=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "stockBajo",
+                  "value": "true"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente."
+          }
+        },
+        {
+          "name": "H17 · Recuperar contraseña (siempre 200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Mensaje neutro\", function () { pm.expect(pm.response.json()).to.have.property(\"mensaje\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/recuperar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "recuperar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"carlos@correo.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Envía un correo real si SMTP está configurado."
+          }
+        },
+        {
+          "name": "H17 · Recuperar con correo inexistente (también 200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/recuperar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "recuperar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"no-existe@correo.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Debe responder igual que con un correo existente."
+          }
+        },
+        {
+          "name": "H17 · Restablecer con token inválido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/restablecer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "restablecer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"token-falso\",\n  \"password\": \"NuevaClave2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente."
+          }
+        },
+        {
+          "name": "H20 · Verificar correo con token inválido (400, HTML)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde HTML\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/html\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verificar?token=token-falso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verificar"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "token-falso"
+                }
+              ]
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente."
+          }
+        },
+        {
+          "name": "⚠ H19 · Eliminar mi cuenta (usuario desechable)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. NUNCA con una cuenta del seed. Usa un usuario creado con 'Registro exitoso'."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -11,6 +11,9 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
@@ -41,6 +44,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ErrorResponse> parametro(Exception e) {
         return responder(HttpStatus.BAD_REQUEST, "Parámetros de la petición inválidos");
+    }
+
+    /** H4: archivo por encima del límite de spring.servlet.multipart.max-file-size */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> archivoGrande(MaxUploadSizeExceededException e) {
+        return responder(HttpStatus.BAD_REQUEST, "El archivo supera el máximo de 5 MB");
+    }
+
+    /** H4: falta el campo 'archivo' */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> faltaArchivo(MissingServletRequestPartException e) {
+        return responder(HttpStatus.BAD_REQUEST, "Falta el archivo: envíalo en el campo 'archivo'");
+    }
+
+    /** H4: la petición no es multipart/form-data */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> noMultipart(MultipartException e) {
+        return responder(HttpStatus.BAD_REQUEST, "La petición debe enviarse como multipart/form-data");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
