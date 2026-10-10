@@ -52,6 +52,7 @@ export const apiReal = {
   validarRuc: (ruc) => solicitar('GET', `/boticas/validar-ruc/${encodeURIComponent(ruc)}`),
   registrarBotica: (datos) => solicitar('POST', '/boticas', datos),
   obtenerMiBotica: () => solicitar('GET', '/boticas/mia'),
+  actualizarMiBotica: (datos) => solicitar('PUT', '/boticas/mia', datos),
   subirLicencia: (archivo) => {
     const formulario = new FormData()
     formulario.append('archivo', archivo)

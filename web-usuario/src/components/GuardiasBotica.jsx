@@ -15,6 +15,13 @@ export function ConBotica({ children }) {
   return children
 }
 
+/** H7: la corrección solo se permite con la botica RECHAZADA; si no, vuelve a "Mi botica". */
+export function SoloRechazada({ children }) {
+  const { botica } = useBotica()
+  if (botica?.estado !== 'RECHAZADO') return <Navigate to="/panel/estado" replace />
+  return children
+}
+
 /** El registro de botica solo se muestra si todavía no tiene una (un dueño = una botica). */
 export function SinBotica({ children }) {
   const { botica } = useBotica()

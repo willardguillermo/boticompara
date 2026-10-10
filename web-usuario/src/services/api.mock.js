@@ -77,6 +77,23 @@ async function contenidoPermitido(archivo) {
   return FIRMAS_LICENCIA.some((firma) => firma.every((b, i) => bytes[i] === b))
 }
 
+// Mismas reglas en POST /boticas y PUT /boticas/mia
+function validarDatosBotica(datos) {
+  const obligatorios = ['nombreComercial', 'ruc', 'razonSocial', 'direccion', 'distrito']
+  if (obligatorios.some((c) => !String(datos?.[c] ?? '').trim())) {
+    throw crearError(400, 'Completa todos los datos obligatorios de la botica.')
+  }
+  if (!validarRuc(datos.ruc).valido) throw crearError(400, 'El RUC no es válido.')
+  validarCoordenadas(datos)
+}
+
+const datosBotica = (datos) => ({
+  nombreComercial: datos.nombreComercial.trim(), ruc: datos.ruc,
+  razonSocial: datos.razonSocial.trim(), direccion: datos.direccion.trim(),
+  distrito: datos.distrito.trim(), telefono: datos.telefono?.trim() || null,
+  latitud: datos.latitud ?? null, longitud: datos.longitud ?? null,
+})
+
 // ---------- Autenticación simulada ----------
 function usuarioActual() {
   const [prefijo, id] = (obtenerToken() ?? '').split('.')
@@ -168,22 +185,13 @@ export const apiMock = {
   async registrarBotica(datos) {
     await esperar()
     const dueno = duenoActual()
-    const obligatorios = ['nombreComercial', 'ruc', 'razonSocial', 'direccion', 'distrito']
-    if (obligatorios.some((c) => !String(datos?.[c] ?? '').trim())) {
-      throw crearError(400, 'Completa todos los datos obligatorios de la botica.')
-    }
-    if (!validarRuc(datos.ruc).valido) throw crearError(400, 'El RUC no es válido.')
-    validarCoordenadas(datos)
+    validarDatosBotica(datos)
     if (db.boticas.some((b) => b.usuarioId === dueno.id)) throw crearError(409, 'Ya registraste una botica con esta cuenta.')
     if (db.boticas.some((b) => b.ruc === datos.ruc)) throw crearError(409, 'El RUC ya está registrado.')
 
     const botica = {
-      id: siguienteId(db.boticas), usuarioId: dueno.id,
-      nombreComercial: datos.nombreComercial.trim(), ruc: datos.ruc,
-      razonSocial: datos.razonSocial.trim(), direccion: datos.direccion.trim(),
-      distrito: datos.distrito.trim(), telefono: datos.telefono?.trim() || null,
-      latitud: datos.latitud ?? null, longitud: datos.longitud ?? null, tieneLicencia: false,
-      estado: 'PENDIENTE', motivoRechazo: null,
+      id: siguienteId(db.boticas), usuarioId: dueno.id, ...datosBotica(datos),
+      tieneLicencia: false, estado: 'PENDIENTE', motivoRechazo: null,
     }
     db.boticas.push(botica)
     const { id, nombreComercial, ruc, estado } = botica
@@ -193,6 +201,21 @@ export const apiMock = {
   async obtenerMiBotica() {
     await esperar()
     return copia(boticaDto(boticaActual()))
+  },
+
+  // H7: solo una botica RECHAZADA se corrige; vuelve a PENDIENTE y conserva la licencia
+  async actualizarMiBotica(datos) {
+    await esperar()
+    const botica = boticaActual()
+    if (botica.estado !== 'RECHAZADO') {
+      throw crearError(403, 'Solo puedes corregir tu botica cuando la solicitud fue rechazada.')
+    }
+    validarDatosBotica(datos)
+    if (db.boticas.some((b) => b.ruc === datos.ruc && b.id !== botica.id)) {
+      throw crearError(409, 'El RUC ya está registrado por otra botica.')
+    }
+    Object.assign(botica, datosBotica(datos), { estado: 'PENDIENTE', motivoRechazo: null })
+    return copia(boticaDto(botica))
   },
 
   async subirLicencia(archivo) {

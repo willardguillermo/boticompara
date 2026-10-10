@@ -66,6 +66,9 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
   boticomparaMock.pendiente(3)
   ```
 
+  Para probar la corrección (H7): rechaza Botica Nueva Era, entra con `lucia@boticanueva.pe`, pulsa
+  **"Actualizar estado"** y luego **"Corregir y reenviar"**.
+
 ## Pantallas e historias de usuario
 
 | Ruta | Pantalla | Historias |
@@ -74,6 +77,7 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
 | `/registro` | Crear cuenta de dueño (rol `DUENO_BOTICA`) | H1 |
 | `/panel/botica/registro` | Registro de botica con validación de RUC en vivo y confirmación con `GET /boticas/validar-ruc/{ruc}` | H1, H2 |
 | `/panel/estado` | Estado de la solicitud (pendiente, aprobada o rechazada con motivo), botón para actualizar y carga o reemplazo de la licencia de funcionamiento (PDF, JPG o PNG, máx. 5 MB) | H4, H5 |
+| `/panel/botica/corregir` | Solo con la botica **rechazada**: muestra el motivo, el formulario precargado (mismas validaciones, RUC en vivo y mapa) y, si falta, la carga de la licencia. Al reenviar vuelve a `PENDIENTE`. Con otro estado redirige a `/panel/estado` | H7 (y H4) |
 | `/panel/catalogo` | Catálogo: tabla, buscador, agregar, editar y eliminar con confirmación. Se bloquea si la botica no está aprobada | H8, H9, H10, H13, H14 |
 
 Navegación:

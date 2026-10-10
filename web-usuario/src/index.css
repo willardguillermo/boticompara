@@ -573,7 +573,14 @@ a {
 }
 
 .motivo {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
   margin: 1rem 0;
+}
+
+.motivo .alerta {
+  justify-self: stretch;
 }
 
 .datos-botica {
@@ -604,6 +611,14 @@ a {
 
 .seccion-licencia h2 {
   margin: 0;
+}
+
+.corregir-licencia {
+  margin-bottom: 1.5rem;
+}
+
+.corregir-licencia .seccion-licencia {
+  margin-top: 0;
 }
 
 .licencia-cargada {
