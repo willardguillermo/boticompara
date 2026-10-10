@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "botica")
 @Getter
@@ -35,10 +37,22 @@ public class Botica {
     @Column(length = 20)
     private String telefono;
 
+    /** H3: ubicación en el mapa (opcional) */
+    @Column(precision = 9, scale = 6)
+    private BigDecimal latitud;
+
+    @Column(precision = 9, scale = 6)
+    private BigDecimal longitud;
+
     /** PENDIENTE, APROBADO o RECHAZADO (lo cambia el admin desde Django) */
     @Column(nullable = false, length = 20)
     private String estado = "PENDIENTE";
 
     @Column(name = "motivo_rechazo", columnDefinition = "text")
     private String motivoRechazo;
+
+
+    /** H4: ruta del archivo en Supabase Storage (bucket privado), no una URL pública */
+    @Column(name = "licencia_url", columnDefinition = "text")
+    private String licenciaUrl;
 }
