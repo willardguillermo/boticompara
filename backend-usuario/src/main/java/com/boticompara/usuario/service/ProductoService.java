@@ -67,5 +67,9 @@ public class ProductoService {
         p.setPresentacion(r.presentacion().trim());
         p.setPrecio(r.precio());
         p.setStock(r.stock());
+        // H12: si no viene, al crear queda el valor por defecto (5) y al editar se conserva el actual
+        if (r.stockMinimo() != null) {
+            p.setStockMinimo(r.stockMinimo());
+        }
     }
 }
