@@ -14,7 +14,7 @@ export default function CorregirBoticaPage() {
   const toast = useToast()
   const navigate = useNavigate()
 
-  // Se decide al entrar: si sube la licencia aquí, la sección sigue visible con "✓ Licencia cargada"
+  // Se decide al entrar: si sube la licencia aquí, la sección sigue visible con "Licencia cargada"
   const [pedirLicencia] = useState(!botica.tieneLicencia)
   // El formulario se precarga una sola vez; recargar la botica (p. ej. al subir la licencia) no lo borra
   const [inicial] = useState(() => ({

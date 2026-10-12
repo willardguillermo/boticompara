@@ -31,8 +31,8 @@ const TEXTOS = {
 }
 
 const AVISOS_CAMBIO = {
-  APROBADO: { tipo: 'exito', icono: 'check', texto: '¡Tu botica fue aprobada! Ya puedes publicar tu catálogo' },
-  RECHAZADO: { tipo: 'aviso', icono: 'alerta', texto: 'Tu solicitud fue observada: revisa el motivo y corrígela' },
+  APROBADO: { tipo: 'exito', icono: 'check', texto: '¡Tu botica fue aprobada! Ya puedes publicar tu catálogo.' },
+  RECHAZADO: { tipo: 'aviso', icono: 'alerta', texto: 'Tu solicitud fue observada: revisa el motivo y corrígela.' },
 }
 
 export default function EstadoPage() {

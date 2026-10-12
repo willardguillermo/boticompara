@@ -114,7 +114,11 @@ export default function CargaMasivaPage() {
       setResultado({ ...respuesta, errores: [...respuesta.errores].sort((a, b) => a.fila - b.fila) })
       setArchivo(null)
       setClaveInput((k) => k + 1)
-      toast(`Carga terminada: ${respuesta.creados} creados y ${respuesta.actualizados} actualizados.`)
+      const { creados, actualizados } = respuesta
+      toast(
+        `Carga terminada: ${creados} ${creados === 1 ? 'creado' : 'creados'} y ` +
+          `${actualizados} ${actualizados === 1 ? 'actualizado' : 'actualizados'}.`,
+      )
     } catch (err) {
       // Con 401 la sesión ya se cerró y se redirige al login
       if (err.status !== 401) setErrorApi(err.mensaje ?? 'No se pudo cargar el archivo.')

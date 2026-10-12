@@ -242,11 +242,14 @@ a {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
+  /* Un mensaje debajo de un campo no debe bajar el control del campo vecino */
+  align-items: start;
 }
 
 .campo {
   display: grid;
   gap: 0.35rem;
+  align-content: start;
 }
 
 .campo label {
@@ -313,6 +316,11 @@ a {
   margin: 0;
 }
 
+/* Centra el ícono con la primera línea del texto */
+.alerta > .icono {
+  margin-top: 0.17em;
+}
+
 .alerta-error {
   background: var(--error-fondo);
   color: var(--error);
@@ -339,7 +347,6 @@ a {
 
 /* H6: aviso de cambio de estado de la botica */
 .aviso-cambio {
-  align-items: center;
   margin-bottom: 1rem;
   padding: 1rem 1.15rem;
   font-size: 1.05rem;
@@ -351,6 +358,7 @@ a {
 }
 
 .aviso-cerrar {
+  margin: -0.4rem -0.4rem -0.4rem 0;
   display: inline-grid;
   place-items: center;
   width: 36px;
@@ -698,6 +706,25 @@ a {
 
 .buscador input {
   padding-left: 2.4rem;
+}
+
+/* Pantallas angostas: una acción por fila (Agregar, Cargar CSV, Solo stock bajo) */
+@media (max-width: 479px) {
+  .barra-catalogo > * {
+    flex-basis: 100%;
+  }
+
+  .barra-catalogo > .btn-primario {
+    order: 1;
+  }
+
+  .barra-catalogo > .btn-secundario {
+    order: 2;
+  }
+
+  .barra-catalogo > .casilla {
+    order: 3;
+  }
 }
 
 .tabla-contenedor {
