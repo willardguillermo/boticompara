@@ -52,6 +52,20 @@ Spring Boot usa `ddl-auto=validate` y Django usa modelos `managed = False` para 
 proyecto. Si necesitas un cambio en la BD, abre un Pull Request a `schema.sql` y avisa a Guillermo,
 que lo aplica en Supabase.
 
+## Privacidad (H21)
+
+BotiCompara **no pide datos de salud ni historial clínico**. Verificado en el Sprint 1:
+
+- **Web (`web-usuario/`):** el registro de cuenta pide solo nombre, correo, teléfono (opcional) y
+  contraseña; el registro de botica, solo datos comerciales (nombre, RUC, razón social, dirección,
+  distrito, teléfono, ubicación y licencia de funcionamiento). Debajo del registro se muestra
+  "BotiCompara no te pide datos de salud ni historial clínico."
+- **API ([`docs/API.md`](docs/API.md)):** `POST /auth/registro` recibe nombre, correo, contraseña,
+  teléfono y rol, y deja escrito que nunca se piden datos de salud.
+- **Base de datos:** la tabla `usuario` de [`database/schema.sql`](database/schema.sql) no tiene
+  columnas de salud.
+- **Móvil:** se verificará cuando el código de `app-movil/` se integre a `main`.
+
 ## Usuarios de prueba
 
 Contraseña de todos: `Boti2026!`. El detalle está en [`docs/API.md`](docs/API.md#usuarios-de-prueba-seedsql).
