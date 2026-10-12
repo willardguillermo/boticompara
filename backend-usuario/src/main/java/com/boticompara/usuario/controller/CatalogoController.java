@@ -21,7 +21,8 @@ public class CatalogoController {
 
     @GetMapping
     public List<ProductoResponse> listar(@AuthenticationPrincipal UsuarioAutenticado yo,
-                                         @RequestParam(required = false) String q) {
-        return catalogo.listar(yo.id(), q);
+                                         @RequestParam(required = false) String q,
+                                         @RequestParam(defaultValue = "false") boolean stockBajo) {
+        return catalogo.listar(yo.id(), q, stockBajo);
     }
 }

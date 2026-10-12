@@ -29,6 +29,10 @@ public record ProductoRequest(
 
         @NotNull(message = "El stock es obligatorio")
         @Min(value = 0, message = "El stock no puede ser negativo")
-        Integer stock
+        Integer stock,
+
+        /** H12: opcional. Si no viene, al crear queda en 5 y al editar se conserva el actual. */
+        @Min(value = 0, message = "El stock mínimo no puede ser negativo")
+        Integer stockMinimo
 ) {
 }
