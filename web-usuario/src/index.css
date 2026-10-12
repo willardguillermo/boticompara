@@ -154,6 +154,85 @@ a {
 }
 
 /* ---------- Formularios ---------- */
+.campo .etiqueta-campo {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+/* ---------- Mapa de ubicación (H3) ---------- */
+.selector-mapa {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.selector-mapa .ayuda {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-texto-suave);
+}
+
+.mapa-ubicacion {
+  height: 320px;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  overflow: hidden;
+  z-index: 0;
+}
+
+.mapa-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.mapa-pie .ok-campo {
+  color: var(--exito);
+}
+
+.mapa-pie .ayuda {
+  color: var(--color-texto-suave);
+}
+
+.mapa-acciones {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mapa-direccion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radio);
+  background: var(--color-primario-suave);
+  font-size: 0.88rem;
+}
+
+.mapa-direccion .ayuda {
+  color: var(--color-texto-suave);
+}
+
+.selector-mapa .error-campo {
+  font-size: 0.85rem;
+  color: var(--error);
+}
+
+.marcador-botica span {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  background: var(--color-primario);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
+  transform: rotate(-45deg);
+}
+
 .formulario {
   display: grid;
   gap: 1rem;
@@ -494,7 +573,14 @@ a {
 }
 
 .motivo {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
   margin: 1rem 0;
+}
+
+.motivo .alerta {
+  justify-self: stretch;
 }
 
 .datos-botica {
@@ -514,6 +600,37 @@ a {
 .datos-botica dd {
   margin: 0;
   font-weight: 600;
+}
+
+/* ---------- Licencia de funcionamiento (H4) ---------- */
+.seccion-licencia {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.seccion-licencia h2 {
+  margin: 0;
+}
+
+.corregir-licencia {
+  margin-bottom: 1.5rem;
+}
+
+.corregir-licencia .seccion-licencia {
+  margin-top: 0;
+}
+
+.licencia-cargada {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.campo input[type='file'] {
+  cursor: pointer;
 }
 
 /* ---------- Catálogo ---------- */
@@ -599,6 +716,32 @@ a {
   font-weight: 700;
 }
 
+.etiqueta-aviso {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--aviso-fondo);
+  color: var(--aviso);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.casilla {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.casilla input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primario);
+}
+
 .vacio {
   padding: 2.5rem 1rem;
   text-align: center;
@@ -635,6 +778,79 @@ a {
   max-width: 520px;
   margin-left: auto;
   margin-right: auto;
+}
+
+/* ---------- Carga masiva (H11) ---------- */
+.carga-masiva .tarjeta + .tarjeta {
+  margin-top: 1.25rem;
+}
+
+.carga-masiva h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.carga-masiva code {
+  font-size: 0.85em;
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: var(--color-fondo);
+}
+
+.resumen-carga {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.resumen-item {
+  display: grid;
+  gap: 0.2rem;
+  padding: 1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  color: var(--color-texto-suave);
+}
+
+.resumen-numero {
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-texto);
+  font-variant-numeric: tabular-nums;
+}
+
+.resumen-exito {
+  background: var(--exito-fondo);
+  border-color: transparent;
+}
+
+.resumen-exito .resumen-numero {
+  color: var(--exito);
+}
+
+.resumen-info {
+  background: var(--info-fondo);
+  border-color: transparent;
+}
+
+.resumen-info .resumen-numero {
+  color: var(--info);
+}
+
+.resumen-error {
+  background: var(--error-fondo);
+  border-color: transparent;
+}
+
+.resumen-error .resumen-numero {
+  color: var(--error);
+}
+
+.tabla-errores {
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
 }
 
 /* ---------- Modal ---------- */

@@ -2,10 +2,12 @@
 // con los usuarios, boticas y productos de prueba de database/seed.sql.
 // Los datos se reinician al recargar la página.
 import { validarRuc } from '../utils/ruc.js'
+import { MAX_BYTES_CSV, validarArchivoLicencia } from '../utils/validacion.js'
 import { crearError } from './ApiError.js'
 import { obtenerToken } from './sesion.js'
 
 const PASSWORD_PRUEBA = 'Boti2026!'
+const STOCK_MINIMO_DEFECTO = 5 // H12: igual que el default de la columna stock_minimo
 
 const db = {
   usuarios: [
@@ -15,9 +17,9 @@ const db = {
     { id: 4, nombre: 'Carlos Ramírez', correo: 'carlos@correo.com', password: PASSWORD_PRUEBA, telefono: '954321098', direccion: 'Av. Lima 123, Chosica', rol: 'COMPRADOR' },
   ],
   boticas: [
-    { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', estado: 'APROBADO', motivoRechazo: null },
-    { id: 2, usuarioId: 2, nombreComercial: 'FarmaVida', ruc: '20549871233', razonSocial: 'FarmaVida Perú E.I.R.L.', direccion: 'Jr. Trujillo 210', distrito: 'Lurigancho-Chosica', telefono: '014561234', estado: 'APROBADO', motivoRechazo: null },
-    { id: 3, usuarioId: 3, nombreComercial: 'Botica Nueva Era', ruc: '20712345676', razonSocial: 'Nueva Era Salud S.A.C.', direccion: 'Av. Nicolás Ayllón 980', distrito: 'Ate', telefono: '013459876', estado: 'PENDIENTE', motivoRechazo: null },
+    { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', latitud: -11.942500, longitud: -76.699000, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
+    { id: 2, usuarioId: 2, nombreComercial: 'FarmaVida', ruc: '20549871233', razonSocial: 'FarmaVida Perú E.I.R.L.', direccion: 'Jr. Trujillo 210', distrito: 'Lurigancho-Chosica', telefono: '014561234', latitud: -11.935100, longitud: -76.694300, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
+    { id: 3, usuarioId: 3, nombreComercial: 'Botica Nueva Era', ruc: '20712345676', razonSocial: 'Nueva Era Salud S.A.C.', direccion: 'Av. Nicolás Ayllón 980', distrito: 'Ate', telefono: '013459876', latitud: null, longitud: null, tieneLicencia: false, estado: 'PENDIENTE', motivoRechazo: null },
   ],
   productos: [
     [1, 'Panadol', 'Paracetamol', 'Tableta 500 mg x 10', 8.5, 40],
@@ -35,7 +37,8 @@ const db = {
     [2, 'Cozaar', 'Losartán', 'Tableta 50 mg x 30', 45.5, 12],
     [2, 'Ibuprofeno Genérico', 'Ibuprofeno', 'Tableta 400 mg x 10', 3.5, 0],
   ].map(([boticaId, nombreComercial, principioActivo, presentacion, precio, stock], i) => ({
-    id: i + 1, boticaId, nombreComercial, principioActivo, presentacion, precio, stock, activo: true,
+    id: i + 1, boticaId, nombreComercial, principioActivo, presentacion, precio, stock,
+    stockMinimo: STOCK_MINIMO_DEFECTO, activo: true,
   })),
 }
 
@@ -50,8 +53,48 @@ const usuarioCorto = ({ id, nombre, correo, rol }) => ({ id, nombre, correo, rol
 const perfil = ({ id, nombre, correo, telefono, direccion, rol }) => ({ id, nombre, correo, telefono, direccion, rol })
 // eslint-disable-next-line no-unused-vars
 const boticaDto = ({ usuarioId, ...botica }) => botica
-const productoDto = ({ id, nombreComercial, principioActivo, presentacion, precio, stock }) =>
-  ({ id, nombreComercial, principioActivo, presentacion, precio, stock })
+const productoDto = ({ id, nombreComercial, principioActivo, presentacion, precio, stock, stockMinimo }) =>
+  ({ id, nombreComercial, principioActivo, presentacion, precio, stock, stockMinimo })
+
+// H3: igual que el backend, ambas coordenadas o ninguna, dentro de rango
+function validarCoordenadas({ latitud, longitud }) {
+  const hayLat = latitud !== undefined && latitud !== null
+  const hayLng = longitud !== undefined && longitud !== null
+  if (hayLat !== hayLng) throw crearError(400, 'Envía latitud y longitud juntas.')
+  if (!hayLat) return
+  if (!(Math.abs(latitud) <= 90) || !(Math.abs(longitud) <= 180)) {
+    throw crearError(400, 'Las coordenadas están fuera de rango.')
+  }
+}
+
+// H4: igual que el backend, revisa el contenido (firma del archivo), no solo la extensión
+const FIRMAS_LICENCIA = [
+  [0x25, 0x50, 0x44, 0x46], // %PDF
+  [0x89, 0x50, 0x4e, 0x47], // PNG
+  [0xff, 0xd8, 0xff], // JPEG
+]
+
+async function contenidoPermitido(archivo) {
+  const bytes = new Uint8Array(await archivo.slice(0, 4).arrayBuffer())
+  return FIRMAS_LICENCIA.some((firma) => firma.every((b, i) => bytes[i] === b))
+}
+
+// Mismas reglas en POST /boticas y PUT /boticas/mia
+function validarDatosBotica(datos) {
+  const obligatorios = ['nombreComercial', 'ruc', 'razonSocial', 'direccion', 'distrito']
+  if (obligatorios.some((c) => !String(datos?.[c] ?? '').trim())) {
+    throw crearError(400, 'Completa todos los datos obligatorios de la botica.')
+  }
+  if (!validarRuc(datos.ruc).valido) throw crearError(400, 'El RUC no es válido.')
+  validarCoordenadas(datos)
+}
+
+const datosBotica = (datos) => ({
+  nombreComercial: datos.nombreComercial.trim(), ruc: datos.ruc,
+  razonSocial: datos.razonSocial.trim(), direccion: datos.direccion.trim(),
+  distrito: datos.distrito.trim(), telefono: datos.telefono?.trim() || null,
+  latitud: datos.latitud ?? null, longitud: datos.longitud ?? null,
+})
 
 // ---------- Autenticación simulada ----------
 function usuarioActual() {
@@ -80,22 +123,177 @@ function productoPropio(id) {
   return producto
 }
 
-function validarProducto(datos) {
-  const textos = ['nombreComercial', 'principioActivo', 'presentacion']
-  if (textos.some((c) => !String(datos?.[c] ?? '').trim())) {
-    throw crearError(400, 'Nombre comercial, principio activo y presentación son obligatorios.')
-  }
-  const precio = Number(datos.precio)
-  if (!Number.isFinite(precio) || precio <= 0) throw crearError(400, 'El precio debe ser mayor a 0.')
-  const stock = Number(datos.stock)
-  if (!Number.isInteger(stock) || stock < 0) throw crearError(400, 'El stock debe ser un número entero mayor o igual a 0.')
+// ---------- Validación de productos (mismos mensajes que el backend) ----------
+const ENTERO_MAXIMO = 2147483647
+const texto = (valor) => String(valor ?? '').trim()
+
+function validarTexto(valor, vacio, largo, max) {
+  if (!valor) return vacio
+  if (valor.length > max) return largo
+  return ''
+}
+
+function validarPrecio(valor) {
+  if (!valor) return 'El precio es obligatorio'
+  const partes = /^[+-]?(\d*)(?:\.(\d*))?$/.exec(valor)
+  if (!partes || !/\d/.test(valor)) return 'El precio debe ser un número (usa punto para los decimales)'
+  if (Number(valor) <= 0) return 'El precio debe ser mayor a 0'
+  if ((partes[2] ?? '').replace(/0+$/, '').length > 2) return 'El precio admite hasta 2 decimales'
+  if (partes[1].replace(/^0+/, '').length > 8) return 'El precio es demasiado alto'
+  return ''
+}
+
+function validarEntero(valor, nombre) {
+  if (!valor) return `${nombre} es obligatorio`
+  if (!/^[+-]?\d+$/.test(valor) || Math.abs(Number(valor)) > ENTERO_MAXIMO) return `${nombre} debe ser un número entero`
+  if (Number(valor) < 0) return `${nombre} no puede ser negativo`
+  return ''
+}
+
+/**
+ * Reglas de POST/PUT /productos, que también usa cada fila de la carga masiva (H11).
+ * Acepta números (JSON) o textos (celdas del CSV). Devuelve { error } o { producto }.
+ * stockMinimo es opcional: si no viene queda en undefined.
+ */
+function revisarProducto(datos) {
+  const nombreComercial = texto(datos?.nombreComercial)
+  const principioActivo = texto(datos?.principioActivo)
+  const presentacion = texto(datos?.presentacion)
+  const precio = texto(datos?.precio)
+  const stock = texto(datos?.stock)
+  const stockMinimo = texto(datos?.stockMinimo)
+  const error =
+    validarTexto(nombreComercial, 'El nombre comercial es obligatorio', 'El nombre comercial admite máximo 150 caracteres', 150) ||
+    validarTexto(principioActivo, 'El principio activo es obligatorio', 'El principio activo admite máximo 150 caracteres', 150) ||
+    validarTexto(presentacion, 'La presentación es obligatoria', 'La presentación admite máximo 100 caracteres', 100) ||
+    validarPrecio(precio) ||
+    validarEntero(stock, 'El stock') ||
+    (stockMinimo && validarEntero(stockMinimo, 'El stock mínimo'))
+  if (error) return { error }
   return {
-    nombreComercial: datos.nombreComercial.trim(),
-    principioActivo: datos.principioActivo.trim(),
-    presentacion: datos.presentacion.trim(),
-    precio: Math.round(precio * 100) / 100,
-    stock,
+    producto: {
+      nombreComercial, principioActivo, presentacion,
+      precio: Math.round(Number(precio) * 100) / 100,
+      stock: Number(stock),
+      stockMinimo: stockMinimo ? Number(stockMinimo) : undefined,
+    },
   }
+}
+
+function validarProducto(datos) {
+  const { error, producto } = revisarProducto(datos)
+  if (error) throw crearError(400, error)
+  return producto
+}
+
+// ---------- H11: lectura del CSV, igual que CsvProductoParser del backend ----------
+const MAX_FILAS_CSV = 1000
+const COLUMNAS_OBLIGATORIAS = ['nombrecomercial', 'principioactivo', 'presentacion', 'precio', 'stock']
+const claveProducto = (nombreComercial, presentacion) =>
+  `${nombreComercial.trim().toLowerCase()}|${presentacion.trim().toLowerCase()}`
+
+/** Lector mínimo: comas, comillas dobles, comillas escapadas ("") y saltos CRLF o LF. */
+function leerCsv(contenido) {
+  const registros = []
+  let campos = []
+  let campo = ''
+  let entreComillas = false
+  let linea = 1
+  let lineaInicio = 1
+  const textoCsv = `${contenido}\n`
+  for (let i = 0; i < textoCsv.length; i++) {
+    const c = textoCsv[i]
+    if (entreComillas) {
+      if (c === '"') {
+        if (textoCsv[i + 1] === '"') {
+          campo += '"'
+          i++
+        } else {
+          entreComillas = false
+        }
+      } else {
+        if (c === '\n') linea++
+        campo += c
+      }
+    } else if (c === '"' && campo === '') {
+      entreComillas = true
+    } else if (c === ',') {
+      campos.push(campo)
+      campo = ''
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && textoCsv[i + 1] === '\n') i++
+      campos.push(campo)
+      campo = ''
+      // Las líneas vacías (o solo con comas, como las que deja Excel) no cuentan como fila
+      if (campos.some((s) => s.trim())) registros.push({ linea: lineaInicio, campos })
+      campos = []
+      linea++
+      lineaInicio = linea
+    } else {
+      campo += c
+    }
+  }
+  if (entreComillas) throw crearError(400, 'El archivo tiene comillas sin cerrar')
+  return registros
+}
+
+/** Problemas del archivo completo lanzan 400; los de cada fila van en `errores`. */
+async function leerFilasProductos(archivo) {
+  if (!archivo) throw crearError(400, "Falta el archivo: envíalo en el campo 'archivo'")
+  if (archivo.size > MAX_BYTES_CSV) throw crearError(400, 'El archivo supera el máximo de 5 MB')
+  if (archivo.size === 0) throw crearError(400, 'El archivo está vacío')
+  let contenido
+  try {
+    // TextDecoder quita el BOM que agrega Excel al guardar como "CSV UTF-8"
+    contenido = new TextDecoder('utf-8', { fatal: true }).decode(await archivo.arrayBuffer())
+  } catch {
+    throw crearError(400, 'El archivo debe estar codificado en UTF-8. Guárdalo como "CSV UTF-8" desde Excel')
+  }
+  if (contenido.includes('\0')) throw crearError(400, 'El archivo no es un CSV válido')
+
+  const registros = leerCsv(contenido)
+  if (!registros.length) throw crearError(400, 'El archivo está vacío')
+  const [cabecera, ...filas] = registros
+  const indice = {}
+  cabecera.campos.forEach((nombre, i) => {
+    indice[nombre.trim().toLowerCase()] ??= i
+  })
+  if (!COLUMNAS_OBLIGATORIAS.every((c) => c in indice)) {
+    throw crearError(400, 'Encabezado inválido. Se esperan las columnas nombreComercial,principioActivo,presentacion,precio,stock[,stockMinimo] separadas por coma')
+  }
+  if (!filas.length) throw crearError(400, 'El archivo no tiene filas de productos')
+  if (filas.length > MAX_FILAS_CSV) throw crearError(400, `El archivo supera el máximo de ${MAX_FILAS_CSV} filas`)
+
+  const validas = []
+  const errores = []
+  const vistos = new Map()
+  for (const { linea, campos } of filas) {
+    if (campos.slice(cabecera.campos.length).some((s) => s.trim())) {
+      errores.push({ fila: linea, mensaje: 'La fila tiene más columnas que el encabezado' })
+      continue
+    }
+    const celda = (columna) => (indice[columna] === undefined ? '' : campos[indice[columna]] ?? '')
+    const { error, producto } = revisarProducto({
+      nombreComercial: celda('nombrecomercial'),
+      principioActivo: celda('principioactivo'),
+      presentacion: celda('presentacion'),
+      precio: celda('precio'),
+      stock: celda('stock'),
+      stockMinimo: celda('stockminimo'),
+    })
+    if (error) {
+      errores.push({ fila: linea, mensaje: error })
+      continue
+    }
+    const clave = claveProducto(producto.nombreComercial, producto.presentacion)
+    if (vistos.has(clave)) {
+      errores.push({ fila: linea, mensaje: `Producto duplicado en el archivo (ya aparece en la fila ${vistos.get(clave)})` })
+      continue
+    }
+    vistos.set(clave, linea)
+    validas.push(producto)
+  }
+  return { validas, errores }
 }
 
 export const apiMock = {
@@ -144,20 +342,13 @@ export const apiMock = {
   async registrarBotica(datos) {
     await esperar()
     const dueno = duenoActual()
-    const obligatorios = ['nombreComercial', 'ruc', 'razonSocial', 'direccion', 'distrito']
-    if (obligatorios.some((c) => !String(datos?.[c] ?? '').trim())) {
-      throw crearError(400, 'Completa todos los datos obligatorios de la botica.')
-    }
-    if (!validarRuc(datos.ruc).valido) throw crearError(400, 'El RUC no es válido.')
+    validarDatosBotica(datos)
     if (db.boticas.some((b) => b.usuarioId === dueno.id)) throw crearError(409, 'Ya registraste una botica con esta cuenta.')
     if (db.boticas.some((b) => b.ruc === datos.ruc)) throw crearError(409, 'El RUC ya está registrado.')
 
     const botica = {
-      id: siguienteId(db.boticas), usuarioId: dueno.id,
-      nombreComercial: datos.nombreComercial.trim(), ruc: datos.ruc,
-      razonSocial: datos.razonSocial.trim(), direccion: datos.direccion.trim(),
-      distrito: datos.distrito.trim(), telefono: datos.telefono?.trim() || null,
-      estado: 'PENDIENTE', motivoRechazo: null,
+      id: siguienteId(db.boticas), usuarioId: dueno.id, ...datosBotica(datos),
+      tieneLicencia: false, estado: 'PENDIENTE', motivoRechazo: null,
     }
     db.boticas.push(botica)
     const { id, nombreComercial, ruc, estado } = botica
@@ -169,14 +360,43 @@ export const apiMock = {
     return copia(boticaDto(boticaActual()))
   },
 
-  // ---------- 4. Catálogo ----------
-  async listarMisProductos(q = '') {
+  // H7: solo una botica RECHAZADA se corrige; vuelve a PENDIENTE y conserva la licencia
+  async actualizarMiBotica(datos) {
     await esperar()
     const botica = boticaActual()
-    const texto = normalizar(q.trim())
+    if (botica.estado !== 'RECHAZADO') {
+      throw crearError(403, 'Solo puedes corregir tu botica cuando la solicitud fue rechazada.')
+    }
+    validarDatosBotica(datos)
+    if (db.boticas.some((b) => b.ruc === datos.ruc && b.id !== botica.id)) {
+      throw crearError(409, 'El RUC ya está registrado por otra botica.')
+    }
+    Object.assign(botica, datosBotica(datos), { estado: 'PENDIENTE', motivoRechazo: null })
+    return copia(boticaDto(botica))
+  },
+
+  async subirLicencia(archivo) {
+    await esperar()
+    const botica = boticaActual()
+    const error = validarArchivoLicencia(archivo)
+    if (error) throw crearError(400, error)
+    if (!(await contenidoPermitido(archivo))) {
+      throw crearError(400, 'El contenido del archivo no corresponde a un PDF, JPG o PNG.')
+    }
+    botica.tieneLicencia = true
+    return { tieneLicencia: true, mensaje: 'Licencia cargada correctamente' }
+  },
+
+  // ---------- 4. Catálogo ----------
+  // H12: con stockBajo solo los que tienen stock <= stockMinimo; se combina con q
+  async listarMisProductos(q = '', { stockBajo = false } = {}) {
+    await esperar()
+    const botica = boticaActual()
+    const busqueda = normalizar(q.trim())
     return db.productos
       .filter((p) => p.boticaId === botica.id && p.activo)
-      .filter((p) => !texto || normalizar(p.nombreComercial).includes(texto) || normalizar(p.principioActivo).includes(texto))
+      .filter((p) => !busqueda || normalizar(p.nombreComercial).includes(busqueda) || normalizar(p.principioActivo).includes(busqueda))
+      .filter((p) => !stockBajo || p.stock <= p.stockMinimo)
       .sort((a, b) => a.nombreComercial.localeCompare(b.nombreComercial, 'es'))
       .map(productoDto)
   },
@@ -187,7 +407,8 @@ export const apiMock = {
     if (botica.estado !== 'APROBADO') {
       throw crearError(403, 'Tu botica debe estar aprobada para agregar productos.')
     }
-    const producto = { id: siguienteId(db.productos), boticaId: botica.id, ...validarProducto(datos), activo: true }
+    const { stockMinimo = STOCK_MINIMO_DEFECTO, ...campos } = validarProducto(datos)
+    const producto = { id: siguienteId(db.productos), boticaId: botica.id, ...campos, stockMinimo, activo: true }
     db.productos.push(producto)
     return productoDto(producto)
   },
@@ -195,7 +416,9 @@ export const apiMock = {
   async actualizarProducto(id, datos) {
     await esperar()
     const producto = productoPropio(id)
-    Object.assign(producto, validarProducto(datos))
+    // Sin stockMinimo se conserva el valor actual
+    const { stockMinimo = producto.stockMinimo, ...campos } = validarProducto(datos)
+    Object.assign(producto, campos, { stockMinimo })
     return productoDto(producto)
   },
 
@@ -203,6 +426,40 @@ export const apiMock = {
     await esperar()
     productoPropio(id).activo = false // baja lógica
     return null
+  },
+
+  // H11: crea los nuevos y actualiza precio y stock (y stockMinimo si viene) de los que ya existen
+  async cargarProductosCsv(archivo) {
+    await esperar()
+    const botica = db.boticas.find((b) => b.usuarioId === duenoActual().id)
+    if (!botica) throw crearError(403, 'Primero debes registrar tu botica')
+    if (botica.estado !== 'APROBADO') {
+      throw crearError(403, `Tu botica aún no está aprobada (estado: ${botica.estado})`)
+    }
+    const { validas, errores } = await leerFilasProductos(archivo)
+
+    const existentes = new Map()
+    for (const p of db.productos.filter((p) => p.boticaId === botica.id && p.activo)) {
+      const clave = claveProducto(p.nombreComercial, p.presentacion)
+      if (!existentes.has(clave)) existentes.set(clave, p)
+    }
+    let creados = 0
+    let actualizados = 0
+    for (const { stockMinimo, ...fila } of validas) {
+      const existente = existentes.get(claveProducto(fila.nombreComercial, fila.presentacion))
+      if (existente) {
+        Object.assign(existente, { precio: fila.precio, stock: fila.stock })
+        if (stockMinimo !== undefined) existente.stockMinimo = stockMinimo
+        actualizados++
+      } else {
+        db.productos.push({
+          id: siguienteId(db.productos), boticaId: botica.id, ...fila,
+          stockMinimo: stockMinimo ?? STOCK_MINIMO_DEFECTO, activo: true,
+        })
+        creados++
+      }
+    }
+    return { creados, actualizados, errores }
   },
 }
 

@@ -52,6 +52,7 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
 | Correo | Qué permite probar |
 |---|---|
 | `rosa@boticasalud.pe` | Botica **aprobada**: catálogo completo (agregar, editar, eliminar, buscar) |
+| `jorge@farmavida.pe` | Botica **aprobada** con un producto agotado: etiqueta y filtro de **stock bajo** (H12) |
 | `lucia@boticanueva.pe` | Botica **pendiente**: catálogo bloqueado |
 | `carlos@correo.com` | Comprador: muestra que debe usar la app móvil |
 
@@ -66,6 +67,9 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
   boticomparaMock.pendiente(3)
   ```
 
+  Para probar la corrección (H7): rechaza Botica Nueva Era, entra con `lucia@boticanueva.pe`, pulsa
+  **"Actualizar estado"** y luego **"Corregir y reenviar"**.
+
 ## Pantallas e historias de usuario
 
 | Ruta | Pantalla | Historias |
@@ -73,8 +77,10 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
 | `/login` | Inicio de sesión del dueño | H18 |
 | `/registro` | Crear cuenta de dueño (rol `DUENO_BOTICA`) | H1 |
 | `/panel/botica/registro` | Registro de botica con validación de RUC en vivo y confirmación con `GET /boticas/validar-ruc/{ruc}` | H1, H2 |
-| `/panel/estado` | Estado de la solicitud (pendiente, aprobada o rechazada con motivo) y botón para actualizar | H5 |
-| `/panel/catalogo` | Catálogo: tabla, buscador, agregar, editar y eliminar con confirmación. Se bloquea si la botica no está aprobada | H8, H9, H10, H13, H14 |
+| `/panel/estado` | Estado de la solicitud (pendiente, aprobada o rechazada con motivo), botón para actualizar y carga o reemplazo de la licencia de funcionamiento (PDF, JPG o PNG, máx. 5 MB) | H4, H5 |
+| `/panel/botica/corregir` | Solo con la botica **rechazada**: muestra el motivo, el formulario precargado (mismas validaciones, RUC en vivo y mapa) y, si falta, la carga de la licencia. Al reenviar vuelve a `PENDIENTE`. Con otro estado redirige a `/panel/estado` | H7 (y H4) |
+| `/panel/catalogo` | Catálogo: tabla, buscador, agregar, editar (con stock mínimo) y eliminar con confirmación. Etiqueta "Stock bajo" (stock ≤ stock mínimo) y filtro "Solo stock bajo" combinable con la búsqueda. Se bloquea si la botica no está aprobada | H8, H9, H10, H12, H13, H14 |
+| `/panel/catalogo/carga-masiva` | Carga masiva por CSV: descarga de plantilla, subida del archivo (solo `.csv`, máx. 5 MB) y reporte con creados, actualizados y errores por fila. Solo con la botica **aprobada**; si no, redirige a `/panel/estado` | H11 |
 
 Navegación:
 - Sin sesión no se entra a `/panel`.

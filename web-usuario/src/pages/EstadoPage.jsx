@@ -1,9 +1,12 @@
 // H5 - Estado de la solicitud de la botica: PENDIENTE, APROBADO o RECHAZADO
+// H4 - Carga de la licencia de funcionamiento (SeccionLicencia)
+// H7 - Si fue rechazada, enlace para corregir y reenviar
 import { useState } from 'react'
 import { Link } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import EstadoBadge from '../components/EstadoBadge.jsx'
 import Icono from '../components/Icono.jsx'
+import SeccionLicencia from '../components/SeccionLicencia.jsx'
 import { useBotica } from '../context/BoticaContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -21,7 +24,7 @@ const TEXTOS = {
   RECHAZADO: {
     cambio: 'rechazada',
     titulo: 'Tu solicitud fue rechazada',
-    texto: 'Revisa el motivo y comunícate con el administrador de BotiCompara para corregir tus datos.',
+    texto: 'Revisa el motivo, corrige tus datos y reenvía la solicitud para que la revisemos de nuevo.',
   },
 }
 
@@ -74,6 +77,9 @@ export default function EstadoPage() {
                 <strong>Motivo del rechazo:</strong> {botica.motivoRechazo || 'No se indicó un motivo.'}
               </p>
             </Alerta>
+            <Link to="/panel/botica/corregir" className="btn btn-primario">
+              <Icono nombre="editar" /> Corregir y reenviar
+            </Link>
           </div>
         )}
 
@@ -104,6 +110,8 @@ export default function EstadoPage() {
           </div>
         </dl>
       </section>
+
+      <SeccionLicencia tieneLicencia={botica.tieneLicencia} />
     </>
   )
 }

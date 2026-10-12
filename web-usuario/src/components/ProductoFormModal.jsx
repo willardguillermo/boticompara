@@ -1,5 +1,6 @@
 // H8 - Agregar producto (POST /productos)
 // H9 - Editar producto (PUT /productos/{id})
+// H12 - Stock mínimo para la alerta de stock bajo
 import { useState } from 'react'
 import { api } from '../services/index.js'
 import { propsError } from '../utils/validacion.js'
@@ -24,6 +25,12 @@ function validar(datos) {
   const stock = datos.stock.trim()
   if (!stock) errores.stock = 'El stock es obligatorio.'
   else if (!ENTERO_VALIDO.test(stock)) errores.stock = 'El stock debe ser un número entero igual o mayor a 0.'
+
+  // Opcional: vacío = el backend usa 5 al crear y conserva el valor actual al editar
+  const stockMinimo = datos.stockMinimo.trim()
+  if (stockMinimo && !ENTERO_VALIDO.test(stockMinimo)) {
+    errores.stockMinimo = 'El stock mínimo debe ser un número entero igual o mayor a 0.'
+  }
   return errores
 }
 
@@ -35,6 +42,7 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado }) {
     presentacion: producto?.presentacion ?? '',
     precio: producto?.precio != null ? Number(producto.precio).toFixed(2) : '',
     stock: producto?.stock != null ? String(producto.stock) : '',
+    stockMinimo: producto?.stockMinimo != null ? String(producto.stockMinimo) : '',
   })
   const [errores, setErrores] = useState({})
   const [error, setError] = useState('')
@@ -59,6 +67,7 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado }) {
       precio: Number(datos.precio),
       stock: Number(datos.stock),
     }
+    if (datos.stockMinimo.trim()) cuerpo.stockMinimo = Number(datos.stockMinimo)
     setGuardando(true)
     try {
       const guardado = editando
@@ -127,6 +136,24 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado }) {
             />
           </Campo>
         </div>
+        <Campo
+          id="stockMinimo"
+          etiqueta="Stock mínimo"
+          opcional
+          error={errores.stockMinimo}
+          ayuda="Te avisaremos cuando el stock llegue a este número."
+        >
+          <input
+            {...propsError('stockMinimo', errores.stockMinimo)}
+            type="number"
+            inputMode="numeric"
+            min="0"
+            step="1"
+            value={datos.stockMinimo}
+            onChange={cambiar('stockMinimo')}
+            placeholder="5"
+          />
+        </Campo>
 
         <div className="acciones-form">
           <button type="button" className="btn btn-secundario" onClick={onCerrar} disabled={guardando}>

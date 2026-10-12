@@ -1,11 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
-import { ConBotica, InicioPanel, SinBotica } from './components/GuardiasBotica.jsx'
+import { ConBotica, InicioPanel, SinBotica, SoloAprobada, SoloRechazada } from './components/GuardiasBotica.jsx'
 import PanelLayout from './components/PanelLayout.jsx'
 import RutaProtegida from './components/RutaProtegida.jsx'
 import RutaPublica from './components/RutaPublica.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
+import CargaMasivaPage from './pages/CargaMasivaPage.jsx'
 import CatalogoPage from './pages/CatalogoPage.jsx'
+import CorregirBoticaPage from './pages/CorregirBoticaPage.jsx'
 import EstadoPage from './pages/EstadoPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegistroBoticaPage from './pages/RegistroBoticaPage.jsx'
@@ -28,8 +30,16 @@ export default function App() {
                   path="botica/registro"
                   element={<SinBotica><RegistroBoticaPage /></SinBotica>}
                 />
+                <Route
+                  path="botica/corregir"
+                  element={<ConBotica><SoloRechazada><CorregirBoticaPage /></SoloRechazada></ConBotica>}
+                />
                 <Route path="estado" element={<ConBotica><EstadoPage /></ConBotica>} />
                 <Route path="catalogo" element={<ConBotica><CatalogoPage /></ConBotica>} />
+                <Route
+                  path="catalogo/carga-masiva"
+                  element={<ConBotica><SoloAprobada><CargaMasivaPage /></SoloAprobada></ConBotica>}
+                />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/panel" replace />} />

@@ -15,6 +15,8 @@ const TRAZOS = {
   alerta: <><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></>,
   reloj: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   equis: <path d="M18 6L6 18M6 6l12 12" />,
+  subir: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" /></>,
+  bajar: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></>,
 }
 
 export default function Icono({ nombre, className = '' }) {
