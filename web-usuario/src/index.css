@@ -337,6 +337,36 @@ a {
   border-color: #bfdbfe;
 }
 
+/* H6: aviso de cambio de estado de la botica */
+.aviso-cambio {
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 1rem 1.15rem;
+  font-size: 1.05rem;
+  box-shadow: var(--sombra);
+}
+
+.aviso-cambio p {
+  flex: 1;
+}
+
+.aviso-cerrar {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.aviso-cerrar:hover,
+.aviso-cerrar:focus-visible {
+  background: rgb(0 0 0 / 6%);
+}
+
 .toasts {
   position: fixed;
   right: 1rem;
