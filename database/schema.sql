@@ -139,3 +139,43 @@ where p.activo = true
 alter table usuario  enable row level security;
 alter table botica   enable row level security;
 alter table producto enable row level security;
+
+-- ---------------------------------------------------------------------
+-- TOKEN_USUARIO (H17, H20): recuperación de contraseña y verificación
+-- de correo. Cada token sirve una sola vez y tiene fecha de vencimiento.
+-- RECUPERACION: código de 6 dígitos (fácil de escribir en el móvil), vence a
+--   los 15 min y se invalida tras 5 intentos fallidos (columna intentos).
+-- VERIFICACION: token largo que viaja en el enlace del correo (48 h).
+-- En la BD que ya existe se agregó con v2_segunda_mitad.sql.
+-- ---------------------------------------------------------------------
+create table if not exists token_usuario (
+  id         bigserial primary key,
+  usuario_id bigint       not null references usuario(id) on delete cascade,
+  token      varchar(255) not null,
+  tipo       varchar(20)  not null check (tipo in ('VERIFICACION', 'RECUPERACION')),
+  expira_en  timestamptz  not null,
+  usado      boolean      not null default false,
+  intentos   smallint     not null default 0 check (intentos >= 0),
+  creado_en  timestamptz  not null default now()
+);
+
+create index if not exists idx_token_usuario_usuario  on token_usuario(usuario_id);
+-- El código de 6 dígitos no es único globalmente: se busca por usuario + tipo
+create index if not exists idx_token_usuario_busqueda on token_usuario(usuario_id, tipo, usado);
+
+alter table token_usuario enable row level security;
+revoke all on token_usuario from anon, authenticated;
+
+-- Acceso solo para el rol de las aplicaciones. Va dentro de un bloque porque en
+-- una BD nueva boticompara_app puede no existir todavía y el GRANT fallaría.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'boticompara_app') then
+    grant select, insert, update, delete on token_usuario to boticompara_app;
+    grant usage, select on sequence token_usuario_id_seq to boticompara_app;
+    drop policy if exists app_acceso_total on token_usuario;
+    create policy app_acceso_total on token_usuario
+      for all to boticompara_app using (true) with check (true);
+  end if;
+end
+$$;
