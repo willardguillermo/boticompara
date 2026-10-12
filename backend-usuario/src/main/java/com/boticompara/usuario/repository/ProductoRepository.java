@@ -2,6 +2,7 @@ package com.boticompara.usuario.repository;
 
 import com.boticompara.usuario.entity.Producto;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -22,4 +23,9 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
     List<Producto> buscarEnBotica(@Param("boticaId") Long boticaId, @Param("patron") String patron);
 
     Optional<Producto> findByIdAndBoticaIdAndActivoTrue(Long id, Long boticaId);
+
+    /** H19: baja lógica de todos los productos activos de una botica. */
+    @Modifying
+    @Query("update Producto p set p.activo = false where p.boticaId = :boticaId and p.activo = true")
+    int desactivarPorBotica(@Param("boticaId") Long boticaId);
 }
