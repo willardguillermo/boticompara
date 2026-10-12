@@ -11,6 +11,7 @@ const CENTRO_LIMA = [-12.0464, -77.0428]
 // El backend acepta hasta 6 decimales (~10 cm de precisión)
 const redondear = (n) => Math.round(n * 1e6) / 1e6
 const aUbicacion = ({ lat, lng }) => ({ latitud: redondear(lat), longitud: redondear(lng) })
+const claveDe = (valor) => (valor ? `${valor.latitud},${valor.longitud}` : null)
 
 const iconoBotica = L.divIcon({
   className: 'marcador-botica',
@@ -24,9 +25,20 @@ export default function MapaUbicacion({ valor, onCambio, onUsarDireccion }) {
   const mapa = useRef(null)
   const marcador = useRef(null)
   const onCambioRef = useRef(onCambio)
+  // Solo se usa al crear el mapa: después el marcador sigue a `valor`
+  const valorInicial = useRef(valor)
   const [buscando, setBuscando] = useState(false)
   const [errorGps, setErrorGps] = useState('')
-  const [direccion, setDireccion] = useState({ estado: 'vacio' })
+  // Última dirección obtenida, junto con las coordenadas que la originaron
+  const [consulta, setConsulta] = useState(null)
+
+  // Si la última respuesta no es del punto actual, todavía se está buscando
+  const clave = claveDe(valor)
+  const direccion = !valor
+    ? { estado: 'vacio' }
+    : consulta?.clave === clave
+      ? consulta
+      : { estado: 'cargando' }
 
   useEffect(() => {
     onCambioRef.current = onCambio
@@ -34,6 +46,7 @@ export default function MapaUbicacion({ valor, onCambio, onUsarDireccion }) {
 
   // Crea el mapa una sola vez
   useEffect(() => {
+    const valor = valorInicial.current
     const inicial = valor ? [valor.latitud, valor.longitud] : CENTRO_LIMA
     const m = L.map(contenedor.current, { center: inicial, zoom: valor ? 16 : 12 })
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -70,17 +83,20 @@ export default function MapaUbicacion({ valor, onCambio, onUsarDireccion }) {
 
   // Busca la dirección del punto marcado (espera 600 ms para no consultar en cada arrastre)
   useEffect(() => {
-    if (!valor) {
-      setDireccion({ estado: 'vacio' })
-      return
-    }
+    if (!valor) return undefined
+    const claveConsulta = claveDe(valor)
     const control = new AbortController()
-    setDireccion({ estado: 'cargando' })
     const espera = setTimeout(() => {
       direccionDesdeCoordenadas(valor, control.signal)
-        .then((resultado) => setDireccion(resultado ? { estado: 'ok', ...resultado } : { estado: 'sin-datos' }))
+        .then((resultado) =>
+          setConsulta(
+            resultado
+              ? { clave: claveConsulta, estado: 'ok', ...resultado }
+              : { clave: claveConsulta, estado: 'sin-datos' },
+          ),
+        )
         .catch((err) => {
-          if (err.name !== 'AbortError') setDireccion({ estado: 'error' })
+          if (err.name !== 'AbortError') setConsulta({ clave: claveConsulta, estado: 'error' })
         })
     }, 600)
     return () => {

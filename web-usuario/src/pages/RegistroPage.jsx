@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Campo from '../components/Campo.jsx'
+import Icono from '../components/Icono.jsx'
 import Marca from '../components/Marca.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
@@ -118,6 +119,11 @@ export default function RegistroPage() {
             {enviando ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
         </form>
+
+        {/* H21: el registro solo pide datos de contacto y de acceso */}
+        <p className="aviso-privacidad">
+          <Icono nombre="candado" /> BotiCompara no te pide datos de salud ni historial clínico.
+        </p>
 
         <p className="acceso-pie">
           ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>

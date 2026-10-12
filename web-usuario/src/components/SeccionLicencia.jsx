@@ -50,8 +50,8 @@ export default function SeccionLicencia({ tieneLicencia }) {
     setSubiendo(true)
     setErrorApi('')
     try {
-      const respuesta = await api.subirLicencia(archivo)
-      toast(respuesta?.mensaje ?? 'Licencia cargada correctamente')
+      await api.subirLicencia(archivo)
+      toast('Licencia cargada correctamente.')
       limpiar()
       setReemplazando(false)
       await recargar()
@@ -71,7 +71,7 @@ export default function SeccionLicencia({ tieneLicencia }) {
         <div className="licencia-cargada">
           <Alerta tipo="exito">
             <p>
-              <strong>✓ Licencia cargada</strong>
+              <strong>Licencia cargada</strong>
             </p>
           </Alerta>
           {!reemplazando && (
