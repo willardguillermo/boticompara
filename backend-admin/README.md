@@ -24,7 +24,7 @@ entran con el login propio de Django (`createsuperuser`), no con la tabla `usuar
 Requisito: el archivo `.env` en la **raíz del repo** (copia de [`.env.example`](../.env.example))
 con los datos de Supabase: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE`.
 Para ver las licencias: `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_BUCKET_LICENCIAS` (por defecto `licencias`).
-Para los correos al dueño: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD` (sandbox de Mailtrap, con TLS) y opcionalmente `MAIL_FROM`.
+Para los correos al dueño: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` (sandbox de Mailtrap, con TLS) y opcionalmente `MAIL_FROM`.
 Opcionales: `DJANGO_SECRET_KEY` (obligatoria fuera de desarrollo) y `DJANGO_DEBUG` (`True` por defecto).
 
 Desde la carpeta `backend-admin/`:
