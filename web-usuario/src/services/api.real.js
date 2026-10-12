@@ -60,8 +60,13 @@ export const apiReal = {
   },
 
   // 4. Catálogo
-  listarMisProductos: (q = '') =>
-    solicitar('GET', `/boticas/mia/productos${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`),
+  listarMisProductos: (q = '', { stockBajo = false } = {}) => {
+    const parametros = new URLSearchParams()
+    if (q.trim()) parametros.set('q', q.trim())
+    if (stockBajo) parametros.set('stockBajo', 'true')
+    const consulta = parametros.toString()
+    return solicitar('GET', `/boticas/mia/productos${consulta ? `?${consulta}` : ''}`)
+  },
   crearProducto: (datos) => solicitar('POST', '/productos', datos),
   actualizarProducto: (id, datos) => solicitar('PUT', `/productos/${id}`, datos),
   eliminarProducto: (id) => solicitar('DELETE', `/productos/${id}`),

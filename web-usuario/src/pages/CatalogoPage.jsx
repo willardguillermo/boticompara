@@ -3,6 +3,7 @@
 // H14 - Buscar en mi catálogo por nombre comercial o principio activo (?q=)
 // H8 / H9 - Agregar y editar productos (ver ProductoFormModal)
 // H10 - Eliminar producto con confirmación (ver ConfirmarEliminarModal)
+// H12 - Etiqueta "Stock bajo" y filtro "Solo stock bajo" (?stockBajo=true)
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
@@ -64,7 +65,18 @@ function TablaProductos({ productos, onEditar, onEliminar }) {
             <td data-etiqueta="Presentación">{p.presentacion}</td>
             <td data-etiqueta="Precio" className="numero">{formatoSoles(p.precio)}</td>
             <td data-etiqueta="Stock" className="numero">
-              {p.stock === 0 ? <span className="sin-stock">Agotado</span> : p.stock}
+              {p.stock === 0 ? (
+                <span className="sin-stock">Agotado</span>
+              ) : (
+                <>
+                  {p.stock <= p.stockMinimo && (
+                    <span className="etiqueta-aviso" title={`Stock mínimo: ${p.stockMinimo}`}>
+                      Stock bajo
+                    </span>
+                  )}{' '}
+                  {p.stock}
+                </>
+              )}
             </td>
             <td className="acciones">
               <button
@@ -97,6 +109,7 @@ export default function CatalogoPage() {
   const aprobada = botica.estado === 'APROBADO'
 
   const [busqueda, setBusqueda] = useState('')
+  const [soloStockBajo, setSoloStockBajo] = useState(false)
   const [productos, setProductos] = useState(null)
   const [error, setError] = useState('')
   const [recarga, setRecarga] = useState(0)
@@ -109,7 +122,7 @@ export default function CatalogoPage() {
     let activo = true
     const espera = setTimeout(() => {
       api
-        .listarMisProductos(busqueda)
+        .listarMisProductos(busqueda, { stockBajo: soloStockBajo })
         .then((lista) => {
           if (!activo) return
           setProductos(lista)
@@ -121,7 +134,7 @@ export default function CatalogoPage() {
       activo = false
       clearTimeout(espera)
     }
-  }, [aprobada, busqueda, recarga])
+  }, [aprobada, busqueda, soloStockBajo, recarga])
 
   if (!aprobada) return <CatalogoBloqueado estado={botica.estado} />
 
@@ -159,6 +172,14 @@ export default function CatalogoPage() {
             onChange={(e) => setBusqueda(e.target.value)}
           />
         </div>
+        <label className="casilla">
+          <input
+            type="checkbox"
+            checked={soloStockBajo}
+            onChange={(e) => setSoloStockBajo(e.target.checked)}
+          />
+          Solo stock bajo
+        </label>
         <button type="button" className="btn btn-primario" onClick={() => setEditando({})}>
           <Icono nombre="mas" /> Agregar producto
         </button>
@@ -171,9 +192,13 @@ export default function CatalogoPage() {
           <Cargando texto="Cargando catálogo..." />
         ) : productos.length === 0 ? (
           <p className="vacio">
-            {busqueda.trim()
-              ? `No hay productos que coincidan con "${busqueda.trim()}".`
-              : 'Todavía no tienes productos en tu catálogo.'}
+            {soloStockBajo
+              ? busqueda.trim()
+                ? `No hay productos con stock bajo que coincidan con "${busqueda.trim()}".`
+                : 'Ningún producto tiene stock bajo.'
+              : busqueda.trim()
+                ? `No hay productos que coincidan con "${busqueda.trim()}".`
+                : 'Todavía no tienes productos en tu catálogo.'}
           </p>
         ) : (
           <TablaProductos productos={productos} onEditar={setEditando} onEliminar={setEliminando} />

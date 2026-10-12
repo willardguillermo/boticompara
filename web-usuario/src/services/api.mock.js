@@ -7,6 +7,7 @@ import { crearError } from './ApiError.js'
 import { obtenerToken } from './sesion.js'
 
 const PASSWORD_PRUEBA = 'Boti2026!'
+const STOCK_MINIMO_DEFECTO = 5 // H12: igual que el default de la columna stock_minimo
 
 const db = {
   usuarios: [
@@ -36,7 +37,8 @@ const db = {
     [2, 'Cozaar', 'Losartán', 'Tableta 50 mg x 30', 45.5, 12],
     [2, 'Ibuprofeno Genérico', 'Ibuprofeno', 'Tableta 400 mg x 10', 3.5, 0],
   ].map(([boticaId, nombreComercial, principioActivo, presentacion, precio, stock], i) => ({
-    id: i + 1, boticaId, nombreComercial, principioActivo, presentacion, precio, stock, activo: true,
+    id: i + 1, boticaId, nombreComercial, principioActivo, presentacion, precio, stock,
+    stockMinimo: STOCK_MINIMO_DEFECTO, activo: true,
   })),
 }
 
@@ -51,8 +53,8 @@ const usuarioCorto = ({ id, nombre, correo, rol }) => ({ id, nombre, correo, rol
 const perfil = ({ id, nombre, correo, telefono, direccion, rol }) => ({ id, nombre, correo, telefono, direccion, rol })
 // eslint-disable-next-line no-unused-vars
 const boticaDto = ({ usuarioId, ...botica }) => botica
-const productoDto = ({ id, nombreComercial, principioActivo, presentacion, precio, stock }) =>
-  ({ id, nombreComercial, principioActivo, presentacion, precio, stock })
+const productoDto = ({ id, nombreComercial, principioActivo, presentacion, precio, stock, stockMinimo }) =>
+  ({ id, nombreComercial, principioActivo, presentacion, precio, stock, stockMinimo })
 
 // H3: igual que el backend, ambas coordenadas o ninguna, dentro de rango
 function validarCoordenadas({ latitud, longitud }) {
@@ -121,22 +123,67 @@ function productoPropio(id) {
   return producto
 }
 
-function validarProducto(datos) {
-  const textos = ['nombreComercial', 'principioActivo', 'presentacion']
-  if (textos.some((c) => !String(datos?.[c] ?? '').trim())) {
-    throw crearError(400, 'Nombre comercial, principio activo y presentación son obligatorios.')
-  }
-  const precio = Number(datos.precio)
-  if (!Number.isFinite(precio) || precio <= 0) throw crearError(400, 'El precio debe ser mayor a 0.')
-  const stock = Number(datos.stock)
-  if (!Number.isInteger(stock) || stock < 0) throw crearError(400, 'El stock debe ser un número entero mayor o igual a 0.')
+// ---------- Validación de productos (mismos mensajes que el backend) ----------
+const ENTERO_MAXIMO = 2147483647
+const texto = (valor) => String(valor ?? '').trim()
+
+function validarTexto(valor, vacio, largo, max) {
+  if (!valor) return vacio
+  if (valor.length > max) return largo
+  return ''
+}
+
+function validarPrecio(valor) {
+  if (!valor) return 'El precio es obligatorio'
+  const partes = /^[+-]?(\d*)(?:\.(\d*))?$/.exec(valor)
+  if (!partes || !/\d/.test(valor)) return 'El precio debe ser un número (usa punto para los decimales)'
+  if (Number(valor) <= 0) return 'El precio debe ser mayor a 0'
+  if ((partes[2] ?? '').replace(/0+$/, '').length > 2) return 'El precio admite hasta 2 decimales'
+  if (partes[1].replace(/^0+/, '').length > 8) return 'El precio es demasiado alto'
+  return ''
+}
+
+function validarEntero(valor, nombre) {
+  if (!valor) return `${nombre} es obligatorio`
+  if (!/^[+-]?\d+$/.test(valor) || Math.abs(Number(valor)) > ENTERO_MAXIMO) return `${nombre} debe ser un número entero`
+  if (Number(valor) < 0) return `${nombre} no puede ser negativo`
+  return ''
+}
+
+/**
+ * Reglas de POST/PUT /productos, que también usa cada fila de la carga masiva (H11).
+ * Acepta números (JSON) o textos (celdas del CSV). Devuelve { error } o { producto }.
+ * stockMinimo es opcional: si no viene queda en undefined.
+ */
+function revisarProducto(datos) {
+  const nombreComercial = texto(datos?.nombreComercial)
+  const principioActivo = texto(datos?.principioActivo)
+  const presentacion = texto(datos?.presentacion)
+  const precio = texto(datos?.precio)
+  const stock = texto(datos?.stock)
+  const stockMinimo = texto(datos?.stockMinimo)
+  const error =
+    validarTexto(nombreComercial, 'El nombre comercial es obligatorio', 'El nombre comercial admite máximo 150 caracteres', 150) ||
+    validarTexto(principioActivo, 'El principio activo es obligatorio', 'El principio activo admite máximo 150 caracteres', 150) ||
+    validarTexto(presentacion, 'La presentación es obligatoria', 'La presentación admite máximo 100 caracteres', 100) ||
+    validarPrecio(precio) ||
+    validarEntero(stock, 'El stock') ||
+    (stockMinimo && validarEntero(stockMinimo, 'El stock mínimo'))
+  if (error) return { error }
   return {
-    nombreComercial: datos.nombreComercial.trim(),
-    principioActivo: datos.principioActivo.trim(),
-    presentacion: datos.presentacion.trim(),
-    precio: Math.round(precio * 100) / 100,
-    stock,
+    producto: {
+      nombreComercial, principioActivo, presentacion,
+      precio: Math.round(Number(precio) * 100) / 100,
+      stock: Number(stock),
+      stockMinimo: stockMinimo ? Number(stockMinimo) : undefined,
+    },
   }
+}
+
+function validarProducto(datos) {
+  const { error, producto } = revisarProducto(datos)
+  if (error) throw crearError(400, error)
+  return producto
 }
 
 export const apiMock = {
@@ -231,13 +278,15 @@ export const apiMock = {
   },
 
   // ---------- 4. Catálogo ----------
-  async listarMisProductos(q = '') {
+  // H12: con stockBajo solo los que tienen stock <= stockMinimo; se combina con q
+  async listarMisProductos(q = '', { stockBajo = false } = {}) {
     await esperar()
     const botica = boticaActual()
-    const texto = normalizar(q.trim())
+    const busqueda = normalizar(q.trim())
     return db.productos
       .filter((p) => p.boticaId === botica.id && p.activo)
-      .filter((p) => !texto || normalizar(p.nombreComercial).includes(texto) || normalizar(p.principioActivo).includes(texto))
+      .filter((p) => !busqueda || normalizar(p.nombreComercial).includes(busqueda) || normalizar(p.principioActivo).includes(busqueda))
+      .filter((p) => !stockBajo || p.stock <= p.stockMinimo)
       .sort((a, b) => a.nombreComercial.localeCompare(b.nombreComercial, 'es'))
       .map(productoDto)
   },
@@ -248,7 +297,8 @@ export const apiMock = {
     if (botica.estado !== 'APROBADO') {
       throw crearError(403, 'Tu botica debe estar aprobada para agregar productos.')
     }
-    const producto = { id: siguienteId(db.productos), boticaId: botica.id, ...validarProducto(datos), activo: true }
+    const { stockMinimo = STOCK_MINIMO_DEFECTO, ...campos } = validarProducto(datos)
+    const producto = { id: siguienteId(db.productos), boticaId: botica.id, ...campos, stockMinimo, activo: true }
     db.productos.push(producto)
     return productoDto(producto)
   },
@@ -256,7 +306,9 @@ export const apiMock = {
   async actualizarProducto(id, datos) {
     await esperar()
     const producto = productoPropio(id)
-    Object.assign(producto, validarProducto(datos))
+    // Sin stockMinimo se conserva el valor actual
+    const { stockMinimo = producto.stockMinimo, ...campos } = validarProducto(datos)
+    Object.assign(producto, campos, { stockMinimo })
     return productoDto(producto)
   },
 
