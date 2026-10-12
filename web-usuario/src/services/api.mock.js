@@ -2,7 +2,7 @@
 // con los usuarios, boticas y productos de prueba de database/seed.sql.
 // Los datos se reinician al recargar la página.
 import { validarRuc } from '../utils/ruc.js'
-import { validarArchivoLicencia } from '../utils/validacion.js'
+import { MAX_BYTES_CSV, validarArchivoLicencia } from '../utils/validacion.js'
 import { crearError } from './ApiError.js'
 import { obtenerToken } from './sesion.js'
 
@@ -186,6 +186,116 @@ function validarProducto(datos) {
   return producto
 }
 
+// ---------- H11: lectura del CSV, igual que CsvProductoParser del backend ----------
+const MAX_FILAS_CSV = 1000
+const COLUMNAS_OBLIGATORIAS = ['nombrecomercial', 'principioactivo', 'presentacion', 'precio', 'stock']
+const claveProducto = (nombreComercial, presentacion) =>
+  `${nombreComercial.trim().toLowerCase()}|${presentacion.trim().toLowerCase()}`
+
+/** Lector mínimo: comas, comillas dobles, comillas escapadas ("") y saltos CRLF o LF. */
+function leerCsv(contenido) {
+  const registros = []
+  let campos = []
+  let campo = ''
+  let entreComillas = false
+  let linea = 1
+  let lineaInicio = 1
+  const textoCsv = `${contenido}\n`
+  for (let i = 0; i < textoCsv.length; i++) {
+    const c = textoCsv[i]
+    if (entreComillas) {
+      if (c === '"') {
+        if (textoCsv[i + 1] === '"') {
+          campo += '"'
+          i++
+        } else {
+          entreComillas = false
+        }
+      } else {
+        if (c === '\n') linea++
+        campo += c
+      }
+    } else if (c === '"' && campo === '') {
+      entreComillas = true
+    } else if (c === ',') {
+      campos.push(campo)
+      campo = ''
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && textoCsv[i + 1] === '\n') i++
+      campos.push(campo)
+      campo = ''
+      // Las líneas vacías (o solo con comas, como las que deja Excel) no cuentan como fila
+      if (campos.some((s) => s.trim())) registros.push({ linea: lineaInicio, campos })
+      campos = []
+      linea++
+      lineaInicio = linea
+    } else {
+      campo += c
+    }
+  }
+  if (entreComillas) throw crearError(400, 'El archivo tiene comillas sin cerrar')
+  return registros
+}
+
+/** Problemas del archivo completo lanzan 400; los de cada fila van en `errores`. */
+async function leerFilasProductos(archivo) {
+  if (!archivo) throw crearError(400, "Falta el archivo: envíalo en el campo 'archivo'")
+  if (archivo.size > MAX_BYTES_CSV) throw crearError(400, 'El archivo supera el máximo de 5 MB')
+  if (archivo.size === 0) throw crearError(400, 'El archivo está vacío')
+  let contenido
+  try {
+    // TextDecoder quita el BOM que agrega Excel al guardar como "CSV UTF-8"
+    contenido = new TextDecoder('utf-8', { fatal: true }).decode(await archivo.arrayBuffer())
+  } catch {
+    throw crearError(400, 'El archivo debe estar codificado en UTF-8. Guárdalo como "CSV UTF-8" desde Excel')
+  }
+  if (contenido.includes('\0')) throw crearError(400, 'El archivo no es un CSV válido')
+
+  const registros = leerCsv(contenido)
+  if (!registros.length) throw crearError(400, 'El archivo está vacío')
+  const [cabecera, ...filas] = registros
+  const indice = {}
+  cabecera.campos.forEach((nombre, i) => {
+    indice[nombre.trim().toLowerCase()] ??= i
+  })
+  if (!COLUMNAS_OBLIGATORIAS.every((c) => c in indice)) {
+    throw crearError(400, 'Encabezado inválido. Se esperan las columnas nombreComercial,principioActivo,presentacion,precio,stock[,stockMinimo] separadas por coma')
+  }
+  if (!filas.length) throw crearError(400, 'El archivo no tiene filas de productos')
+  if (filas.length > MAX_FILAS_CSV) throw crearError(400, `El archivo supera el máximo de ${MAX_FILAS_CSV} filas`)
+
+  const validas = []
+  const errores = []
+  const vistos = new Map()
+  for (const { linea, campos } of filas) {
+    if (campos.slice(cabecera.campos.length).some((s) => s.trim())) {
+      errores.push({ fila: linea, mensaje: 'La fila tiene más columnas que el encabezado' })
+      continue
+    }
+    const celda = (columna) => (indice[columna] === undefined ? '' : campos[indice[columna]] ?? '')
+    const { error, producto } = revisarProducto({
+      nombreComercial: celda('nombrecomercial'),
+      principioActivo: celda('principioactivo'),
+      presentacion: celda('presentacion'),
+      precio: celda('precio'),
+      stock: celda('stock'),
+      stockMinimo: celda('stockminimo'),
+    })
+    if (error) {
+      errores.push({ fila: linea, mensaje: error })
+      continue
+    }
+    const clave = claveProducto(producto.nombreComercial, producto.presentacion)
+    if (vistos.has(clave)) {
+      errores.push({ fila: linea, mensaje: `Producto duplicado en el archivo (ya aparece en la fila ${vistos.get(clave)})` })
+      continue
+    }
+    vistos.set(clave, linea)
+    validas.push(producto)
+  }
+  return { validas, errores }
+}
+
 export const apiMock = {
   // ---------- 1. Autenticación ----------
   async login({ correo, password }) {
@@ -316,6 +426,40 @@ export const apiMock = {
     await esperar()
     productoPropio(id).activo = false // baja lógica
     return null
+  },
+
+  // H11: crea los nuevos y actualiza precio y stock (y stockMinimo si viene) de los que ya existen
+  async cargarProductosCsv(archivo) {
+    await esperar()
+    const botica = db.boticas.find((b) => b.usuarioId === duenoActual().id)
+    if (!botica) throw crearError(403, 'Primero debes registrar tu botica')
+    if (botica.estado !== 'APROBADO') {
+      throw crearError(403, `Tu botica aún no está aprobada (estado: ${botica.estado})`)
+    }
+    const { validas, errores } = await leerFilasProductos(archivo)
+
+    const existentes = new Map()
+    for (const p of db.productos.filter((p) => p.boticaId === botica.id && p.activo)) {
+      const clave = claveProducto(p.nombreComercial, p.presentacion)
+      if (!existentes.has(clave)) existentes.set(clave, p)
+    }
+    let creados = 0
+    let actualizados = 0
+    for (const { stockMinimo, ...fila } of validas) {
+      const existente = existentes.get(claveProducto(fila.nombreComercial, fila.presentacion))
+      if (existente) {
+        Object.assign(existente, { precio: fila.precio, stock: fila.stock })
+        if (stockMinimo !== undefined) existente.stockMinimo = stockMinimo
+        actualizados++
+      } else {
+        db.productos.push({
+          id: siguienteId(db.productos), boticaId: botica.id, ...fila,
+          stockMinimo: stockMinimo ?? STOCK_MINIMO_DEFECTO, activo: true,
+        })
+        creados++
+      }
+    }
+    return { creados, actualizados, errores }
   },
 }
 

@@ -22,6 +22,13 @@ export function SoloRechazada({ children }) {
   return children
 }
 
+/** Pantallas del catálogo que exigen botica APROBADO (H11); si no, vuelve a "Mi botica". */
+export function SoloAprobada({ children }) {
+  const { botica } = useBotica()
+  if (botica?.estado !== 'APROBADO') return <Navigate to="/panel/estado" replace />
+  return children
+}
+
 /** El registro de botica solo se muestra si todavía no tiene una (un dueño = una botica). */
 export function SinBotica({ children }) {
   const { botica } = useBotica()

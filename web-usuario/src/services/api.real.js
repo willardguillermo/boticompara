@@ -70,4 +70,9 @@ export const apiReal = {
   crearProducto: (datos) => solicitar('POST', '/productos', datos),
   actualizarProducto: (id, datos) => solicitar('PUT', `/productos/${id}`, datos),
   eliminarProducto: (id) => solicitar('DELETE', `/productos/${id}`),
+  cargarProductosCsv: (archivo) => {
+    const formulario = new FormData()
+    formulario.append('archivo', archivo)
+    return solicitar('POST', '/productos/carga-masiva', formulario)
+  },
 }

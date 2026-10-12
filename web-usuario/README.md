@@ -80,6 +80,7 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
 | `/panel/estado` | Estado de la solicitud (pendiente, aprobada o rechazada con motivo), botón para actualizar y carga o reemplazo de la licencia de funcionamiento (PDF, JPG o PNG, máx. 5 MB) | H4, H5 |
 | `/panel/botica/corregir` | Solo con la botica **rechazada**: muestra el motivo, el formulario precargado (mismas validaciones, RUC en vivo y mapa) y, si falta, la carga de la licencia. Al reenviar vuelve a `PENDIENTE`. Con otro estado redirige a `/panel/estado` | H7 (y H4) |
 | `/panel/catalogo` | Catálogo: tabla, buscador, agregar, editar (con stock mínimo) y eliminar con confirmación. Etiqueta "Stock bajo" (stock ≤ stock mínimo) y filtro "Solo stock bajo" combinable con la búsqueda. Se bloquea si la botica no está aprobada | H8, H9, H10, H12, H13, H14 |
+| `/panel/catalogo/carga-masiva` | Carga masiva por CSV: descarga de plantilla, subida del archivo (solo `.csv`, máx. 5 MB) y reporte con creados, actualizados y errores por fila. Solo con la botica **aprobada**; si no, redirige a `/panel/estado` | H11 |
 
 Navegación:
 - Sin sesión no se entra a `/panel`.

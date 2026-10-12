@@ -780,6 +780,79 @@ a {
   margin-right: auto;
 }
 
+/* ---------- Carga masiva (H11) ---------- */
+.carga-masiva .tarjeta + .tarjeta {
+  margin-top: 1.25rem;
+}
+
+.carga-masiva h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.carga-masiva code {
+  font-size: 0.85em;
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  background: var(--color-fondo);
+}
+
+.resumen-carga {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.resumen-item {
+  display: grid;
+  gap: 0.2rem;
+  padding: 1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  color: var(--color-texto-suave);
+}
+
+.resumen-numero {
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-texto);
+  font-variant-numeric: tabular-nums;
+}
+
+.resumen-exito {
+  background: var(--exito-fondo);
+  border-color: transparent;
+}
+
+.resumen-exito .resumen-numero {
+  color: var(--exito);
+}
+
+.resumen-info {
+  background: var(--info-fondo);
+  border-color: transparent;
+}
+
+.resumen-info .resumen-numero {
+  color: var(--info);
+}
+
+.resumen-error {
+  background: var(--error-fondo);
+  border-color: transparent;
+}
+
+.resumen-error .resumen-numero {
+  color: var(--error);
+}
+
+.tabla-errores {
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+}
+
 /* ---------- Modal ---------- */
 .modal-fondo {
   position: fixed;
