@@ -236,7 +236,7 @@ Con `stockBajo=true` devuelve solo los productos con `stock <= stockMinimo` (H12
 { "nombreComercial": "Panadol", "principioActivo": "Paracetamol",
   "presentacion": "Tableta 500 mg x 10", "precio": 8.50, "stock": 40, "stockMinimo": 5 }
 ```
-Respuesta: 201 con el producto creado. Validaciones: `precio > 0`, `stock >= 0`, textos obligatorios. `stockMinimo` es opcional (por defecto 5) y debe ser `>= 0`.
+Respuesta: 201 con el producto creado. Validaciones: `precio > 0`, `stock >= 0`, textos obligatorios. `stockMinimo` es opcional y debe ser `>= 0`: al crear queda en 5 si no se envía, y al editar con `PUT` se conserva el valor actual.
 
 ### `PUT /productos/{id}` 🔒 — H9
 Mismo cuerpo que el POST. Respuesta: 200 con el producto actualizado. 404 si no es de su botica.

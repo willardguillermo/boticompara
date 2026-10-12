@@ -18,9 +18,12 @@ public class CatalogoService {
     private final BoticaService boticas;
     private final ProductoRepository productos;
 
-    /** H13, H14: catálogo activo propio, con filtro opcional por nombre o principio activo. */
+    /**
+     * H13, H14: catálogo activo propio, con filtro opcional por nombre o principio activo.
+     * H12: con stockBajo = true solo devuelve los productos con stock <= stockMinimo.
+     */
     @Transactional(readOnly = true)
-    public List<ProductoResponse> listar(Long usuarioId, String q) {
+    public List<ProductoResponse> listar(Long usuarioId, String q, boolean stockBajo) {
         Botica botica = boticas.obtenerMia(usuarioId);
         List<Producto> lista;
         if (q == null || q.isBlank()) {
@@ -29,6 +32,9 @@ public class CatalogoService {
             String patron = "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
             lista = productos.buscarEnBotica(botica.getId(), patron);
         }
-        return lista.stream().map(ProductoResponse::from).toList();
+        return lista.stream()
+                .filter(p -> !stockBajo || p.getStock() <= p.getStockMinimo())
+                .map(ProductoResponse::from)
+                .toList();
     }
 }
