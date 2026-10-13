@@ -1289,8 +1289,8 @@
       ]
     },
     {
-      "name": "6. Segunda mitad del sprint (se activan al implementarlos)",
-      "description": "Estos requests siguen el contrato de docs/API.md. Fallan con 404 o 405 hasta que cada endpoint exista. Los que usan {{tokenDesechable}} necesitan un usuario creado solo para pruebas: nunca uses una cuenta del seed.",
+      "name": "6. Segunda mitad del sprint (H3, H4, H7, H11, H12, H17, H19, H20)",
+      "description": "Endpoints de la segunda mitad del sprint, según docs/API.md. Los marcados 'No escribe nada' se pueden ejecutar sin riesgo. Los que usan {{tokenDesechable}} necesitan un usuario creado solo para pruebas (regístralo, inicia sesión y guarda su token en esa variable): nunca uses una cuenta del seed, porque H19 la elimina.",
       "item": [
         {
           "name": "H3 · Registrar botica con ubicación",
@@ -1334,14 +1334,14 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\",\n  \"latitud\": -11.9425,\n  \"longitud\": -76.699\n}",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20998877661\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\",\n  \"latitud\": -11.9425,\n  \"longitud\": -76.699\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Requiere un dueño sin botica (tokenDesechable)."
+            "description": "Deja filas permanentes. Requiere un dueño SIN botica: registra uno con 'Registro exitoso' (rol DUENO_BOTICA), inicia sesión y guarda su token en la variable tokenDesechable. Bórralos después; nunca uses una cuenta del seed."
           }
         },
         {
@@ -1380,7 +1380,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{tokenDesechable}}",
+                  "value": "{{tokenRosa}}",
                   "type": "string"
                 }
               ]
@@ -1393,7 +1393,8 @@
                   "language": "json"
                 }
               }
-            }
+            },
+            "description": "No escribe nada: la validación falla antes de guardar."
           }
         },
         {
@@ -1405,7 +1406,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
-                  "pm.test(\"Trae latitud y longitud\", function () { const j = pm.response.json(); pm.expect(j).to.have.property(\"latitud\"); pm.expect(j).to.have.property(\"longitud\"); });"
+                  "pm.test(\"Trae latitud, longitud y tieneLicencia\", function () { const j = pm.response.json(); pm.expect(j).to.have.property(\"latitud\"); pm.expect(j).to.have.property(\"longitud\"); pm.expect(j).to.have.property(\"tieneLicencia\"); });"
                 ]
               }
             }
@@ -1428,12 +1429,11 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{tokenDesechable}}",
+                  "value": "{{tokenRosa}}",
                   "type": "string"
                 }
               ]
-            },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente."
+            }
           }
         },
         {
@@ -1487,7 +1487,7 @@
                 }
               }
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Rosa está APROBADO, así que debe dar 403 y no modifica nada."
+            "description": "Rosa está APROBADO, así que responde 403 y no modifica nada."
           }
         },
         {
@@ -1541,7 +1541,7 @@
                 }
               }
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Requiere que Guillermo haya rechazado la botica del usuario desechable desde Django."
+            "description": "Requiere un dueño con botica RECHAZADA: pídele a Guillermo que rechace con motivo la de un usuario de prueba desde Django y guarda el token de ese usuario en tokenDesechable. No se puede probar con las cuentas del seed."
           }
         },
         {
@@ -1592,7 +1592,7 @@
                 }
               ]
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Selecciona un archivo en el campo 'archivo' antes de enviar."
+            "description": "Escribe en Supabase Storage y en la botica: solo con una cuenta desechable que tenga botica (tokenDesechable). Selecciona un PDF, JPG o PNG en el campo 'archivo' antes de enviar."
           }
         },
         {
@@ -1628,7 +1628,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{tokenDesechable}}",
+                  "value": "{{tokenRosa}}",
                   "type": "string"
                 }
               ]
@@ -1643,7 +1643,7 @@
                 }
               ]
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Selecciona un archivo .txt o .exe."
+            "description": "No escribe nada. Selecciona un archivo .txt o .exe en el campo 'archivo'."
           }
         },
         {
@@ -1694,7 +1694,7 @@
                 }
               ]
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Escribe filas reales en el catálogo de Rosa: usa un CSV con productos ZZ de prueba y bórralos después."
+            "description": "Escribe filas reales en el catálogo de Rosa: usa un CSV con productos ZZ de prueba y bórralos después. Columnas: nombreComercial,principioActivo,presentacion,precio,stock[,stockMinimo]."
           }
         },
         {
@@ -1744,7 +1744,7 @@
                 }
               ]
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente."
+            "description": "No escribe nada."
           }
         },
         {
@@ -1790,8 +1790,7 @@
                   "type": "string"
                 }
               ]
-            },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente."
+            }
           }
         },
         {
@@ -1835,7 +1834,7 @@
                 }
               }
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Envía un correo real si SMTP está configurado."
+            "description": "Envía un correo a la bandeja de Mailtrap y deja un código pendiente de Carlos (queda sin efecto al pedir otro o a los 15 minutos)."
           }
         },
         {
@@ -1878,11 +1877,11 @@
                 }
               }
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. Debe responder igual que con un correo existente."
+            "description": "Debe responder igual que con un correo existente y no envía ningún correo."
           }
         },
         {
-          "name": "H17 · Restablecer con token inválido (400)",
+          "name": "H17 · Restablecer con código inválido (400)",
           "event": [
             {
               "listen": "test",
@@ -1915,14 +1914,14 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"token-falso\",\n  \"password\": \"NuevaClave2026!\"\n}",
+              "raw": "{\n  \"correo\": \"nadie@correo.com\",\n  \"token\": \"000000\",\n  \"password\": \"NuevaClave2026!\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente."
+            "description": "El código es de 6 dígitos y la petición lleva el correo. Con un correo inexistente el mensaje es el mismo que con un código incorrecto."
           }
         },
         {
@@ -1957,8 +1956,195 @@
                   "value": "token-falso"
                 }
               ]
+            }
+          }
+        },
+        {
+          "name": "H3 · Latitud fuera de rango (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas"
+              ]
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente."
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"latitud\": 95,\n  \"longitud\": -76.7\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "No escribe nada: la validación falla antes de guardar."
+          }
+        },
+        {
+          "name": "H7 · Corregir botica como COMPRADOR (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H12 · stockMinimo negativo (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba\",\n  \"principioActivo\": \"Ibuprofeno\",\n  \"presentacion\": \"Tableta\",\n  \"precio\": 5.5,\n  \"stock\": 2,\n  \"stockMinimo\": -1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "No escribe nada: la validación falla antes de guardar."
+          }
+        },
+        {
+          "name": "H20 · Verificar correo sin token (400, HTML)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde HTML\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/html\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verificar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verificar"
+              ]
+            }
           }
         },
         {
@@ -1997,7 +2183,7 @@
                 }
               ]
             },
-            "description": "Pendiente: endpoint de la segunda mitad del sprint. Fallará hasta que se implemente. NUNCA con una cuenta del seed. Usa un usuario creado con 'Registro exitoso'."
+            "description": "DESTRUCTIVO: anonimiza la cuenta y da de baja los productos de su botica. NUNCA con una cuenta del seed: usa un usuario creado con 'Registro exitoso'."
           }
         }
       ]

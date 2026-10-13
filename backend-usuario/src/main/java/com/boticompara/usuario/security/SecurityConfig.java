@@ -1,5 +1,6 @@
 package com.boticompara.usuario.security;
 
+import com.boticompara.usuario.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +26,7 @@ public class SecurityConfig {
 
     private final JwtService jwtService;
     private final SecurityErrorHandler errorHandler;
+    private final UsuarioRepository usuarios;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -44,7 +46,7 @@ public class SecurityConfig {
                 .requestMatchers("/productos/buscar").authenticated()
                 .requestMatchers("/boticas/**", "/productos/**").hasRole("DUENO_BOTICA")
                 .anyRequest().authenticated())
-            .addFilterBefore(new JwtAuthFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(new JwtAuthFilter(jwtService, usuarios), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

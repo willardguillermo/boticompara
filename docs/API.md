@@ -88,19 +88,20 @@ Inicia la recuperación de contraseña. **Siempre responde 200**, exista o no el
 // 200 OK
 { "mensaje": "Si el correo está registrado, te enviamos las instrucciones para restablecer tu contraseña" }
 ```
-Si el correo existe, se envía un mensaje con el token y un enlace. El token vence a los 30 minutos y solo sirve una vez.
+Si el correo existe, se envía un mensaje con un código de 6 dígitos. El código vence a los 15 minutos, solo sirve una vez y se invalida tras 5 intentos fallidos. Si ya se pidió uno hace menos de un minuto, no se envía otro (la respuesta sigue siendo 200).
 Errores: 400 (falta el campo `correo`).
 
 ### `POST /auth/restablecer` — H17
 ```json
 // Request
-{ "token": "eyJhbGciOiJIUzI1NiJ9...", "password": "NuevaClave2026!" }
+{ "correo": "carlos@correo.com", "token": "483920", "password": "NuevaClave2026!" }
 ```
 ```json
 // 200 OK
 { "mensaje": "Contraseña actualizada" }
 ```
-Errores: 400 (token inválido, vencido o ya usado; o password de menos de 8 caracteres).
+El código de 6 dígitos no es único entre usuarios, por eso se envía junto con el `correo`. Cada intento con un código incorrecto se cuenta; al quinto, el código queda invalidado y hay que pedir uno nuevo con `POST /auth/recuperar`. Al restablecer, los demás códigos pendientes de ese usuario quedan invalidados.
+Errores: 400 (código inválido, vencido, ya usado o invalidado; o password de menos de 8 caracteres). El mensaje es el mismo en todos los casos de código inválido, para no revelar si el correo existe.
 
 ### `GET /auth/verificar?token=...` — H20
 Es el enlace que llega por correo al registrarse. No requiere sesión. **Responde una página HTML, no JSON**, para que se pueda abrir en cualquier navegador.
