@@ -31,22 +31,22 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
-                .cors(Customizer.withDefaults())
-                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(e -> e
-                        .authenticationEntryPoint(errorHandler)
-                        .accessDeniedHandler(errorHandler))
-                .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/boticas/validar-ruc/**").permitAll()
-                        .requestMatchers("/usuarios/me").authenticated()
-                        .requestMatchers("/productos/buscar").authenticated()
-                        .requestMatchers("/boticas/**", "/productos/**").hasRole("DUENO_BOTICA")
-                        .anyRequest().authenticated())
-                .addFilterBefore(new JwtAuthFilter(jwtService, usuarios), UsernamePasswordAuthenticationFilter.class);
+            .csrf(csrf -> csrf.disable())
+            .cors(Customizer.withDefaults())
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(e -> e
+                .authenticationEntryPoint(errorHandler)
+                .accessDeniedHandler(errorHandler))
+            .authorizeHttpRequests(a -> a
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/boticas/validar-ruc/**").permitAll()
+                .requestMatchers("/usuarios/me").authenticated()
+                .requestMatchers("/productos/buscar").authenticated()
+                .requestMatchers("/boticas/**", "/productos/**").hasRole("DUENO_BOTICA")
+                .anyRequest().authenticated())
+            .addFilterBefore(new JwtAuthFilter(jwtService, usuarios), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
