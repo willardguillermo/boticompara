@@ -1,8 +1,12 @@
 package com.boticompara.app
 
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -13,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -33,6 +38,21 @@ class MainActivity : ComponentActivity() {
         setContent {
             BotiComparaAppTheme {
                 var startDestination by remember { mutableStateOf<String?>(null) }
+
+                // Android 17 (API 37) bloquea la red local (10.0.2.2) sin este permiso.
+                // Si el usuario lo rechaza, la app abre igual.
+                val permisoRedLocal = "android.permission.ACCESS_LOCAL_NETWORK"
+                val pedirPermiso = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { }
+                LaunchedEffect(Unit) {
+                    if (Build.VERSION.SDK_INT >= 37 &&
+                        ContextCompat.checkSelfPermission(this@MainActivity, permisoRedLocal)
+                        != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        pedirPermiso.launch(permisoRedLocal)
+                    }
+                }
 
                 // Comprobar si ya existe token guardado (H18)
                 LaunchedEffect(Unit) {
