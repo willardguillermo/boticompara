@@ -1,0 +1,3 @@
+# mvnw es un script de shell y necesita saltos LF; mvnw.cmd es de Windows y necesita CRLF
+mvnw text eol=lf
+mvnw.cmd text eol=crlf
