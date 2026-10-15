@@ -311,6 +311,28 @@ Solo devuelve productos activos, con stock > 0, de boticas `APROBADO` (vista `v_
 ```
 Sin resultados → `200` con `[]` (la app muestra "No encontramos ese medicamento").
 
+### `GET /productos/{id}` — H28
+
+Público (no necesita token). Devuelve el detalle de un producto que el comprador puede ver: activo, con stock > 0 y de una botica `APROBADO` (vista `v_producto_busqueda`).
+```json
+// 200 OK
+{
+  "productoId": 9,
+  "nombreComercial": "Paracetamol Genérico",
+  "principioActivo": "Paracetamol",
+  "presentacion": "Tableta 500 mg x 10",
+  "precio": 2.20,
+  "stock": 90,
+  "boticaId": 2,
+  "boticaNombre": "FarmaVida",
+  "boticaDireccion": "Jr. Trujillo 210",
+  "boticaDistrito": "Lurigancho-Chosica",
+  "boticaTelefono": "014567890"
+}
+```
+`boticaTelefono` es `null` si la botica no lo registró.
+Errores: 400 (`id` no numérico), 404 (el producto no existe, está dado de baja, no tiene stock o su botica no está aprobada).
+
 ---
 
 ## Usuarios de prueba (seed.sql)
