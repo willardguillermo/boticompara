@@ -46,7 +46,7 @@ public final class CsvProductoParser {
 
     private static final class FilaInvalida extends RuntimeException {
         FilaInvalida(String mensaje) {
-            super(mensaje, null, false, false);
+            super(mensaje.endsWith(".") ? mensaje : mensaje + ".", null, false, false);
         }
     }
 
@@ -59,28 +59,28 @@ public final class CsvProductoParser {
      */
     public static Resultado parsear(byte[] datos) {
         if (datos == null || datos.length == 0) {
-            throw ApiException.badRequest("El archivo está vacío");
+            throw ApiException.badRequest("El archivo está vacío.");
         }
         String texto = decodificar(datos);
         if (texto.indexOf('\0') >= 0) {
-            throw ApiException.badRequest("El archivo no es un CSV válido");
+            throw ApiException.badRequest("El archivo no es un CSV válido.");
         }
         if (texto.startsWith("\uFEFF")) {
             texto = texto.substring(1); // BOM que agrega Excel al guardar como CSV UTF-8
         }
         List<Registro> registros = leer(texto + "\n");
         if (registros.isEmpty()) {
-            throw ApiException.badRequest("El archivo está vacío");
+            throw ApiException.badRequest("El archivo está vacío.");
         }
 
         Registro cabecera = registros.get(0);
         Map<String, Integer> indice = indiceDeColumnas(cabecera);
         List<Registro> filasDatos = registros.subList(1, registros.size());
         if (filasDatos.isEmpty()) {
-            throw ApiException.badRequest("El archivo no tiene filas de productos");
+            throw ApiException.badRequest("El archivo no tiene filas de productos.");
         }
         if (filasDatos.size() > MAX_FILAS) {
-            throw ApiException.badRequest("El archivo supera el máximo de " + MAX_FILAS + " filas");
+            throw ApiException.badRequest("El archivo supera el máximo de " + MAX_FILAS + " filas.");
         }
 
         List<FilaProducto> filas = new ArrayList<>();
@@ -92,7 +92,7 @@ public final class CsvProductoParser {
                 Integer previa = vistos.get(f.clave());
                 if (previa != null) {
                     errores.add(new ErrorFila(r.linea(),
-                            "Producto duplicado en el archivo (ya aparece en la fila " + previa + ")"));
+                            "Producto duplicado en el archivo (ya aparece en la fila " + previa + ")."));
                     continue;
                 }
                 vistos.put(f.clave(), r.linea());
@@ -113,7 +113,7 @@ public final class CsvProductoParser {
                     .toString();
         } catch (CharacterCodingException e) {
             throw ApiException.badRequest(
-                    "El archivo debe estar codificado en UTF-8. Guárdalo como \"CSV UTF-8\" desde Excel");
+                    "El archivo debe estar codificado en UTF-8. Guárdalo como \"CSV UTF-8\" desde Excel.");
         }
     }
 
@@ -124,7 +124,7 @@ public final class CsvProductoParser {
         }
         if (!OBLIGATORIAS.stream().allMatch(indice::containsKey)) {
             throw ApiException.badRequest(
-                    "Encabezado inválido. Se esperan las columnas " + COLUMNAS + " separadas por coma");
+                    "Encabezado inválido. Se esperan las columnas " + COLUMNAS + " separadas por coma.");
         }
         return indice;
     }
@@ -178,7 +178,7 @@ public final class CsvProductoParser {
             }
         }
         if (entreComillas) {
-            throw ApiException.badRequest("El archivo tiene comillas sin cerrar");
+            throw ApiException.badRequest("El archivo tiene comillas sin cerrar.");
         }
         return registros;
     }

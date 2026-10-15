@@ -29,7 +29,7 @@ public class CargaMasivaController {
         try {
             contenido = archivo.getBytes();
         } catch (IOException e) {
-            throw ApiException.badRequest("No se pudo leer el archivo");
+            throw ApiException.badRequest("No se pudo leer el archivo.");
         }
         return carga.cargar(yo.id(), contenido);
     }
