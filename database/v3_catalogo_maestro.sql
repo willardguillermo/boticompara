@@ -10,11 +10,18 @@ create extension if not exists pg_trgm with schema extensions;
 
 -- ---------------------------------------------------------------------
 -- CATEGORIA: agrupación del catálogo maestro (analgésicos, antibióticos...)
+-- Nombre único sin distinguir mayúsculas, igual que principio_activo.
 -- ---------------------------------------------------------------------
 create table if not exists public.categoria (
   id     bigserial primary key,
-  nombre varchar(100) not null unique
+  nombre varchar(100) not null
 );
+
+-- Si la tabla se creó con una versión anterior de este archivo (nombre unique)
+alter table public.categoria drop constraint if exists categoria_nombre_key;
+
+create unique index if not exists uq_categoria_nombre
+  on public.categoria(lower(nombre));
 
 -- ---------------------------------------------------------------------
 -- PRINCIPIO_ACTIVO: nombre único sin distinguir mayúsculas
@@ -49,6 +56,10 @@ create table if not exists public.medicamento (
 
 create index if not exists idx_medicamento_principio on public.medicamento(principio_activo_id);
 create index if not exists idx_medicamento_categoria on public.medicamento(categoria_id);
+
+-- Registro sanitario único cuando existe (puede ser null)
+create unique index if not exists uq_medicamento_registro
+  on public.medicamento(registro_sanitario) where registro_sanitario is not null;
 
 -- ---------------------------------------------------------------------
 -- GRUPO_EQUIVALENCIA y MEDICAMENTO_GRUPO
@@ -169,6 +180,7 @@ to boticompara_app;
 --   medicamento_id, principio_activo_id: null si el producto no está enlazado.
 --   registro_vigente: null si no está enlazado o el registro no tiene fecha.
 --   oculto: false si no está enlazado.
+--   botica_latitud, botica_longitud: null si la botica no registró ubicación.
 -- ---------------------------------------------------------------------
 create or replace view public.v_producto_busqueda
 with (security_invoker = true) as
@@ -187,7 +199,9 @@ select
   p.medicamento_id,
   m.principio_activo_id,
   (m.fecha_vencimiento_registro >= current_date) as registro_vigente,
-  coalesce(m.oculto, false)                      as oculto
+  coalesce(m.oculto, false)                      as oculto,
+  b.latitud                                      as botica_latitud,
+  b.longitud                                     as botica_longitud
 from public.producto p
 join public.botica b on b.id = p.botica_id
 left join public.medicamento m on m.id = p.medicamento_id

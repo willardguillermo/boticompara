@@ -84,11 +84,15 @@ for each row execute function public.set_actualizado_en();
 -- CATÁLOGO MAESTRO (H29-H32). En la BD que ya existe se agregó con
 -- v3_catalogo_maestro.sql.
 -- CATEGORIA: agrupación del catálogo maestro (analgésicos, antibióticos...)
+-- Nombre único sin distinguir mayúsculas, igual que principio_activo.
 -- ---------------------------------------------------------------------
 create table if not exists categoria (
   id     bigserial primary key,
-  nombre varchar(100) not null unique
+  nombre varchar(100) not null
 );
+
+create unique index if not exists uq_categoria_nombre
+  on categoria(lower(nombre));
 
 -- ---------------------------------------------------------------------
 -- PRINCIPIO_ACTIVO: nombre único sin distinguir mayúsculas
@@ -123,6 +127,10 @@ create table if not exists medicamento (
 
 create index if not exists idx_medicamento_principio on medicamento(principio_activo_id);
 create index if not exists idx_medicamento_categoria on medicamento(categoria_id);
+
+-- Registro sanitario único cuando existe (puede ser null)
+create unique index if not exists uq_medicamento_registro
+  on medicamento(registro_sanitario) where registro_sanitario is not null;
 
 -- ---------------------------------------------------------------------
 -- GRUPO_EQUIVALENCIA y MEDICAMENTO_GRUPO
@@ -233,6 +241,8 @@ create index if not exists idx_favorito_producto on favorito(producto_id);
 --   registro_vigente: null si no está enlazado o el registro no tiene fecha.
 --   oculto: false si no está enlazado. El filtro no lo aplica: lo decide
 --   quien consulta.
+--   botica_latitud, botica_longitud (H27): null si la botica no registró
+--   ubicación.
 -- ---------------------------------------------------------------------
 create or replace view v_producto_busqueda
 with (security_invoker = true) as
@@ -251,7 +261,9 @@ select
   p.medicamento_id,
   m.principio_activo_id,
   (m.fecha_vencimiento_registro >= current_date) as registro_vigente,
-  coalesce(m.oculto, false)                      as oculto
+  coalesce(m.oculto, false)                      as oculto,
+  b.latitud                                      as botica_latitud,
+  b.longitud                                     as botica_longitud
 from producto p
 join botica b on b.id = p.botica_id
 left join medicamento m on m.id = p.medicamento_id
