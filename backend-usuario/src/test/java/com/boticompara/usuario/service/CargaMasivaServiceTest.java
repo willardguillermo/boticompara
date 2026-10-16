@@ -142,7 +142,7 @@ class CargaMasivaServiceTest {
 
         assertEquals(1, r.creados());
         assertEquals(0, r.actualizados());
-        assertEquals(List.of(new ErrorFila(3, "El precio debe ser mayor a 0")), r.errores());
+        assertEquals(List.of(new ErrorFila(3, "El precio debe ser mayor a 0.")), r.errores());
         verify(productos).saveAll(guardados.capture());
         assertEquals(1, guardados.getValue().size());
     }

@@ -268,8 +268,8 @@ La columna `stockMinimo` es opcional.
   "creados": 12,
   "actualizados": 3,
   "errores": [
-    { "fila": 7, "mensaje": "El precio debe ser mayor a 0" },
-    { "fila": 9, "mensaje": "Producto duplicado en el archivo" }
+    { "fila": 7, "mensaje": "El precio debe ser mayor a 0." },
+    { "fila": 9, "mensaje": "Producto duplicado en el archivo (ya aparece en la fila 2)." }
   ]
 }
 ```

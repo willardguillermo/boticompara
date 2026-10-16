@@ -115,12 +115,12 @@ class CsvProductoParserTest {
         assertEquals(1, r.filas().size());
         assertEquals(8, r.filas().get(0).fila());
         assertEquals(List.of(
-                new ErrorFila(2, "El precio debe ser mayor a 0"),
-                new ErrorFila(3, "El precio debe ser un número (usa punto para los decimales)"),
-                new ErrorFila(4, "El precio admite hasta 2 decimales"),
-                new ErrorFila(5, "El stock no puede ser negativo"),
-                new ErrorFila(6, "El stock debe ser un número entero"),
-                new ErrorFila(7, "El nombre comercial es obligatorio")), r.errores());
+                new ErrorFila(2, "El precio debe ser mayor a 0."),
+                new ErrorFila(3, "El precio debe ser un número (usa punto para los decimales)."),
+                new ErrorFila(4, "El precio admite hasta 2 decimales."),
+                new ErrorFila(5, "El stock no puede ser negativo."),
+                new ErrorFila(6, "El stock debe ser un número entero."),
+                new ErrorFila(7, "El nombre comercial es obligatorio.")), r.errores());
     }
 
     @Test
@@ -144,7 +144,7 @@ class CsvProductoParserTest {
                 " panadol ,Otro,TABLETA 500 MG X 10,9.00,10,"));
 
         assertEquals(1, r.filas().size());
-        assertEquals(List.of(new ErrorFila(3, "Producto duplicado en el archivo (ya aparece en la fila 2)")),
+        assertEquals(List.of(new ErrorFila(3, "Producto duplicado en el archivo (ya aparece en la fila 2).")),
                 r.errores());
     }
 
@@ -167,7 +167,7 @@ class CsvProductoParserTest {
 
         assertEquals(1, r.filas().size());
         assertEquals(3, r.filas().get(0).fila());
-        assertEquals(List.of(new ErrorFila(2, "La fila tiene más columnas que el encabezado")), r.errores());
+        assertEquals(List.of(new ErrorFila(2, "La fila tiene más columnas que el encabezado.")), r.errores());
     }
 
     @Test
