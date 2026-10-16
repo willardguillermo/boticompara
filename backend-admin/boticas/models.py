@@ -91,6 +91,16 @@ class Producto(models.Model):
     stock = models.IntegerField()
     stock_minimo = models.IntegerField('stock mínimo', default=5)
     activo = models.BooleanField(default=True)
+    # Enlace opcional al catálogo maestro (H29). on_delete=PROTECT: la BD no deja
+    # borrar un medicamento al que apuntan productos
+    medicamento = models.ForeignKey(
+        'catalogo.Medicamento',
+        on_delete=models.PROTECT,
+        db_column='medicamento_id',
+        related_name='productos',
+        null=True,
+        blank=True,
+    )
     creado_en = models.DateTimeField()
     actualizado_en = models.DateTimeField()
 
