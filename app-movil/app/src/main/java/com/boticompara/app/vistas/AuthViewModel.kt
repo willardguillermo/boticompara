@@ -27,12 +27,13 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
+            var exito = false
             try {
                 val response = apiService.login(LoginRequest(correo.trim(), contrasena))
                 val body = response.body()
                 if (response.isSuccessful && body != null) {
                     tokenManager.saveSession(body.token, body.usuario.nombre, body.usuario.rol)
-                    onSuccess()
+                    exito = true
                 } else {
                     errorMessage = "Correo o contraseña incorrectos"
                 }
@@ -41,6 +42,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 isLoading = false
             }
+            // Fuera del try: un error al navegar ya no se muestra como error de conexion
+            if (exito) onSuccess()
         }
     }
 
@@ -55,16 +58,13 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
+            var registrado = false
             try {
                 val response = apiService.registro(
                     RegistroRequest(nombre.trim(), correo.trim(), contrasena, telefono, "COMPRADOR")
                 )
                 when {
-                    response.isSuccessful -> {
-                        isLoading = false
-                        login(correo, contrasena, onSuccess)
-                        return@launch
-                    }
+                    response.isSuccessful -> registrado = true
                     response.code() == 409 -> errorMessage = "Ese correo ya está registrado"
                     response.code() == 400 -> errorMessage = "Revisa los datos: la contraseña debe tener al menos 8 caracteres"
                     else -> errorMessage = "No se pudo completar el registro"
@@ -74,6 +74,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 isLoading = false
             }
+            // Fuera del try: el login automatico se lanza solo si el registro salio bien
+            if (registrado) login(correo, contrasena, onSuccess)
         }
     }
 
