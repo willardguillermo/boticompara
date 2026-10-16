@@ -37,10 +37,10 @@ class UsuarioAdmin(SoloLecturaAdmin):
 @admin.register(Producto)
 class ProductoAdmin(SoloLecturaAdmin):
     list_display = ('nombre_comercial', 'principio_activo', 'presentacion', 'precio',
-                    'stock', 'stock_minimo', 'botica', 'activo')
+                    'stock', 'stock_minimo', 'botica', 'medicamento', 'activo')
     list_filter = ('activo', 'botica__estado', 'botica')
     search_fields = ('nombre_comercial', 'principio_activo', 'botica__nombre_comercial')
-    list_select_related = ('botica',)
+    list_select_related = ('botica', 'medicamento')
 
 
 class ProductoInline(admin.TabularInline):

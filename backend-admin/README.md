@@ -55,3 +55,40 @@ Abrir `http://localhost:8000/admin/`.
 > [`database/rls_todas_las_tablas.sql`](../database/rls_todas_las_tablas.sql) en el SQL Editor de
 > Supabase. Django crea sus tablas sin RLS y quedarían expuestas por la API automática de Supabase.
 > Repetirlo si una versión nueva de Django o una app nueva agrega tablas.
+
+## Catálogo maestro (H29-H31)
+
+La app `catalogo` administra el catálogo maestro definido en
+[`database/v3_catalogo_maestro.sql`](../database/v3_catalogo_maestro.sql):
+
+| Sección | Permite |
+|---|---|
+| **Categorías** | Crear, editar y buscar categorías, con el número de medicamentos de cada una. El nombre no se puede repetir (sin distinguir mayúsculas). |
+| **Principios activos** | Igual que las categorías, con descripción opcional. |
+| **Medicamentos** | Crear y editar el catálogo maestro: nombre comercial, presentación, concentración, principio activo, categoría, registro sanitario (único si se indica) y vencimiento del registro. Filtros por categoría y por `oculto` (lo retira de la búsqueda sin borrarlo). No deja cambiar el principio activo de un medicamento que está en un grupo de equivalencia: primero hay que sacarlo del grupo. |
+
+En **Productos** se ve, en solo lectura, a qué medicamento del catálogo está enlazado cada uno.
+No se puede borrar una categoría, un principio activo o un medicamento que esté en uso.
+
+Al bajar esta versión, correr **una vez** (desde `backend-admin/`, con el entorno virtual activado):
+
+```bash
+python manage.py migrate
+```
+
+Solo registra la app `catalogo` y sus permisos: **no crea tablas**, porque los modelos usan
+`managed = False` y las tablas ya existen en Supabase.
+
+### Poblar los principios activos (H30)
+
+`poblar_principios_activos` crea en `principio_activo` los nombres que ya usan los productos
+**activos** de las boticas (normalizados con `initcap(trim(...))`), solo los que falten. Se puede
+repetir sin duplicar nada.
+
+```bash
+# 1. Ver qué se crearía, sin escribir en la base de datos
+python manage.py poblar_principios_activos --dry-run
+
+# 2. Crear de verdad: muestra el mismo resumen y pide confirmación [s/N]
+python manage.py poblar_principios_activos
+```
