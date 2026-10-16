@@ -1,7 +1,7 @@
 """
-H30: crea en principio_activo los nombres que ya usan los productos de las boticas.
+H30: crea en principio_activo los nombres que ya usan los productos activos de las boticas.
 
-Lee los valores distintos de producto.principio_activo normalizados con
+Lee los valores distintos de producto.principio_activo (solo activo = true) normalizados con
 initcap(trim(...)) y crea solo los que falten (comparando sin distinguir
 mayúsculas, igual que el índice uq_principio_activo_nombre). Se puede repetir:
 la segunda vez no crea nada.
@@ -23,7 +23,7 @@ class Initcap(Func):
 
 
 class Command(BaseCommand):
-    help = 'Crea los principios activos que faltan a partir de producto.principio_activo (H30).'
+    help = 'Crea los principios activos que faltan a partir de producto.principio_activo de los productos activos (H30).'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -35,6 +35,7 @@ class Command(BaseCommand):
     def handle(self, *args, **opciones):
         encontrados = list(
             Producto.objects
+            .filter(activo=True)
             .annotate(nombre=Initcap(Trim('principio_activo')))
             .exclude(nombre='')
             .values('nombre')
@@ -44,9 +45,9 @@ class Command(BaseCommand):
         existentes = set(PrincipioActivo.objects.annotate(clave=Lower('nombre')).values_list('clave', flat=True))
         por_crear = [f for f in encontrados if f['nombre'].lower() not in existentes]
 
-        self.stdout.write(f'Principios activos distintos en producto: {len(encontrados)}')
-        self.stdout.write(f'Ya registrados en principio_activo:      {len(encontrados) - len(por_crear)}')
-        self.stdout.write(f'Por crear:                               {len(por_crear)}')
+        self.stdout.write(f'Principios activos distintos en productos activos: {len(encontrados)}')
+        self.stdout.write(f'Ya registrados en principio_activo:               {len(encontrados) - len(por_crear)}')
+        self.stdout.write(f'Por crear:                                        {len(por_crear)}')
         for fila in por_crear:
             self.stdout.write(f'  + {fila["nombre"]} ({fila["productos"]} producto(s))')
 
