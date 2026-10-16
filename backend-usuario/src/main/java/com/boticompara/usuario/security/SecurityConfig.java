@@ -44,7 +44,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/boticas/validar-ruc/**").permitAll()
                 .requestMatchers("/usuarios/me").authenticated()
                 .requestMatchers("/productos/buscar").authenticated()
-                    .requestMatchers(HttpMethod.GET, "/productos/{id}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/productos/{id}").permitAll()
                 .requestMatchers("/boticas/**", "/productos/**").hasRole("DUENO_BOTICA")
                 .anyRequest().authenticated())
             .addFilterBefore(new JwtAuthFilter(jwtService, usuarios), UsernamePasswordAuthenticationFilter.class);
