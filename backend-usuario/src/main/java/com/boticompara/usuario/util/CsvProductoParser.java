@@ -41,7 +41,8 @@ public final class CsvProductoParser {
     public record Resultado(List<FilaProducto> filas, List<ErrorFila> errores) {
     }
 
-    private record Registro(int linea, List<String> campos) {
+    /** Una fila leída del archivo (CSV o .xlsx), antes de validarla. */
+    record Registro(int linea, List<String> campos) {
     }
 
     private static final class FilaInvalida extends RuntimeException {
@@ -51,6 +52,21 @@ public final class CsvProductoParser {
     }
 
     private CsvProductoParser() {
+    }
+
+    /**
+     * H11: punto de entrada de la carga masiva. Detecta el tipo por el contenido, no por la extensión:
+     * .xlsx (ZIP) se lee con XlsxProductoLector, .xls antiguo se rechaza y todo lo demás se trata como CSV.
+     */
+    public static Resultado parsearArchivo(byte[] datos) {
+        if (XlsxProductoLector.esXls(datos)) {
+            throw ApiException.badRequest(
+                    "Los archivos .xls (Excel 97-2003) no se admiten. Guárdalo como .xlsx o como CSV UTF-8.");
+        }
+        if (XlsxProductoLector.esXlsx(datos)) {
+            return validarRegistros(XlsxProductoLector.leer(datos));
+        }
+        return parsear(datos);
     }
 
     /**
@@ -68,7 +84,11 @@ public final class CsvProductoParser {
         if (texto.startsWith("\uFEFF")) {
             texto = texto.substring(1); // BOM que agrega Excel al guardar como CSV UTF-8
         }
-        List<Registro> registros = leer(texto + "\n");
+        return validarRegistros(leer(texto + "\n"));
+    }
+
+    /** Validaciones comunes al CSV y al .xlsx: encabezado, límite de filas, cada fila y duplicados. */
+    static Resultado validarRegistros(List<Registro> registros) {
         if (registros.isEmpty()) {
             throw ApiException.badRequest("El archivo está vacío.");
         }
