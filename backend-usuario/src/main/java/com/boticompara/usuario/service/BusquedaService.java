@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
+import com.boticompara.usuario.dto.ProductoDetalleResponse;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -55,5 +56,36 @@ public class BusquedaService {
                 rs.getString("botica_nombre"),
                 rs.getString("botica_direccion"),
                 rs.getString("botica_distrito")));
+    }
+
+    /**
+     * H28: detalle de un producto visible para el comprador.
+     * Lee de la misma vista que la búsqueda: si el producto está inactivo, sin stock
+     * o su botica no está APROBADO, no aparece y se responde 404.
+     */
+    @Transactional(readOnly = true)
+    public ProductoDetalleResponse detalle(Long id) {
+        String sql = "select producto_id, nombre_comercial, principio_activo, presentacion, precio, stock, "
+                + "botica_id, botica_nombre, botica_direccion, botica_distrito, botica_telefono "
+                + "from v_producto_busqueda where producto_id = :id";
+
+        List<ProductoDetalleResponse> filas = jdbc.query(sql, new MapSqlParameterSource("id", id),
+                (rs, i) -> new ProductoDetalleResponse(
+                        rs.getLong("producto_id"),
+                        rs.getString("nombre_comercial"),
+                        rs.getString("principio_activo"),
+                        rs.getString("presentacion"),
+                        rs.getBigDecimal("precio"),
+                        rs.getInt("stock"),
+                        rs.getLong("botica_id"),
+                        rs.getString("botica_nombre"),
+                        rs.getString("botica_direccion"),
+                        rs.getString("botica_distrito"),
+                        rs.getString("botica_telefono")));
+
+        if (filas.isEmpty()) {
+            throw ApiException.notFound("Producto no encontrado");
+        }
+        return filas.get(0);
     }
 }
