@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.db.models import Count
 from django.forms.models import BaseInlineFormSet
 
-from .forms import CategoriaForm, MedicamentoForm, PrincipioActivoForm
+from .forms import (CategoriaForm, GrupoEquivalenciaForm, MedicamentoForm, MiembroGrupoForm,
+                    PrincipioActivoForm)
 from .models import Categoria, GrupoEquivalencia, Medicamento, MedicamentoGrupo, PrincipioActivo
 
 
@@ -54,6 +55,10 @@ class MedicamentoAdmin(admin.ModelAdmin):
 class MiembroGrupoFormSet(BaseInlineFormSet):
     """Copia el principio activo del grupo en cada fila: el usuario no lo elige."""
 
+    def get_form_kwargs(self, index):
+        # self.instance ya trae los datos enviados del grupo (Django los aplica antes de crear los inlines)
+        return {**super().get_form_kwargs(index), 'grupo': self.instance}
+
     def save_new(self, form, commit=True):
         form.instance.principio_activo_id = self.instance.principio_activo_id
         return super().save_new(form, commit)
@@ -91,6 +96,7 @@ class MiembroGrupoInline(admin.TabularInline):
 class AgregarMiembroInline(admin.TabularInline):
     """Filas vacías para agregar medicamentos al grupo."""
     model = MedicamentoGrupo
+    form = MiembroGrupoForm
     formset = MiembroGrupoFormSet
     fields = ('medicamento',)
     autocomplete_fields = ('medicamento',)
@@ -107,6 +113,7 @@ class AgregarMiembroInline(admin.TabularInline):
 
 @admin.register(GrupoEquivalencia)
 class GrupoEquivalenciaAdmin(admin.ModelAdmin):
+    form = GrupoEquivalenciaForm
     list_display = ('nombre', 'principio_activo', 'numero_medicamentos')
     list_filter = ('principio_activo',)
     search_fields = ('nombre', 'principio_activo__nombre')
