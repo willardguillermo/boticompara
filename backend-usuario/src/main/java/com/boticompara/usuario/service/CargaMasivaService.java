@@ -31,7 +31,7 @@ public class CargaMasivaService {
     @Transactional
     public ResultadoCarga cargar(Long usuarioId, byte[] datos) {
         Botica botica = boticaAprobada(usuarioId);
-        CsvProductoParser.Resultado csv = CsvProductoParser.parsear(datos);
+        CsvProductoParser.Resultado csv = CsvProductoParser.parsearArchivo(datos);
 
         Map<String, Producto> existentes = new HashMap<>();
         for (Producto p : productos.findByBoticaIdAndActivoTrueOrderByNombreComercialAsc(botica.getId())) {

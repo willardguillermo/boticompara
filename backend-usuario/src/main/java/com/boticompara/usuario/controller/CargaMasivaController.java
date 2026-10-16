@@ -21,7 +21,7 @@ public class CargaMasivaController {
 
     private final CargaMasivaService carga;
 
-    /** H11: CSV con los productos. Campo multipart 'archivo'. */
+    /** H11: CSV o .xlsx con los productos. Campo multipart 'archivo'. */
     @PostMapping("/carga-masiva")
     public ResultadoCarga cargar(@AuthenticationPrincipal UsuarioAutenticado yo,
                                  @RequestParam("archivo") MultipartFile archivo) {

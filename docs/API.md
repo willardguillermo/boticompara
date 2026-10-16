@@ -246,14 +246,19 @@ Mismo cuerpo que el POST. Respuesta: 200 con el producto actualizado. 404 si no 
 Baja lógica (`activo = false`): deja de aparecer en listados y búsquedas. Respuesta: 204 sin cuerpo.
 
 ### `POST /productos/carga-masiva` 🔒 — H11
-Carga o actualiza muchos productos con un archivo CSV. Es `multipart/form-data` con un campo `archivo`. Requiere botica `APROBADO` (si no → 403).
+Carga o actualiza muchos productos con un archivo CSV o Excel (`.xlsx`). Es `multipart/form-data` con un campo `archivo`. Requiere botica `APROBADO` (si no → 403).
 
-**Formato del archivo:** UTF-8, separador coma, primera fila de encabezado, máximo 5 MB y 1000 filas.
+El tipo se detecta por el contenido del archivo, no por su extensión. Para los dos formatos: primera fila de encabezado, máximo 5 MB y 1000 filas de productos; las filas vacías no cuentan.
+
+**CSV:** UTF-8, separador coma.
 ```
 nombreComercial,principioActivo,presentacion,precio,stock,stockMinimo
 Panadol,Paracetamol,Tableta 500 mg x 10,8.50,40,5
 Ibuprofeno Genérico,Ibuprofeno,Tableta 400 mg x 10,3.20,100,10
 ```
+
+**Excel (`.xlsx`):** las mismas columnas, en la primera hoja. Las celdas pueden ser de texto o numéricas; de una fórmula se toma el valor calculado. Los `.xls` de Excel 97-2003 no se admiten: hay que guardarlos como `.xlsx` o como CSV UTF-8.
+
 La columna `stockMinimo` es opcional.
 
 **Reglas por fila:**
@@ -273,8 +278,8 @@ La columna `stockMinimo` es opcional.
   ]
 }
 ```
-`fila` es el número de línea del archivo (el encabezado es la fila 1).
-Errores: 400 (archivo ausente, vacío, no es CSV, encabezado inválido o más de 1000 filas), 403 (botica no aprobada).
+`fila` es el número de línea del CSV o el número de fila que muestra Excel (el encabezado es la fila 1).
+Errores: 400 (archivo ausente o vacío, CSV que no está en UTF-8, `.xlsx` dañado, `.xls` antiguo, encabezado inválido o más de 1000 filas), 403 (botica no aprobada).
 
 ### Alerta diaria de stock bajo — H12
 No es un endpoint. Todos los días a las 8:00 (hora de Lima) el backend envía al correo del dueño la lista de productos activos de su botica con `stock <= stockMinimo`. Si no hay ninguno, no se envía nada.
