@@ -1,6 +1,7 @@
 package com.boticompara.app.data.remote
 
 import android.content.Context
+import com.boticompara.app.BuildConfig
 import com.boticompara.app.data.local.TokenManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -31,7 +32,7 @@ object RetrofitClient {
                 .build()
 
             retrofit = Retrofit.Builder()
-                .baseUrl("http://10.0.2.2:8080/api/")
+                .baseUrl(BuildConfig.BASE_URL)
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
