@@ -25,6 +25,7 @@ import com.boticompara.app.data.local.TokenManager
 import com.boticompara.app.ui.theme.BotiComparaAppTheme
 import com.boticompara.app.vistas.LoginScreen
 import com.boticompara.app.vistas.ProfileScreen
+import com.boticompara.app.vistas.RecuperarScreen
 import com.boticompara.app.vistas.RegisterScreen
 import com.boticompara.app.vistas.SearchScreen
 import kotlinx.coroutines.flow.first
@@ -77,6 +78,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         composable("login") { LoginScreen(navController) }
                         composable("registro") { RegisterScreen(navController) }
+                        composable("recuperar") { RecuperarScreen(navController) }   // H17
                         composable("busqueda") { SearchScreen(navController) }
                         composable("perfil") { ProfileScreen(navController) }
                     }

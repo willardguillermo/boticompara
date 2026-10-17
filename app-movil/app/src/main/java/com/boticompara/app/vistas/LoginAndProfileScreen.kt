@@ -65,6 +65,11 @@ fun LoginScreen(navController: NavController, authViewModel: AuthViewModel = vie
             Text(it, color = MaterialTheme.colorScheme.error)
         }
 
+        // H17: recuperar contraseña
+        TextButton(onClick = { navController.navigate("recuperar") }) {
+            Text("¿Olvidaste tu contraseña?")
+        }
+
         TextButton(onClick = { navController.navigate("registro") }) {
             Text("¿No tienes cuenta? Regístrate")
         }
