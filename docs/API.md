@@ -288,17 +288,19 @@ No es un endpoint. Todos los días a las 8:00 (hora de Lima) el backend envía a
 
 ## 5. Búsqueda del comprador
 
-### `GET /productos/buscar?q=paracetamol&tipo=nombre&orden=precio_asc` 🔒 — H22, H23, H24
+### `GET /productos/buscar?q=paracetamol&tipo=nombre&orden=precio_asc` 🔒 — H22, H23, H24, H27
 
 | Parámetro | Valores | Por defecto |
 |---|---|---|
 | `q` | texto a buscar (mínimo 2 caracteres) | obligatorio |
 | `tipo` | `nombre` (H22) o `principio` (H23) | `nombre` |
-| `orden` | `precio_asc` (H24) o `precio_desc` | `precio_asc` |
+| `orden` | `precio_asc` (H24), `precio_desc` o `distancia` (H27) | `distancia` si se envían `lat` y `lng`; si no, `precio_asc` |
+| `lat`, `lng` | ubicación del comprador (H27); se envían juntas | sin ubicación |
+| `radioKm` | solo boticas a esa distancia o menos (H27); mayor que 0 y hasta 50 | sin filtro; si llega vacío (`radioKm=`), 5 |
 
 Solo devuelve productos activos, con stock > 0, de boticas `APROBADO` (vista `v_producto_busqueda`).
 ```json
-// 200 OK
+// 200 OK (con lat y lng)
 [
   {
     "productoId": 9,
@@ -310,11 +312,19 @@ Solo devuelve productos activos, con stock > 0, de boticas `APROBADO` (vista `v_
     "boticaId": 2,
     "boticaNombre": "FarmaVida",
     "boticaDireccion": "Jr. Trujillo 210",
-    "boticaDistrito": "Lurigancho-Chosica"
+    "boticaDistrito": "Lurigancho-Chosica",
+    "distanciaKm": 1.25
   }
 ]
 ```
 Sin resultados → `200` con `[]` (la app muestra "No encontramos ese medicamento").
+
+**Búsqueda por cercanía (H27):**
+- Con `lat` y `lng`, cada resultado trae `distanciaKm`: la distancia en línea recta hasta la botica, con 2 decimales. Sin ubicación, `distanciaKm` es `null` y la búsqueda funciona como antes.
+- `orden=distancia`: de la más cercana a la más lejana; a igual distancia, primero el más barato. Las boticas sin coordenadas van al final, con `distanciaKm: null`.
+- Con `radioKm`, solo quedan las boticas a esa distancia o menos; las que no tienen coordenadas quedan fuera.
+
+Errores: 400 (`q` de menos de 2 caracteres; `tipo` u `orden` inválidos; solo una de `lat` y `lng`; coordenadas fuera de rango; `radioKm` inválido; `orden=distancia` o `radioKm` sin `lat` y `lng`).
 
 ### `GET /productos/{id}` — H28
 
