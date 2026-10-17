@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Categoria, Medicamento, MedicamentoGrupo, PrincipioActivo
+from .models import Categoria, GrupoEquivalencia, Medicamento, MedicamentoGrupo, PrincipioActivo
 
 
 class NombreUnicoForm(forms.ModelForm):
@@ -67,3 +67,55 @@ class MedicamentoForm(forms.ModelForm):
                     'Primero sácalo del grupo para cambiar su principio activo.'
                 )
         return principio
+
+
+class GrupoEquivalenciaForm(forms.ModelForm):
+    """No deja cambiar el principio activo de un grupo que ya tiene medicamentos."""
+
+    class Meta:
+        model = GrupoEquivalencia
+        fields = ('nombre', 'principio_activo')
+
+    def clean_principio_activo(self):
+        principio = self.cleaned_data['principio_activo']
+        if self.instance.pk and principio.pk != self.instance.principio_activo_id:
+            # La FK compuesta (grupo_id, principio_activo_id) rechazaría el cambio en la BD
+            cantidad = MedicamentoGrupo.objects.filter(grupo_id=self.instance.pk).count()
+            if cantidad:
+                raise forms.ValidationError(
+                    f'Este grupo tiene {cantidad} medicamento(s) de {self.instance.principio_activo}. '
+                    'Primero quítalos del grupo y guarda; luego cambia el principio activo.'
+                )
+        return principio
+
+
+class MiembroGrupoForm(forms.ModelForm):
+    """Fila para agregar un medicamento a un grupo. El formset le pasa el grupo que se está editando."""
+
+    class Meta:
+        model = MedicamentoGrupo
+        fields = ('medicamento',)
+
+    def __init__(self, *args, grupo=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.grupo = grupo
+
+    def clean_medicamento(self):
+        medicamento = self.cleaned_data['medicamento']
+        # Si el formulario del grupo no es válido puede no haber principio activo con qué comparar
+        if self.grupo is not None and self.grupo.principio_activo_id:
+            if medicamento.principio_activo_id != self.grupo.principio_activo_id:
+                raise forms.ValidationError(
+                    f'«{medicamento}» tiene principio activo {medicamento.principio_activo}; '
+                    f'este grupo es de {self.grupo.principio_activo}.'
+                )
+        membresia = (MedicamentoGrupo.objects.filter(medicamento=medicamento)
+                     .select_related('grupo').first())
+        if membresia:
+            if self.grupo is not None and membresia.grupo_id == self.grupo.pk:
+                raise forms.ValidationError(f'«{medicamento}» ya está en este grupo.')
+            raise forms.ValidationError(
+                f'«{medicamento}» ya está en el grupo «{membresia.grupo}». '
+                'Un medicamento solo puede estar en un grupo: primero sácalo de ese.'
+            )
+        return medicamento
