@@ -155,7 +155,8 @@ Primero valida el formato y el dígito verificador. Si pasan, consulta el RUC en
 `valido` es `false`, con el motivo en `mensaje`, si el formato o el dígito verificador son incorrectos (no se consulta SUNAT), si el RUC no existe en SUNAT, o si `estado` no es `ACTIVO` o `condicion` no es `HABIDO`.
 
 - `fuente`: `SUNAT` si se consultó; `LOCAL` si solo se validó el formato (RUC mal escrito, o SUNAT no respondió en 5 s o falló).
-- Cada consulta a SUNAT se guarda 24 h en memoria, para no gastar la cuota del servicio.
+- Sin sesión de dueño de botica (sin token o con otro rol) solo se hace la validación local (`fuente: LOCAL`), para cuidar la cuota del servicio.
+- Cada consulta a SUNAT se guarda 24 h en memoria
 
 **Algoritmo del dígito verificador:**
 1. 11 dígitos numéricos; los 2 primeros deben ser `10`, `15`, `17` o `20`.
