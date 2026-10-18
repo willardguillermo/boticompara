@@ -240,20 +240,36 @@ Con `stockBajo=true` devuelve solo los productos con `stock <= stockMinimo` (H12
 // 200 OK
 [
   { "id": 1, "nombreComercial": "Panadol", "principioActivo": "Paracetamol",
-    "presentacion": "Tableta 500 mg x 10", "precio": 8.50, "stock": 40, "stockMinimo": 5 }
+    "presentacion": "Tableta 500 mg x 10", "precio": 8.50, "stock": 40, "stockMinimo": 5,
+    "medicamentoId": 12 }
 ]
 ```
+`medicamentoId` es `null` si el producto no está enlazado al catálogo maestro (H31).
+
+### `GET /medicamentos?q=texto` 🔒 — H31
+Busca en el catálogo maestro para el selector de la web al crear o editar un producto. `q` (mínimo 2 caracteres) se busca en el nombre comercial y en el principio activo, sin distinguir mayúsculas. Devuelve hasta 20 medicamentos, sin los ocultos, ordenados por nombre comercial.
+```json
+// 200 OK
+[
+  { "id": 12, "nombreComercial": "Panadol", "principioActivo": "Paracetamol",
+    "presentacion": "Tableta", "concentracion": "500 mg" }
+]
+```
+`concentracion` es `null` si no está registrada. Sin resultados → `200` con `[]`.
+Errores: 400 (`q` de menos de 2 caracteres).
 
 ### `POST /productos` 🔒 — H8
 ```json
 // Request
 { "nombreComercial": "Panadol", "principioActivo": "Paracetamol",
-  "presentacion": "Tableta 500 mg x 10", "precio": 8.50, "stock": 40, "stockMinimo": 5 }
+  "presentacion": "Tableta 500 mg x 10", "precio": 8.50, "stock": 40, "stockMinimo": 5,
+  "medicamentoId": 12 }
 ```
 Respuesta: 201 con el producto creado. Validaciones: `precio > 0`, `stock >= 0`, textos obligatorios. `stockMinimo` es opcional y debe ser `>= 0`: al crear queda en 5 si no se envía, y al editar con `PUT` se conserva el valor actual.
+`medicamentoId` es opcional (H31): enlaza el producto con un medicamento del catálogo maestro, elegido con `GET /medicamentos`. Si el medicamento no existe o está oculto → 400.
 
 ### `PUT /productos/{id}` 🔒 — H9
-Mismo cuerpo que el POST. Respuesta: 200 con el producto actualizado. 404 si no es de su botica.
+Mismo cuerpo que el POST. Si no se envía `medicamentoId`, se conserva el enlace actual (H31). Respuesta: 200 con el producto actualizado. 404 si no es de su botica.
 
 ### `DELETE /productos/{id}` 🔒 — H10
 Baja lógica (`activo = false`): deja de aparecer en listados y búsquedas. Respuesta: 204 sin cuerpo.

@@ -17,11 +17,13 @@ public class ProductoService {
 
     private final BoticaRepository boticas;
     private final ProductoRepository productos;
+    private final MedicamentoService medicamentos;
 
     /** H8 */
     @Transactional
     public ProductoResponse crear(Long usuarioId, ProductoRequest r) {
         Botica botica = boticaAprobada(usuarioId);
+        validarMedicamento(r);
         Producto p = new Producto();
         p.setBoticaId(botica.getId());
         aplicar(p, r);
@@ -33,6 +35,7 @@ public class ProductoService {
     public ProductoResponse actualizar(Long usuarioId, Long id, ProductoRequest r) {
         Botica botica = boticaAprobada(usuarioId);
         Producto p = propio(id, botica);
+        validarMedicamento(r);
         aplicar(p, r);
         return ProductoResponse.from(productos.save(p));
     }
@@ -70,6 +73,17 @@ public class ProductoService {
         // H12: si no viene, al crear queda el valor por defecto (5) y al editar se conserva el actual
         if (r.stockMinimo() != null) {
             p.setStockMinimo(r.stockMinimo());
+        }
+        // H31: igual que stockMinimo, si no viene se conserva el enlace actual
+        if (r.medicamentoId() != null) {
+            p.setMedicamentoId(r.medicamentoId());
+        }
+    }
+
+    /** H31: 400 si el medicamento enviado no existe o está oculto. */
+    private void validarMedicamento(ProductoRequest r) {
+        if (r.medicamentoId() != null) {
+            medicamentos.validarEnlazable(r.medicamentoId());
         }
     }
 }

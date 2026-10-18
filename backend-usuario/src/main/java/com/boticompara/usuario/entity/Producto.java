@@ -41,4 +41,8 @@ public class Producto {
     /** H12: umbral de alerta de stock bajo. Por defecto 5, igual que la base de datos. */
     @Column(name = "stock_minimo", nullable = false)
     private Integer stockMinimo = 5;
+
+    /** H31: enlace opcional al catálogo maestro (tabla medicamento). */
+    @Column(name = "medicamento_id")
+    private Long medicamentoId;
 }
