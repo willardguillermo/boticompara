@@ -141,11 +141,22 @@ Respuesta: 204 sin cuerpo. El token usado deja de ser válido (las siguientes ll
 ## 3. Botica (rol `DUENO_BOTICA`)
 
 ### `GET /boticas/validar-ruc/{ruc}` — H2
-Valida solo el formato y el dígito verificador (sin servicios externos). La web lo usa para avisar mientras se escribe.
+Primero valida el formato y el dígito verificador. Si pasan, consulta el RUC en SUNAT (servicio Decolecta) para obtener la razón social, el estado y la condición. La web lo usa para avisar mientras se escribe y para mostrar la razón social.
 ```json
-// 200 OK
-{ "ruc": "20601234565", "valido": true, "mensaje": "RUC válido" }
+// 200 OK — consultado en SUNAT
+{ "ruc": "20601234565", "valido": true, "mensaje": "RUC válido",
+  "razonSocial": "SALUD TOTAL FARMA S.A.C.", "estado": "ACTIVO", "condicion": "HABIDO", "fuente": "SUNAT" }
 ```
+```json
+// 200 OK — SUNAT no respondió: solo validación local
+{ "ruc": "20601234565", "valido": true, "mensaje": "RUC válido (no se pudo consultar SUNAT)",
+  "razonSocial": null, "estado": null, "condicion": null, "fuente": "LOCAL" }
+```
+`valido` es `false`, con el motivo en `mensaje`, si el formato o el dígito verificador son incorrectos (no se consulta SUNAT), si el RUC no existe en SUNAT, o si `estado` no es `ACTIVO` o `condicion` no es `HABIDO`.
+
+- `fuente`: `SUNAT` si se consultó; `LOCAL` si solo se validó el formato (RUC mal escrito, o SUNAT no respondió en 5 s o falló).
+- Sin sesión de dueño de botica (sin token o con otro rol) solo se hace la validación local (`fuente: LOCAL`), para cuidar la cuota del servicio.
+- Cada consulta a SUNAT se guarda 24 h en memoria
 
 **Algoritmo del dígito verificador:**
 1. 11 dígitos numéricos; los 2 primeros deben ser `10`, `15`, `17` o `20`.
@@ -155,6 +166,7 @@ Valida solo el formato y el dígito verificador (sin servicios externos). La web
 
 ### `POST /boticas` 🔒 — H1, H2, H3
 Registra la botica del dueño logueado. Queda en estado `PENDIENTE`.
+El RUC se verifica igual que en `validar-ruc`. Si SUNAT responde, se guarda su razón social (reemplaza la enviada); si no responde, se guarda la enviada.
 ```json
 // Request
 {
@@ -170,10 +182,11 @@ Registra la botica del dueño logueado. Queda en estado `PENDIENTE`.
 ```
 ```json
 // 201 Created
-{ "id": 1, "nombreComercial": "Botica Salud Total", "ruc": "20601234565", "estado": "PENDIENTE" }
+{ "id": 1, "nombreComercial": "Botica Salud Total", "ruc": "20601234565",
+  "razonSocial": "SALUD TOTAL FARMA S.A.C.", "estado": "PENDIENTE" }
 ```
 `latitud` y `longitud` son opcionales (H3), pero si se envía una hay que enviar la otra. Rangos: latitud entre -90 y 90, longitud entre -180 y 180, hasta 6 decimales.
-Errores: 400 (RUC inválido, coordenadas inválidas o incompletas), 409 (RUC ya registrado o el dueño ya tiene botica).
+Errores: 400 (RUC inválido, inexistente en SUNAT, que no está `ACTIVO` o no está `HABIDO`; coordenadas inválidas o incompletas), 409 (RUC ya registrado o el dueño ya tiene botica).
 
 ### `GET /boticas/mia` 🔒 — H5
 ```json
@@ -197,7 +210,7 @@ Errores: 400 (RUC inválido, coordenadas inválidas o incompletas), 409 (RUC ya 
 
 ### `PUT /boticas/mia` 🔒 — H7
 Corrige y reenvía una solicitud rechazada. **Solo se permite si el estado es `RECHAZADO`.** Al guardar, la botica vuelve a `PENDIENTE` y `motivoRechazo` se borra. La licencia ya subida se conserva.
-Cuerpo igual al de `POST /boticas` (incluye `latitud` y `longitud` opcionales).
+Cuerpo igual al de `POST /boticas` (incluye `latitud` y `longitud` opcionales). El RUC se verifica en SUNAT con las mismas reglas.
 Respuesta: 200 con el mismo formato que `GET /boticas/mia` (con `estado: "PENDIENTE"` y `motivoRechazo: null`).
 Errores: 400 (datos inválidos), 403 (el estado no es `RECHAZADO`), 404 (no tiene botica), 409 (el RUC pertenece a otra botica).
 

@@ -1,10 +1,13 @@
 package com.boticompara.usuario.service;
 
+import com.boticompara.usuario.dto.BoticaCreadaResponse;
 import com.boticompara.usuario.dto.BoticaDetalleResponse;
 import com.boticompara.usuario.dto.BoticaRequest;
+import com.boticompara.usuario.dto.RucResponse;
 import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -20,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,6 +39,9 @@ class BoticaServiceTest {
 
     @Mock
     BoticaRepository boticas;
+
+    @Mock
+    RucSunatService rucSunat;
 
     @InjectMocks
     BoticaService service;
@@ -57,6 +65,17 @@ class BoticaServiceTest {
             b.setMotivoRechazo("La dirección no coincide con la ficha RUC");
         }
         return b;
+    }
+
+    /** Por defecto SUNAT no responde: se acepta con la validación local y se usa la razón social enviada. */
+    @BeforeEach
+    void sunatNoDisponible() {
+        lenient().when(rucSunat.exigirValido(anyString())).thenAnswer(i -> new RucResponse(i.getArgument(0), true,
+                "RUC válido (no se pudo consultar SUNAT)", null, null, null, "LOCAL"));
+    }
+
+    private static RucResponse sunatActivo(String ruc) {
+        return new RucResponse(ruc, true, "RUC válido", "SALUD TOTAL FARMA S.A.C.", "ACTIVO", "HABIDO", "SUNAT");
     }
 
     // ---------- H3: ubicación al registrar ----------
@@ -186,5 +205,61 @@ class BoticaServiceTest {
                 () -> service.corregir(10L, request(RUC_A, null, null)));
 
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
+    // ---------- H2: verificación del RUC en SUNAT ----------
+
+    @Test
+    void registrarGuardaLaRazonSocialDeSunat() {
+        when(rucSunat.exigirValido(RUC_A)).thenReturn(sunatActivo(RUC_A));
+        when(boticas.save(any(Botica.class))).thenAnswer(i -> i.getArgument(0));
+
+        BoticaCreadaResponse resp = service.registrar(10L, request(RUC_A, null, null));
+
+        assertEquals("SALUD TOTAL FARMA S.A.C.", resp.razonSocial());
+    }
+
+    @Test
+    void registrarSinRespuestaDeSunatGuardaLaRazonSocialEnviada() {
+        when(boticas.save(any(Botica.class))).thenAnswer(i -> i.getArgument(0));
+
+        BoticaCreadaResponse resp = service.registrar(10L, request(RUC_A, null, null));
+
+        assertEquals("Razón Corregida S.A.C.", resp.razonSocial());
+    }
+
+    @Test
+    void registrarRechazadoPorSunatNoGuardaLaBotica() {
+        when(rucSunat.exigirValido(RUC_A)).thenThrow(ApiException.badRequest("El RUC no existe en SUNAT"));
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.registrar(10L, request(RUC_A, null, null)));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("El RUC no existe en SUNAT", ex.getMessage());
+        verify(boticas, never()).save(any(Botica.class));
+    }
+
+    @Test
+    void registrarConRucDuplicadoNoConsultaSunat() {
+        when(boticas.existsByRuc(RUC_A)).thenReturn(true);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.registrar(10L, request(RUC_A, null, null)));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        verify(rucSunat, never()).exigirValido(anyString());
+    }
+
+    @Test
+    void corregirGuardaLaRazonSocialDeSunat() {
+        Botica b = botica("RECHAZADO", RUC_A);
+        when(boticas.findByUsuarioId(10L)).thenReturn(Optional.of(b));
+        when(rucSunat.exigirValido(RUC_A)).thenReturn(sunatActivo(RUC_A));
+        when(boticas.save(any(Botica.class))).thenAnswer(i -> i.getArgument(0));
+
+        BoticaDetalleResponse resp = service.corregir(10L, request(RUC_A, null, null));
+
+        assertEquals("SALUD TOTAL FARMA S.A.C.", resp.razonSocial());
     }
 }

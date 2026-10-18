@@ -3,6 +3,7 @@ package com.boticompara.usuario.service;
 import com.boticompara.usuario.dto.BoticaCreadaResponse;
 import com.boticompara.usuario.dto.BoticaDetalleResponse;
 import com.boticompara.usuario.dto.BoticaRequest;
+import com.boticompara.usuario.dto.RucResponse;
 import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class BoticaService {
 
     private final BoticaRepository boticas;
+    private final RucSunatService rucSunat;
 
     /** H1, H2, H3: la botica queda PENDIENTE hasta que el admin la apruebe en Django. */
     @Transactional
@@ -31,9 +33,11 @@ public class BoticaService {
         if (boticas.existsByRuc(ruc)) {
             throw ApiException.conflict("El RUC ya está registrado");
         }
+        // SUNAT al final: no se gasta cuota en registros que igual se rechazarían
+        String razonSocial = razonSocial(r, rucSunat.exigirValido(ruc));
         Botica b = new Botica();
         b.setUsuarioId(usuarioId);
-        aplicar(b, r, ruc);
+        aplicar(b, r, ruc, razonSocial);
         b.setEstado("PENDIENTE");
         return BoticaCreadaResponse.from(boticas.save(b));
     }
@@ -58,7 +62,8 @@ public class BoticaService {
         if (!ruc.equals(b.getRuc()) && boticas.existsByRuc(ruc)) {
             throw ApiException.conflict("El RUC ya está registrado");
         }
-        aplicar(b, r, ruc);
+        String razonSocial = razonSocial(r, rucSunat.exigirValido(ruc));
+        aplicar(b, r, ruc, razonSocial);
         b.setEstado("PENDIENTE");
         b.setMotivoRechazo(null);
         return BoticaDetalleResponse.from(boticas.save(b));
@@ -76,10 +81,16 @@ public class BoticaService {
                 .orElseThrow(() -> ApiException.notFound("Aún no registraste tu botica"));
     }
 
-    private void aplicar(Botica b, BoticaRequest r, String ruc) {
+    /** H2: la razón social de SUNAT reemplaza a la enviada; si SUNAT no respondió, se usa la enviada. */
+    private static String razonSocial(BoticaRequest r, RucResponse sunat) {
+        String razon = sunat.razonSocial() != null ? sunat.razonSocial() : r.razonSocial().trim();
+        return razon.length() > 200 ? razon.substring(0, 200) : razon;
+    }
+
+    private void aplicar(Botica b, BoticaRequest r, String ruc, String razonSocial) {
         b.setNombreComercial(r.nombreComercial().trim());
         b.setRuc(ruc);
-        b.setRazonSocial(r.razonSocial().trim());
+        b.setRazonSocial(razonSocial);
         b.setDireccion(r.direccion().trim());
         b.setDistrito(r.distrito().trim());
         b.setTelefono(r.telefono() == null || r.telefono().isBlank() ? null : r.telefono().trim());
