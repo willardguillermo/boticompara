@@ -17,6 +17,7 @@ data class RegistroRequest(
 
 // ---- Recuperar contraseña (H17) ----
 data class RecuperarRequest(val correo: String)
+data class RestablecerRequest(val correo: String, val token: String, val password: String)
 data class MensajeResponse(val mensaje: String)
 
 // ---- Perfil (H16) ----
@@ -49,6 +50,9 @@ interface ApiService {
 
     @POST("auth/recuperar")   // H17: siempre responde 200, exista o no el correo
     suspend fun recuperar(@Body request: RecuperarRequest): Response<MensajeResponse>
+
+    @POST("auth/restablecer")   // H17: 200 si el código es válido, 400 si no
+    suspend fun restablecer(@Body request: RestablecerRequest): Response<MensajeResponse>
 
     @GET("usuarios/me")
     suspend fun obtenerPerfil(@Header("Authorization") auth: String): Response<PerfilResponse>

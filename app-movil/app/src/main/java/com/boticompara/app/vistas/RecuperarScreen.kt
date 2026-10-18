@@ -1,5 +1,6 @@
 package com.boticompara.app.vistas
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -96,7 +97,7 @@ fun RecuperarScreen(navController: NavController, vm: CuentaViewModel = viewMode
             }
         }
 
-        // Mensaje de éxito
+        // Mensaje de éxito + paso siguiente
         vm.mensaje?.let {
             Spacer(Modifier.height(16.dp))
             Surface(
@@ -111,6 +112,14 @@ fun RecuperarScreen(navController: NavController, vm: CuentaViewModel = viewMode
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(14.dp)
                 )
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { navController.navigate("restablecer/${Uri.encode(correo.trim())}") },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(50.dp)
+            ) {
+                Text("Ya tengo un código", fontWeight = FontWeight.SemiBold)
             }
         }
 

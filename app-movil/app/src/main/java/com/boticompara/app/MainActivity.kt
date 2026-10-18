@@ -27,6 +27,7 @@ import com.boticompara.app.vistas.LoginScreen
 import com.boticompara.app.vistas.ProfileScreen
 import com.boticompara.app.vistas.RecuperarScreen
 import com.boticompara.app.vistas.RegisterScreen
+import com.boticompara.app.vistas.RestablecerScreen
 import com.boticompara.app.vistas.SearchScreen
 import kotlinx.coroutines.flow.first
 
@@ -79,6 +80,9 @@ class MainActivity : ComponentActivity() {
                         composable("login") { LoginScreen(navController) }
                         composable("registro") { RegisterScreen(navController) }
                         composable("recuperar") { RecuperarScreen(navController) }   // H17
+                        composable("restablecer/{correo}") { entry ->                 // H17
+                            RestablecerScreen(navController, entry.arguments?.getString("correo") ?: "")
+                        }
                         composable("busqueda") { SearchScreen(navController) }
                         composable("perfil") { ProfileScreen(navController) }
                     }
