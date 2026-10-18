@@ -234,9 +234,16 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 }
 
 @Composable
-fun ProfileScreen(navController: NavController, vm: ProfileViewModel = viewModel()) {
-    LaunchedEffect(vm.sesionVencida) {
-        if (vm.sesionVencida) {
+fun ProfileScreen(
+    navController: NavController,
+    vm: ProfileViewModel = viewModel(),
+    cuentaVm: CuentaViewModel = viewModel()   // H19
+) {
+    var mostrarDialogo by remember { mutableStateOf(false) }
+
+    // Si el token venció o la cuenta se eliminó, volver al login limpiando la navegación
+    LaunchedEffect(vm.sesionVencida, cuentaVm.cuentaEliminada) {
+        if (vm.sesionVencida || cuentaVm.cuentaEliminada) {
             navController.navigate("login") {
                 popUpTo(navController.graph.id) { inclusive = true }
             }
@@ -279,5 +286,45 @@ fun ProfileScreen(navController: NavController, vm: ProfileViewModel = viewModel
                 }
             }
         }) { Text("Cerrar sesión", color = MaterialTheme.colorScheme.error) }
+
+        // ---------- H19: eliminar cuenta ----------
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(16.dp))
+        OutlinedButton(
+            onClick = { mostrarDialogo = true },
+            enabled = !cuentaVm.isLoading,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (cuentaVm.isLoading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            else Text("Eliminar mi cuenta")
+        }
+        cuentaVm.error?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, color = MaterialTheme.colorScheme.error)
+        }
+    }
+
+    // Diálogo de confirmación (H19)
+    if (mostrarDialogo) {
+        AlertDialog(
+            onDismissRequest = { mostrarDialogo = false },
+            title = { Text("¿Eliminar tu cuenta?") },
+            text = {
+                Text("Se borrarán tus datos personales y se cerrará tu sesión. Esta acción no se puede deshacer.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    mostrarDialogo = false
+                    cuentaVm.eliminarCuenta()
+                }) {
+                    Text("Sí, eliminar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarDialogo = false }) { Text("Cancelar") }
+            }
+        )
     }
 }

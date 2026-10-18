@@ -23,6 +23,8 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var restablecido by mutableStateOf(false)
         private set
+    var cuentaEliminada by mutableStateOf(false)
+        private set
 
     // H17: pide el código de 6 dígitos. Por seguridad el mensaje es el mismo exista o no el correo.
     fun solicitarCodigo(correo: String) {
@@ -70,7 +72,21 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 ResultadoCuenta.DatosInvalidos -> error = "El código no es válido o ya venció. Pide uno nuevo."
                 ResultadoCuenta.SinConexion -> error = "No se pudo conectar con el servidor"
-                ResultadoCuenta.ErrorServidor -> error = "No se pudo restablecer la contraseña"
+                else -> error = "No se pudo restablecer la contraseña"
+            }
+            isLoading = false
+        }
+    }
+
+    // H19: elimina la cuenta del usuario logueado y cierra la sesión
+    fun eliminarCuenta() {
+        viewModelScope.launch {
+            isLoading = true
+            error = null
+            when (repository.eliminarCuenta()) {
+                ResultadoCuenta.Exito, ResultadoCuenta.SesionVencida -> cuentaEliminada = true
+                ResultadoCuenta.SinConexion -> error = "No se pudo conectar con el servidor"
+                else -> error = "No se pudo eliminar la cuenta"
             }
             isLoading = false
         }

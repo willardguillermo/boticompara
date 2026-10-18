@@ -63,6 +63,9 @@ interface ApiService {
         @Body request: PerfilRequest
     ): Response<PerfilResponse>
 
+    @DELETE("usuarios/me")   // H19: 204 sin cuerpo, la cuenta queda anonimizada
+    suspend fun eliminarCuenta(@Header("Authorization") auth: String): Response<Unit>
+
     @GET("productos/buscar")
     suspend fun buscarProductos(
         @Header("Authorization") auth: String,
