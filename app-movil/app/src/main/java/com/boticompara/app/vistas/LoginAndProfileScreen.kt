@@ -25,6 +25,8 @@ import com.boticompara.app.data.local.TokenManager
 import com.boticompara.app.data.remote.PerfilRequest
 import com.boticompara.app.data.remote.RetrofitClient
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 // ===================== LOGIN (H18) =====================
 @Composable
@@ -250,77 +252,216 @@ fun ProfileScreen(
         }
     }
 
+    // Iniciales para el avatar (ej. "Carlos Ramírez" -> "CR")
+    val iniciales = vm.nombre.trim().split(" ").filter { it.isNotBlank() }
+        .take(2).joinToString("") { it.first().uppercase() }.ifBlank { "?" }
+
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Mi perfil", style = MaterialTheme.typography.headlineMedium)
-        Text(vm.correo, style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(24.dp))
-
-        OutlinedTextField(value = vm.nombre, onValueChange = { vm.nombre = it },
-            label = { Text("Nombre") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = vm.telefono, onValueChange = { vm.telefono = it },
-            label = { Text("Teléfono") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(value = vm.direccion, onValueChange = { vm.direccion = it },
-            label = { Text("Dirección") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(24.dp))
-
-        Button(onClick = { vm.guardar() }, enabled = !vm.isLoading, modifier = Modifier.fillMaxWidth()) {
-            Text("Guardar cambios")
-        }
-        vm.mensaje?.let {
-            Spacer(Modifier.height(12.dp))
-            Text(it, color = MaterialTheme.colorScheme.primary)
+        // Barra superior simple
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = { navController.popBackStack() }) { Text("← Volver") }
         }
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = { navController.popBackStack() }) { Text("Volver a la búsqueda") }
-        TextButton(onClick = {
-            vm.cerrarSesion {
-                navController.navigate("login") {
-                    popUpTo(navController.graph.id) { inclusive = true }
+
+        // Avatar con iniciales
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                iniciales,
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            vm.nombre.ifBlank { "Mi perfil" },
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            vm.correo,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(24.dp))
+
+        // ---------- Datos personales (H16) ----------
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "Datos personales",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = vm.nombre, onValueChange = { vm.nombre = it },
+                    label = { Text("Nombre") }, singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = vm.telefono, onValueChange = { vm.telefono = it },
+                    label = { Text("Teléfono") }, singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = vm.direccion, onValueChange = { vm.direccion = it },
+                    label = { Text("Dirección") }, singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(16.dp))
+
+                Button(
+                    onClick = { vm.guardar() },
+                    enabled = !vm.isLoading,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                ) {
+                    if (vm.isLoading) {
+                        CircularProgressIndicator(
+                            Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text("Guardar cambios", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
-        }) { Text("Cerrar sesión", color = MaterialTheme.colorScheme.error) }
+        }
 
-        // ---------- H19: eliminar cuenta ----------
+        // Mensaje de guardado
+        vm.mensaje?.let {
+            Spacer(Modifier.height(12.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "✅  $it",
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(14.dp)
+                )
+            }
+        }
         Spacer(Modifier.height(16.dp))
-        HorizontalDivider()
-        Spacer(Modifier.height(16.dp))
+
+        // ---------- Sesión ----------
         OutlinedButton(
-            onClick = { mostrarDialogo = true },
-            enabled = !cuentaVm.isLoading,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.fillMaxWidth()
+            onClick = {
+                vm.cerrarSesion {
+                    navController.navigate("login") {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                }
+            },
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
-            if (cuentaVm.isLoading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            else Text("Eliminar mi cuenta")
+            Text("Cerrar sesión", fontWeight = FontWeight.SemiBold)
         }
-        cuentaVm.error?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.error)
+        Spacer(Modifier.height(24.dp))
+
+        // ---------- Zona de peligro (H19) ----------
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "Zona de peligro",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Si eliminas tu cuenta se borrarán tus datos personales y no podrás recuperarla.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { mostrarDialogo = true },
+                    enabled = !cuentaVm.isLoading,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                ) {
+                    if (cuentaVm.isLoading) {
+                        CircularProgressIndicator(
+                            Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onError
+                        )
+                    } else {
+                        Text("Eliminar mi cuenta", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                cuentaVm.error?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text("⚠️  $it", color = MaterialTheme.colorScheme.onErrorContainer)
+                }
+            }
         }
+        Spacer(Modifier.height(24.dp))
     }
 
     // Diálogo de confirmación (H19)
     if (mostrarDialogo) {
         AlertDialog(
             onDismissRequest = { mostrarDialogo = false },
+            icon = { Text("⚠️", fontSize = 28.sp) },
             title = { Text("¿Eliminar tu cuenta?") },
             text = {
                 Text("Se borrarán tus datos personales y se cerrará tu sesión. Esta acción no se puede deshacer.")
             },
             confirmButton = {
-                TextButton(onClick = {
-                    mostrarDialogo = false
-                    cuentaVm.eliminarCuenta()
-                }) {
-                    Text("Sí, eliminar", color = MaterialTheme.colorScheme.error)
-                }
+                Button(
+                    onClick = {
+                        mostrarDialogo = false
+                        cuentaVm.eliminarCuenta()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) { Text("Sí, eliminar") }
             },
             dismissButton = {
                 TextButton(onClick = { mostrarDialogo = false }) { Text("Cancelar") }
