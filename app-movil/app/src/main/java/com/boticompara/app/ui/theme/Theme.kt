@@ -1,54 +1,73 @@
 package com.boticompara.app.ui.theme
 
-import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+// Esquema de color Material 3 de BotiCompara
+private val LightColorScheme = lightColorScheme(
+    primary = VerdePrimario,
+    onPrimary = SobreVerdePrimario,
+    primaryContainer = VerdeContenedor,
+    onPrimaryContainer = SobreVerdeContenedor,
+    secondary = Secundario,
+    onSecondary = SobreSecundario,
+    secondaryContainer = SecundarioContenedor,
+    onSecondaryContainer = SobreSecundarioContenedor,
+    tertiary = Terciario,
+    onTertiary = SobreTerciario,
+    tertiaryContainer = TerciarioContenedor,
+    onTertiaryContainer = SobreTerciarioContenedor,
+    error = ErrorClaro,
+    onError = SobreErrorClaro,
+    errorContainer = ErrorContenedorClaro,
+    onErrorContainer = SobreErrorContenedorClaro,
+    background = FondoClaro,
+    onBackground = SobreFondoClaro,
+    surface = FondoClaro,
+    onSurface = SobreFondoClaro,
+    surfaceVariant = SuperficieVarianteClaro,
+    onSurfaceVariant = SobreSuperficieVarianteClaro,
+    outline = ContornoClaro,
+    outlineVariant = ContornoVarianteClaro
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+private val DarkColorScheme = darkColorScheme(
+    primary = VerdePrimarioOscuro,
+    onPrimary = SobreVerdePrimarioOscuro,
+    primaryContainer = VerdeContenedorOscuro,
+    onPrimaryContainer = SobreVerdeContenedorOscuro,
+    secondary = SecundarioOscuro,
+    onSecondary = SobreSecundarioOscuro,
+    secondaryContainer = SecundarioContenedorOscuro,
+    onSecondaryContainer = SobreSecundarioContenedorOscuro,
+    tertiary = TerciarioOscuro,
+    onTertiary = SobreTerciarioOscuro,
+    tertiaryContainer = TerciarioContenedorOscuro,
+    onTertiaryContainer = SobreTerciarioContenedorOscuro,
+    error = ErrorOscuro,
+    onError = SobreErrorOscuro,
+    errorContainer = ErrorContenedorOscuro,
+    onErrorContainer = SobreErrorContenedorOscuro,
+    background = FondoOscuro,
+    onBackground = SobreFondoOscuro,
+    surface = FondoOscuro,
+    onSurface = SobreFondoOscuro,
+    surfaceVariant = SuperficieVarianteOscuro,
+    onSurfaceVariant = SobreSuperficieVarianteOscuro,
+    outline = ContornoOscuro,
+    outlineVariant = ContornoVarianteOscuro
 )
 
 @Composable
 fun BotiComparaAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    // Sin colores dinámicos: la app usa siempre la paleta de BotiCompara
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,
