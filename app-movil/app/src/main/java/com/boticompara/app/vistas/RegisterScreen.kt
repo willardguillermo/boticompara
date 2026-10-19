@@ -1,5 +1,6 @@
 package com.boticompara.app.vistas
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,7 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 
-// ===================== REGISTRO DE COMPRADOR (H15) =====================
+// ===================== REGISTRO DE COMPRADOR (H15, H20) =====================
 @Composable
 fun RegisterScreen(navController: NavController, authViewModel: AuthViewModel = viewModel()) {
     var nombre by remember { mutableStateOf("") }
@@ -161,7 +162,10 @@ fun RegisterScreen(navController: NavController, authViewModel: AuthViewModel = 
                                 contrasena = contrasena,
                                 telefono = telefono.ifBlank { null }
                             ) {
-                                navController.navigate("busqueda") { popUpTo("login") { inclusive = true } }
+                                // H20: después de registrarse se muestra "Verifica tu correo"
+                                navController.navigate("verificar/${Uri.encode(correo.trim())}") {
+                                    popUpTo("registro") { inclusive = true }
+                                }
                             }
                         }
                     },
