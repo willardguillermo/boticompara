@@ -1,7 +1,9 @@
 package com.boticompara.usuario.service;
 
+import com.boticompara.usuario.dto.BusquedaResponse;
 import com.boticompara.usuario.dto.ProductoDetalleResponse;
 import com.boticompara.usuario.error.ApiException;
+import com.boticompara.usuario.service.BusquedaService.FilaBusqueda;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -20,11 +22,13 @@ import java.sql.ResultSet;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -110,5 +114,153 @@ class BusquedaServiceTest {
         assertEquals(new ProductoDetalleResponse(9L, "Paracetamol Genérico", "Paracetamol",
                 "Tableta 500 mg x 10", new BigDecimal("2.20"), 90, 2L, "FarmaVida",
                 "Jr. Trujillo 210", "Lurigancho-Chosica", null), r);
+    }
+
+    // ---------- H27: búsqueda por cercanía ----------
+
+    /** Comprador en Chosica. */
+    private static final double LAT = -11.9425;
+    private static final double LNG = -76.699;
+
+    /** Botica a ~1.09 km (0.01° de longitud). */
+    private static FilaBusqueda cerca(long id, String precio) {
+        return fila(id, precio, "-11.942500", "-76.689000");
+    }
+
+    /** Botica en la Plaza de Armas de Lima, a ~39.14 km. */
+    private static FilaBusqueda lejos(long id, String precio) {
+        return fila(id, precio, "-12.046374", "-77.042793");
+    }
+
+    private static FilaBusqueda sinCoordenadas(long id, String precio) {
+        return fila(id, precio, null, null);
+    }
+
+    private static FilaBusqueda fila(long id, String precio, String lat, String lng) {
+        BusquedaResponse p = new BusquedaResponse(id, "Paracetamol " + id, "Paracetamol", "Tableta 500 mg x 10",
+                new BigDecimal(precio), 10, id, "Botica " + id, "Av. " + id, "Chosica", null);
+        return new FilaBusqueda(p, lat == null ? null : new BigDecimal(lat), lng == null ? null : new BigDecimal(lng));
+    }
+
+    /** La base ya devuelve las filas ordenadas por precio ascendente. */
+    private void baseDevuelve(FilaBusqueda... filas) {
+        when(jdbc.query(anyString(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<FilaBusqueda>>any()))
+                .thenReturn(List.of(filas));
+    }
+
+    private static List<Long> ids(List<BusquedaResponse> r) {
+        return r.stream().map(BusquedaResponse::productoId).toList();
+    }
+
+    @Test
+    void buscar_sinUbicacion_funcionaComoAntes() {
+        baseDevuelve(lejos(1, "2.20"), sinCoordenadas(2, "2.50"), cerca(3, "3.00"));
+
+        List<BusquedaResponse> r = service.buscar("para", "nombre", null, null, null, null);
+
+        assertEquals(List.of(1L, 2L, 3L), ids(r));
+        assertTrue(r.stream().allMatch(x -> x.distanciaKm() == null));
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<FilaBusqueda>>any());
+        assertTrue(sql.getValue().contains("order by precio asc"));
+    }
+
+    @Test
+    void buscar_conUbicacion_ordenaPorDistanciaYSinCoordenadasAlFinal() {
+        baseDevuelve(lejos(1, "2.20"), sinCoordenadas(2, "2.50"), cerca(3, "3.00"));
+
+        List<BusquedaResponse> r = service.buscar("para", "nombre", null, LAT, LNG, null);
+
+        assertEquals(List.of(3L, 1L, 2L), ids(r));
+        assertEquals(new BigDecimal("1.09"), r.get(0).distanciaKm());
+        assertEquals(new BigDecimal("39.14"), r.get(1).distanciaKm());
+        assertNull(r.get(2).distanciaKm());
+    }
+
+    @Test
+    void buscar_conUbicacionYOrdenPrecio_mantieneElPrecioYTraeLaDistancia() {
+        baseDevuelve(lejos(1, "2.20"), sinCoordenadas(2, "2.50"), cerca(3, "3.00"));
+
+        List<BusquedaResponse> r = service.buscar("para", "nombre", "precio_asc", LAT, LNG, null);
+
+        assertEquals(List.of(1L, 2L, 3L), ids(r));
+        assertEquals(new BigDecimal("39.14"), r.get(0).distanciaKm());
+    }
+
+    @Test
+    void buscar_aIgualDistancia_primeroElMasBarato() {
+        baseDevuelve(cerca(1, "1.00"), cerca(2, "3.00"));
+
+        List<BusquedaResponse> r = service.buscar("para", "nombre", "distancia", LAT, LNG, null);
+
+        assertEquals(List.of(1L, 2L), ids(r));
+    }
+
+    @Test
+    void buscar_radioVacio_usa5Km() {
+        baseDevuelve(lejos(1, "2.20"), sinCoordenadas(2, "2.50"), cerca(3, "3.00"));
+
+        List<BusquedaResponse> r = service.buscar("para", "nombre", null, LAT, LNG, "");
+
+        assertEquals(List.of(3L), ids(r));
+    }
+
+    @Test
+    void buscar_conRadio_dejaFueraLasBoticasSinCoordenadas() {
+        baseDevuelve(lejos(1, "2.20"), sinCoordenadas(2, "2.50"), cerca(3, "3.00"));
+
+        List<BusquedaResponse> r = service.buscar("para", "nombre", null, LAT, LNG, "50");
+
+        assertEquals(List.of(3L, 1L), ids(r));
+    }
+
+    private void esperar400(String mensaje, Runnable llamada) {
+        ApiException ex = assertThrows(ApiException.class, llamada::run);
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals(mensaje, ex.getMessage());
+        verify(jdbc, never()).query(anyString(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<FilaBusqueda>>any());
+    }
+
+    @Test
+    void buscar_soloLatitud_responde400() {
+        esperar400("Debes enviar lat y lng juntas",
+                () -> service.buscar("para", "nombre", null, LAT, null, null));
+    }
+
+    @Test
+    void buscar_latitudFueraDeRango_responde400() {
+        esperar400("La latitud debe estar entre -90 y 90",
+                () -> service.buscar("para", "nombre", null, 91.0, LNG, null));
+    }
+
+    @Test
+    void buscar_radioSinUbicacion_responde400() {
+        esperar400("El radio requiere lat y lng",
+                () -> service.buscar("para", "nombre", null, null, null, "5"));
+    }
+
+    @Test
+    void buscar_radioInvalido_responde400() {
+        esperar400("radioKm debe ser un número mayor que 0 y hasta 50",
+                () -> service.buscar("para", "nombre", null, LAT, LNG, "51"));
+        esperar400("radioKm debe ser un número mayor que 0 y hasta 50",
+                () -> service.buscar("para", "nombre", null, LAT, LNG, "abc"));
+        esperar400("radioKm debe ser un número mayor que 0 y hasta 50",
+                () -> service.buscar("para", "nombre", null, LAT, LNG, "0"));
+    }
+
+    @Test
+    void buscar_ordenPorDistanciaSinUbicacion_responde400() {
+        esperar400("El orden por distancia requiere lat y lng",
+                () -> service.buscar("para", "nombre", "distancia", null, null, null));
+    }
+
+    @Test
+    void buscar_ordenInvalido_responde400() {
+        esperar400("El orden debe ser precio_asc, precio_desc o distancia",
+                () -> service.buscar("para", "nombre", "cerca", null, null, null));
     }
 }

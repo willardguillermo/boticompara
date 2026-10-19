@@ -1047,7 +1047,7 @@
       ]
     },
     {
-      "name": "5. Búsqueda del comprador (H22, H23, H24)",
+      "name": "5. Búsqueda del comprador (H22, H23, H24, H26, H27)",
       "item": [
         {
           "name": "Paracetamol por principio activo (al menos 4 resultados, primero S/ 2.20)",
@@ -1060,7 +1060,8 @@
                   "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
                   "const r = pm.response.json();",
                   "pm.test(\"Al menos 4 resultados\", function () { pm.expect(r.length).to.be.at.least(4); });",
-                  "pm.test(\"El primero cuesta 2.20\", function () { pm.expect(r[0].precio).to.eql(2.2); });"
+                  "pm.test(\"El primero cuesta 2.20\", function () { pm.expect(r[0].precio).to.eql(2.2); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
                 ]
               }
             }
@@ -1112,7 +1113,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });"
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
                 ]
               }
             }
@@ -1162,7 +1164,8 @@
                 "exec": [
                   "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
                   "const r = pm.response.json();",
-                  "pm.test(\"Orden descendente\", function () { for (let i = 1; i < r.length; i++) { pm.expect(r[i-1].precio).to.be.at.least(r[i].precio); } });"
+                  "pm.test(\"Orden descendente\", function () { for (let i = 1; i < r.length; i++) { pm.expect(r[i-1].precio).to.be.at.least(r[i].precio); } });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
                 ]
               }
             }
@@ -1215,7 +1218,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
-                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
                 ]
               }
             }
@@ -1260,7 +1264,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
-                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
                 ]
               }
             }
@@ -1281,6 +1286,184 @@
                 {
                   "key": "q",
                   "value": "paracetamol"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cerca de Botica Salud Total: ordena por distancia, sin coordenadas al final (H27)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"El primero es Botica Salud Total a 1.07 km\", function () { pm.expect(r[0].boticaNombre).to.eql(\"Botica Salud Total\"); pm.expect(r[0].distanciaKm).to.eql(1.07); });",
+                  "pm.test(\"Las boticas sin coordenadas van al final\", function () { pm.expect(r[r.length - 1].distanciaKm).to.eql(null); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&lat=-12.046856&lng=-77.074",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "lat",
+                  "value": "-12.046856"
+                },
+                {
+                  "key": "lng",
+                  "value": "-77.074"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Radio vacío = 5 km: solo boticas con coordenadas (H27)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Al menos 1 resultado\", function () { pm.expect(r.length).to.be.at.least(1); });",
+                  "pm.test(\"Todos a 5 km o menos\", function () { r.forEach(function (p) { pm.expect(p.distanciaKm).to.be.a(\"number\"); pm.expect(p.distanciaKm).to.be.at.most(5); }); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&lat=-12.046856&lng=-77.074&radioKm=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "lat",
+                  "value": "-12.046856"
+                },
+                {
+                  "key": "lng",
+                  "value": "-77.074"
+                },
+                {
+                  "key": "radioKm",
+                  "value": ""
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Solo lat sin lng (400) (H27)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Mensaje de ubicación incompleta\", function () { pm.expect(pm.response.json().mensaje).to.eql(\"Debes enviar lat y lng juntas\"); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&lat=-12.04",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "lat",
+                  "value": "-12.04"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
                 }
               ]
             }
