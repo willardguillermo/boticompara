@@ -19,11 +19,15 @@ public class BusquedaController {
 
     private final BusquedaService busqueda;
 
+    /** H22-H24, H27. radioKm se recibe como texto para distinguir "no enviado" (sin filtro) de "vacío" (5 km). */
     @GetMapping("/buscar")
     public List<BusquedaResponse> buscar(@RequestParam(required = false) String q,
                                          @RequestParam(defaultValue = "nombre") String tipo,
-                                         @RequestParam(defaultValue = "precio_asc") String orden) {
-        return busqueda.buscar(q, tipo, orden);
+                                         @RequestParam(required = false) String orden,
+                                         @RequestParam(required = false) Double lat,
+                                         @RequestParam(required = false) Double lng,
+                                         @RequestParam(required = false) String radioKm) {
+        return busqueda.buscar(q, tipo, orden, lat, lng, radioKm);
     }
 
     /** H28: público (ver SecurityConfig). Un id no numérico responde 400 por GlobalExceptionHandler. */
