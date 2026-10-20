@@ -47,7 +47,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // H15: el registro NO devuelve token, así que después se inicia sesión automáticamente
+    // H15 + H20: registra la cuenta. El backend envía el correo de verificación,
+    // así que después se muestra la pantalla "Verifica tu correo" (sin iniciar sesión automático).
     fun registrar(
         nombre: String,
         correo: String,
@@ -74,8 +75,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 isLoading = false
             }
-            // Fuera del try: el login automatico se lanza solo si el registro salio bien
-            if (registrado) login(correo, contrasena, onSuccess)
+            // Fuera del try: se navega a la pantalla de verificación solo si el registro salió bien
+            if (registrado) onSuccess()
         }
     }
 

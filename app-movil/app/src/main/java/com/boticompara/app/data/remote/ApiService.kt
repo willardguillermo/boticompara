@@ -15,6 +15,11 @@ data class RegistroRequest(
     val rol: String = "COMPRADOR"
 )
 
+// ---- Recuperar contraseña (H17) ----
+data class RecuperarRequest(val correo: String)
+data class RestablecerRequest(val correo: String, val token: String, val password: String)
+data class MensajeResponse(val mensaje: String)
+
 // ---- Perfil (H16) ----
 data class PerfilResponse(
     val id: Long, val nombre: String, val correo: String,
@@ -43,6 +48,12 @@ interface ApiService {
     @POST("auth/registro")   // 201, devuelve el usuario SIN token -> luego llamar a login
     suspend fun registro(@Body request: RegistroRequest): Response<UsuarioResponse>
 
+    @POST("auth/recuperar")   // H17: siempre responde 200, exista o no el correo
+    suspend fun recuperar(@Body request: RecuperarRequest): Response<MensajeResponse>
+
+    @POST("auth/restablecer")   // H17: 200 si el código es válido, 400 si no
+    suspend fun restablecer(@Body request: RestablecerRequest): Response<MensajeResponse>
+
     @GET("usuarios/me")
     suspend fun obtenerPerfil(@Header("Authorization") auth: String): Response<PerfilResponse>
 
@@ -51,6 +62,9 @@ interface ApiService {
         @Header("Authorization") auth: String,
         @Body request: PerfilRequest
     ): Response<PerfilResponse>
+
+    @DELETE("usuarios/me")   // H19: 204 sin cuerpo, la cuenta queda anonimizada
+    suspend fun eliminarCuenta(@Header("Authorization") auth: String): Response<Unit>
 
     @GET("productos/buscar")
     suspend fun buscarProductos(
