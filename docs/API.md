@@ -377,6 +377,44 @@ Público (no necesita token). Devuelve el detalle de un producto que el comprado
 `boticaTelefono` es `null` si la botica no lo registró.
 Errores: 400 (`id` no numérico), 404 (el producto no existe, está dado de baja, no tiene stock, su botica no está aprobada, o su medicamento está oculto o con el registro sanitario vencido).
 
+### `GET /productos/{id}/alternativas` — H36, H37, H38, H41
+
+Público (no necesita token). Devuelve los productos que el comprador puede usar en lugar del consultado, para comparar precios.
+```json
+// 200 OK
+{
+  "productoId": 7,
+  "sinEquivalentes": false,
+  "alternativas": [
+    {
+      "productoId": 13,
+      "nombreComercial": "Paracetamol Genérico",
+      "principioActivo": "Paracetamol",
+      "presentacion": "Tableta 500 mg x 10",
+      "precio": 2.20,
+      "stock": 90,
+      "boticaId": 2,
+      "boticaNombre": "FarmaVida",
+      "boticaDireccion": "Jr. Trujillo 210",
+      "boticaDistrito": "Lurigancho-Chosica",
+      "tipoCoincidencia": "EQUIVALENTE",
+      "ahorroPorcentaje": 73.2
+    }
+  ]
+}
+```
+**Cómo se buscan las alternativas (H36):**
+- Si el producto está enlazado a un medicamento (H31) que pertenece a un grupo de equivalencia, las alternativas son los productos de los medicamentos de ese grupo: `tipoCoincidencia` = `EQUIVALENTE`.
+- Si el producto no está enlazado, o su medicamento no está en ningún grupo, se usan los productos con el mismo principio activo, sin distinguir mayúsculas ni espacios de más: `tipoCoincidencia` = `PRINCIPIO_ACTIVO`.
+- Solo salen productos que el comprador puede ver: activos, con stock > 0, de boticas `APROBADO` y sin medicamento oculto ni registro sanitario vencido (H38, H39). El producto consultado no aparece entre sus alternativas.
+- Orden: de menor a mayor precio, y a igual precio por nombre de botica. Máximo 20 resultados.
+
+**`ahorroPorcentaje` (H37):** `(precio consultado − precio de la alternativa) / precio consultado × 100`, con 1 decimal. Es `null` si la alternativa no es más barata que el consultado.
+
+**`sinEquivalentes` (H41):** `true` cuando `alternativas` viene vacía (la app muestra que no hay equivalentes).
+
+Errores: 400 (`id` no numérico), 404 (el producto consultado no existe o no es visible: los mismos casos que `GET /productos/{id}`).
+
 ---
 
 ## Usuarios de prueba (seed.sql)
