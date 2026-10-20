@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,12 +20,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.ProductoResponse
 import java.util.Locale
 
-// ===================== BÚSQUEDA (H22, H23, H24, H25, H26) =====================
+// ===================== BÚSQUEDA (H22, H23, H24, H25, H26, H40) =====================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel = viewModel()) {
     val vm = searchViewModel
@@ -36,6 +39,12 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                 popUpTo(navController.graph.id) { inclusive = true }
             }
         }
+    }
+
+    // H40: cada vez que la pantalla vuelve a estar visible (ej. al regresar del perfil) se recarga
+    LifecycleResumeEffect(Unit) {
+        vm.recargarAlVolver()
+        onPauseOrDispose { }
     }
 
     Column(
@@ -126,8 +135,8 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                 }
                 Spacer(Modifier.height(12.dp))
 
-                // H26: indicador de carga
-                if (vm.isLoading) {
+                // H26: indicador de carga (no se muestra si la carga viene de deslizar, ahí sale el círculo)
+                if (vm.isLoading && !vm.isRefreshing) {
                     LinearProgressIndicator(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -136,13 +145,14 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Buscando en boticas cercanas…",
+                        "Buscando en boticas…",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
                 } else {
                     Text(
-                        "✨ Los resultados aparecen mientras escribes",
+                        if (vm.productos.isNotEmpty()) "↓ Desliza hacia abajo para actualizar los precios"
+                        else "✨ Los resultados aparecen mientras escribes",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -161,13 +171,21 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
+
+                // H40: deslizar hacia abajo para actualizar
+                PullToRefreshBox(
+                    isRefreshing = vm.isRefreshing,
+                    onRefresh = { vm.refrescar() },
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    itemsIndexed(vm.productos, key = { _, p -> p.productoId }) { indice, producto ->
-                        ResultadoCard(producto = producto, esMasBarato = indice == 0)
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp)
+                    ) {
+                        itemsIndexed(vm.productos, key = { _, p -> p.productoId }) { indice, producto ->
+                            ResultadoCard(producto = producto, esMasBarato = indice == 0)
+                        }
                     }
                 }
             }

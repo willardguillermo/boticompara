@@ -25,6 +25,8 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var isLoading by mutableStateOf(false)
         private set
+    var isRefreshing by mutableStateOf(false)   // H40: deslizar para actualizar
+        private set
     var mensaje by mutableStateOf<String?>(null)
         private set
     var sesionVencida by mutableStateOf(false)
@@ -60,6 +62,23 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         programarBusqueda(inmediata = true)
     }
 
+    // H40: deslizar hacia abajo para actualizar los precios
+    fun refrescar() {
+        val query = searchQuery.trim()
+        if (query.length < 2) return
+        busquedaJob?.cancel()
+        busquedaJob = viewModelScope.launch {
+            isRefreshing = true
+            ejecutarBusqueda(query)
+            isRefreshing = false
+        }
+    }
+
+    // H40: al volver a la pantalla se recarga si había una búsqueda
+    fun recargarAlVolver() {
+        if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
+    }
+
     // Botón ✕ del campo
     fun limpiar() {
         busquedaJob?.cancel()
@@ -67,10 +86,12 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         productos = emptyList()
         mensaje = null
         isLoading = false
+        isRefreshing = false
     }
 
     private fun programarBusqueda(inmediata: Boolean) {
         busquedaJob?.cancel()   // cancela la búsqueda anterior si todavía no terminó
+        isRefreshing = false
         val query = searchQuery.trim()
         if (query.length < 2) {
             productos = emptyList()
