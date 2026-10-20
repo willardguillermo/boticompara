@@ -6,14 +6,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.boticompara.app.data.local.TokenManager
 import com.boticompara.app.data.remote.ProductoResponse
-import com.boticompara.app.data.remote.RetrofitClient
+import com.boticompara.app.data.repository.ProductoRepository
+import com.boticompara.app.data.repository.ResultadoBusqueda
 import kotlinx.coroutines.launch
 
+// ViewModel (MVVM) de la búsqueda: valida, llama al Repository y expone el estado a la vista
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
-    private val apiService = RetrofitClient.getInstance(application)
-    private val tokenManager = TokenManager(application)
+    private val repository = ProductoRepository(application)
 
     var productos by mutableStateOf<List<ProductoResponse>>(emptyList())
         private set
@@ -29,39 +29,29 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     fun buscarProductos() {
         if (searchQuery.trim().length < 2) {
+            productos = emptyList()
             mensaje = "Escribe al menos 2 letras"
             return
         }
         viewModelScope.launch {
             isLoading = true
             mensaje = null
-            try {
-                val response = apiService.buscarProductos(
-                    auth = tokenManager.getBearer(),
-                    query = searchQuery.trim(),
-                    tipo = searchType,
-                    orden = "precio_asc"            // H24: del más barato al más caro
-                )
-                when {
-                    response.isSuccessful -> {
-                        productos = response.body() ?: emptyList()
-                        if (productos.isEmpty()) mensaje = "No encontramos ese medicamento"
-                    }
-                    response.code() == 401 -> {
-                        tokenManager.clearSession()
-                        sesionVencida = true
-                    }
-                    else -> {
-                        productos = emptyList()
-                        mensaje = "No se pudo realizar la búsqueda"
-                    }
+            when (val resultado = repository.buscar(searchQuery.trim(), searchType, "precio_asc")) {   // H24
+                is ResultadoBusqueda.Exito -> {
+                    productos = resultado.productos
+                    if (productos.isEmpty()) mensaje = "No encontramos ese medicamento"
                 }
-            } catch (e: Exception) {
-                productos = emptyList()
-                mensaje = "No se pudo conectar con el servidor"
-            } finally {
-                isLoading = false
+                ResultadoBusqueda.SesionVencida -> sesionVencida = true
+                ResultadoBusqueda.SinConexion -> {
+                    productos = emptyList()
+                    mensaje = "No se pudo conectar con el servidor"
+                }
+                ResultadoBusqueda.ErrorServidor -> {
+                    productos = emptyList()
+                    mensaje = "No se pudo realizar la búsqueda"
+                }
             }
+            isLoading = false
         }
     }
 }
