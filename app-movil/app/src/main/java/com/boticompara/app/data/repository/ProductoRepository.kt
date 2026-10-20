@@ -4,6 +4,7 @@ import android.content.Context
 import com.boticompara.app.data.local.TokenManager
 import com.boticompara.app.data.remote.ProductoResponse
 import com.boticompara.app.data.remote.RetrofitClient
+import kotlin.coroutines.cancellation.CancellationException
 
 // Resultado de la búsqueda, sin depender de Retrofit en el ViewModel
 sealed interface ResultadoBusqueda {
@@ -35,6 +36,8 @@ class ProductoRepository(context: Context) {
                 }
                 else -> ResultadoBusqueda.ErrorServidor
             }
+        } catch (e: CancellationException) {
+            throw e   // H26: la búsqueda se canceló porque el usuario siguió escribiendo, no es un error
         } catch (e: Exception) {
             ResultadoBusqueda.SinConexion
         }

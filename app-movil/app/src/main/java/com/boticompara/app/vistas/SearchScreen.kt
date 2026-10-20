@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -23,7 +24,7 @@ import androidx.navigation.NavController
 import com.boticompara.app.data.remote.ProductoResponse
 import java.util.Locale
 
-// ===================== BÚSQUEDA (H22, H23, H24, H25) =====================
+// ===================== BÚSQUEDA (H22, H23, H24, H25, H26) =====================
 @Composable
 fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel = viewModel()) {
     val vm = searchViewModel
@@ -84,7 +85,7 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
             Column(modifier = Modifier.padding(16.dp)) {
                 OutlinedTextField(
                     value = vm.searchQuery,
-                    onValueChange = { vm.searchQuery = it },
+                    onValueChange = { vm.onQueryChange(it) },   // H26: busca sola al dejar de escribir
                     label = {
                         Text(if (vm.searchType == "nombre") "Nombre comercial" else "Principio activo")
                     },
@@ -92,6 +93,13 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                         Text(if (vm.searchType == "nombre") "Ej. Panadol" else "Ej. Paracetamol")
                     },
                     leadingIcon = { Text("🔍", fontSize = 18.sp) },
+                    trailingIcon = {
+                        if (vm.searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { vm.limpiar() }) {
+                                Text("✕", fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -104,27 +112,40 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                 Row {
                     FilterChip(
                         selected = vm.searchType == "nombre",
-                        onClick = { vm.searchType = "nombre" },
+                        onClick = { vm.onTipoChange("nombre") },
                         label = { Text("Por nombre") },
                         shape = RoundedCornerShape(50)
                     )
                     Spacer(Modifier.width(8.dp))
                     FilterChip(
                         selected = vm.searchType == "principio",
-                        onClick = { vm.searchType = "principio" },
+                        onClick = { vm.onTipoChange("principio") },
                         label = { Text("Por principio activo") },
                         shape = RoundedCornerShape(50)
                     )
                 }
                 Spacer(Modifier.height(12.dp))
 
-                Button(
-                    onClick = { vm.buscarProductos() },
-                    enabled = !vm.isLoading,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
-                ) {
-                    Text("Buscar", fontWeight = FontWeight.SemiBold)
+                // H26: indicador de carga
+                if (vm.isLoading) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(50))
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Buscando en boticas cercanas…",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Text(
+                        "✨ Los resultados aparecen mientras escribes",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -132,14 +153,7 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
 
         // ---------- Resultados ----------
         when {
-            vm.isLoading ->
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) { CircularProgressIndicator() }
-
-            vm.mensaje != null -> EstadoVacio("🔎", vm.mensaje!!)
-
+            // Hay resultados: se muestran aunque se esté actualizando (no "parpadea")
             vm.productos.isNotEmpty() -> {
                 Text(
                     "${vm.productos.size} resultados · del más barato al más caro",
@@ -158,7 +172,24 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                 }
             }
 
-            else -> EstadoVacio("💊", "Busca un medicamento para comparar precios entre boticas")
+            // Primera búsqueda en curso
+            vm.isLoading ->
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Comparando precios…",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+            vm.mensaje != null -> EstadoVacio("🔎", vm.mensaje!!)
+
+            else -> EstadoVacio("💊", "Escribe el nombre de un medicamento para comparar precios entre boticas")
         }
     }
 }
