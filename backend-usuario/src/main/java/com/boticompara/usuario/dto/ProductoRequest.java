@@ -33,6 +33,9 @@ public record ProductoRequest(
 
         /** H12: opcional. Si no viene, al crear queda en 5 y al editar se conserva el actual. */
         @Min(value = 0, message = "El stock mínimo no puede ser negativo")
-        Integer stockMinimo
+        Integer stockMinimo,
+
+        /** H31: opcional. Al editar, si no viene se conserva el enlace actual. */
+        Long medicamentoId
 ) {
 }

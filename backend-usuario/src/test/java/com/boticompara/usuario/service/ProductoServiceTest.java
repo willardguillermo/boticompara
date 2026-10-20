@@ -4,6 +4,7 @@ import com.boticompara.usuario.dto.ProductoRequest;
 import com.boticompara.usuario.dto.ProductoResponse;
 import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Producto;
+import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,12 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,6 +33,9 @@ class ProductoServiceTest {
 
     @Mock
     ProductoRepository productos;
+
+    @Mock
+    MedicamentoService medicamentos;
 
     @InjectMocks
     ProductoService service;
@@ -40,8 +49,12 @@ class ProductoServiceTest {
     }
 
     private ProductoRequest request(Integer stockMinimo) {
+        return request(stockMinimo, null);
+    }
+
+    private ProductoRequest request(Integer stockMinimo, Long medicamentoId) {
         return new ProductoRequest("Panadol", "Paracetamol", "Tableta 500 mg x 10",
-                new BigDecimal("8.50"), 40, stockMinimo);
+                new BigDecimal("8.50"), 40, stockMinimo, medicamentoId);
     }
 
     private Producto productoExistente(int stockMinimo) {
@@ -99,5 +112,68 @@ class ProductoServiceTest {
         ProductoResponse r = service.actualizar(10L, 7L, request(20));
 
         assertEquals(20, r.stockMinimo());
+    }
+
+    // ---------- H31: enlace con el catálogo maestro ----------
+
+    @Test
+    void crearSinMedicamento_noConsultaElCatalogo() {
+        conBoticaAprobada();
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.crear(10L, request(null));
+
+        assertNull(r.medicamentoId());
+        verify(medicamentos, never()).validarEnlazable(any());
+    }
+
+    @Test
+    void crearConMedicamentoValido_loEnlaza() {
+        conBoticaAprobada();
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.crear(10L, request(null, 12L));
+
+        assertEquals(12L, r.medicamentoId());
+        verify(medicamentos).validarEnlazable(12L);
+    }
+
+    @Test
+    void crearConMedicamentoInvalido_noGuarda() {
+        conBoticaAprobada();
+        doThrow(ApiException.badRequest("El medicamento no existe en el catálogo"))
+                .when(medicamentos).validarEnlazable(99L);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(10L, request(null, 99L)));
+
+        assertEquals("El medicamento no existe en el catálogo", ex.getMessage());
+        verify(productos, never()).save(any(Producto.class));
+    }
+
+    @Test
+    void actualizarSinMedicamento_conservaElEnlaceActual() {
+        conBoticaAprobada();
+        Producto existente = productoExistente(9);
+        existente.setMedicamentoId(12L);
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(existente));
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.actualizar(10L, 7L, request(null));
+
+        assertEquals(12L, r.medicamentoId());
+    }
+
+    @Test
+    void actualizarConOtroMedicamento_loCambia() {
+        conBoticaAprobada();
+        Producto existente = productoExistente(9);
+        existente.setMedicamentoId(12L);
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(existente));
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.actualizar(10L, 7L, request(null, 15L));
+
+        assertEquals(15L, r.medicamentoId());
+        verify(medicamentos).validarEnlazable(15L);
     }
 }

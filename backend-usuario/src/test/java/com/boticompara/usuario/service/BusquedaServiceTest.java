@@ -263,4 +263,30 @@ class BusquedaServiceTest {
         esperar400("El orden debe ser precio_asc, precio_desc o distancia",
                 () -> service.buscar("para", "nombre", "cerca", null, null, null));
     }
+
+    // ---------- H39: medicamentos ocultos o con registro vencido ----------
+
+    @Test
+    void buscar_excluyeOcultosYRegistroVencido_peroNoLosSinEnlazar() {
+        baseDevuelve(cerca(1, "2.20"));
+
+        service.buscar("para", "nombre", null, null, null, null);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<FilaBusqueda>>any());
+        assertTrue(sql.getValue().contains("and not oculto and registro_vigente is not false order by"));
+    }
+
+    @Test
+    void detalle_excluyeOcultosYRegistroVencido_peroNoLosSinEnlazar() {
+        vistaDevuelve(List.of(ejemplo()));
+
+        service.detalle(9L);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<ProductoDetalleResponse>>any());
+        assertTrue(sql.getValue().endsWith("where producto_id = :id and not oculto and registro_vigente is not false"));
+    }
 }

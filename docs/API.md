@@ -240,20 +240,36 @@ Con `stockBajo=true` devuelve solo los productos con `stock <= stockMinimo` (H12
 // 200 OK
 [
   { "id": 1, "nombreComercial": "Panadol", "principioActivo": "Paracetamol",
-    "presentacion": "Tableta 500 mg x 10", "precio": 8.50, "stock": 40, "stockMinimo": 5 }
+    "presentacion": "Tableta 500 mg x 10", "precio": 8.50, "stock": 40, "stockMinimo": 5,
+    "medicamentoId": 12 }
 ]
 ```
+`medicamentoId` es `null` si el producto no está enlazado al catálogo maestro (H31).
+
+### `GET /medicamentos?q=texto` 🔒 — H31
+Busca en el catálogo maestro para el selector de la web al crear o editar un producto. `q` (mínimo 2 caracteres) se busca en el nombre comercial y en el principio activo, sin distinguir mayúsculas. Devuelve hasta 20 medicamentos, sin los ocultos, ordenados por nombre comercial.
+```json
+// 200 OK
+[
+  { "id": 12, "nombreComercial": "Panadol", "principioActivo": "Paracetamol",
+    "presentacion": "Tableta", "concentracion": "500 mg" }
+]
+```
+`concentracion` es `null` si no está registrada. Sin resultados → `200` con `[]`.
+Errores: 400 (`q` de menos de 2 caracteres).
 
 ### `POST /productos` 🔒 — H8
 ```json
 // Request
 { "nombreComercial": "Panadol", "principioActivo": "Paracetamol",
-  "presentacion": "Tableta 500 mg x 10", "precio": 8.50, "stock": 40, "stockMinimo": 5 }
+  "presentacion": "Tableta 500 mg x 10", "precio": 8.50, "stock": 40, "stockMinimo": 5,
+  "medicamentoId": 12 }
 ```
 Respuesta: 201 con el producto creado. Validaciones: `precio > 0`, `stock >= 0`, textos obligatorios. `stockMinimo` es opcional y debe ser `>= 0`: al crear queda en 5 si no se envía, y al editar con `PUT` se conserva el valor actual.
+`medicamentoId` es opcional (H31): enlaza el producto con un medicamento del catálogo maestro, elegido con `GET /medicamentos`. Si el medicamento no existe o está oculto → 400.
 
 ### `PUT /productos/{id}` 🔒 — H9
-Mismo cuerpo que el POST. Respuesta: 200 con el producto actualizado. 404 si no es de su botica.
+Mismo cuerpo que el POST. Si no se envía `medicamentoId`, se conserva el enlace actual (H31). Respuesta: 200 con el producto actualizado. 404 si no es de su botica.
 
 ### `DELETE /productos/{id}` 🔒 — H10
 Baja lógica (`activo = false`): deja de aparecer en listados y búsquedas. Respuesta: 204 sin cuerpo.
@@ -311,7 +327,7 @@ No es un endpoint. Todos los días a las 8:00 (hora de Lima) el backend envía a
 | `lat`, `lng` | ubicación del comprador (H27); se envían juntas | sin ubicación |
 | `radioKm` | solo boticas a esa distancia o menos (H27); mayor que 0 y hasta 50 | sin filtro; si llega vacío (`radioKm=`), 5 |
 
-Solo devuelve productos activos, con stock > 0, de boticas `APROBADO` (vista `v_producto_busqueda`).
+Solo devuelve productos activos, con stock > 0, de boticas `APROBADO` (vista `v_producto_busqueda`). Se excluyen los productos enlazados a un medicamento que el administrador ocultó o cuyo registro sanitario está vencido (H39); los productos sin enlazar al catálogo maestro sí se muestran.
 ```json
 // 200 OK (con lat y lng)
 [
@@ -341,7 +357,7 @@ Errores: 400 (`q` de menos de 2 caracteres; `tipo` u `orden` inválidos; solo un
 
 ### `GET /productos/{id}` — H28
 
-Público (no necesita token). Devuelve el detalle de un producto que el comprador puede ver: activo, con stock > 0 y de una botica `APROBADO` (vista `v_producto_busqueda`).
+Público (no necesita token). Devuelve el detalle de un producto que el comprador puede ver: activo, con stock > 0, de una botica `APROBADO` y sin medicamento oculto ni registro sanitario vencido (vista `v_producto_busqueda`).
 ```json
 // 200 OK
 {
@@ -359,7 +375,7 @@ Público (no necesita token). Devuelve el detalle de un producto que el comprado
 }
 ```
 `boticaTelefono` es `null` si la botica no lo registró.
-Errores: 400 (`id` no numérico), 404 (el producto no existe, está dado de baja, no tiene stock o su botica no está aprobada).
+Errores: 400 (`id` no numérico), 404 (el producto no existe, está dado de baja, no tiene stock, su botica no está aprobada, o su medicamento está oculto o con el registro sanitario vencido).
 
 ---
 
