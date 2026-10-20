@@ -26,6 +26,12 @@ public class BusquedaService {
     static final double RADIO_MAXIMO_KM = 50.0;
     private static final String MENSAJE_RADIO = "radioKm debe ser un número mayor que 0 y hasta 50";
 
+    /**
+     * H39: no se muestran los medicamentos que el admin ocultó ni los de registro sanitario vencido.
+     * Si el producto no está enlazado al catálogo, registro_vigente es null y SÍ se muestra.
+     */
+    static final String FILTRO_VISIBLE = "not oculto and registro_vigente is not false";
+
     private final NamedParameterJdbcTemplate jdbc;
 
     /** Fila leída de la vista con las coordenadas de la botica, que no salen en la respuesta. */
@@ -66,6 +72,7 @@ public class BusquedaService {
         String sql = "select producto_id, nombre_comercial, principio_activo, presentacion, precio, stock, "
                 + "botica_id, botica_nombre, botica_direccion, botica_distrito, botica_latitud, botica_longitud "
                 + "from v_producto_busqueda where lower(" + columna + ") like :patron "
+                + "and " + FILTRO_VISIBLE + " "
                 + "order by precio " + direccion + ", botica_nombre asc";
 
         String patron = "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
@@ -160,7 +167,7 @@ public class BusquedaService {
     public ProductoDetalleResponse detalle(Long id) {
         String sql = "select producto_id, nombre_comercial, principio_activo, presentacion, precio, stock, "
                 + "botica_id, botica_nombre, botica_direccion, botica_distrito, botica_telefono "
-                + "from v_producto_busqueda where producto_id = :id";
+                + "from v_producto_busqueda where producto_id = :id and " + FILTRO_VISIBLE;
 
         List<ProductoDetalleResponse> filas = jdbc.query(sql, new MapSqlParameterSource("id", id),
                 (rs, i) -> new ProductoDetalleResponse(

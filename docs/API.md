@@ -327,7 +327,7 @@ No es un endpoint. Todos los días a las 8:00 (hora de Lima) el backend envía a
 | `lat`, `lng` | ubicación del comprador (H27); se envían juntas | sin ubicación |
 | `radioKm` | solo boticas a esa distancia o menos (H27); mayor que 0 y hasta 50 | sin filtro; si llega vacío (`radioKm=`), 5 |
 
-Solo devuelve productos activos, con stock > 0, de boticas `APROBADO` (vista `v_producto_busqueda`).
+Solo devuelve productos activos, con stock > 0, de boticas `APROBADO` (vista `v_producto_busqueda`). Se excluyen los productos enlazados a un medicamento que el administrador ocultó o cuyo registro sanitario está vencido (H39); los productos sin enlazar al catálogo maestro sí se muestran.
 ```json
 // 200 OK (con lat y lng)
 [
@@ -357,7 +357,7 @@ Errores: 400 (`q` de menos de 2 caracteres; `tipo` u `orden` inválidos; solo un
 
 ### `GET /productos/{id}` — H28
 
-Público (no necesita token). Devuelve el detalle de un producto que el comprador puede ver: activo, con stock > 0 y de una botica `APROBADO` (vista `v_producto_busqueda`).
+Público (no necesita token). Devuelve el detalle de un producto que el comprador puede ver: activo, con stock > 0, de una botica `APROBADO` y sin medicamento oculto ni registro sanitario vencido (vista `v_producto_busqueda`).
 ```json
 // 200 OK
 {
@@ -375,7 +375,7 @@ Público (no necesita token). Devuelve el detalle de un producto que el comprado
 }
 ```
 `boticaTelefono` es `null` si la botica no lo registró.
-Errores: 400 (`id` no numérico), 404 (el producto no existe, está dado de baja, no tiene stock o su botica no está aprobada).
+Errores: 400 (`id` no numérico), 404 (el producto no existe, está dado de baja, no tiene stock, su botica no está aprobada, o su medicamento está oculto o con el registro sanitario vencido).
 
 ---
 
