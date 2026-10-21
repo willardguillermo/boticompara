@@ -260,6 +260,7 @@ fun ProfileScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
+            .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -465,6 +466,25 @@ fun ProfileScreen(
             },
             dismissButton = {
                 TextButton(onClick = { mostrarDialogo = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // H19: el token venció, la cuenta NO se eliminó
+    if (cuentaVm.sesionVencida) {
+        AlertDialog(
+            onDismissRequest = { },
+            icon = { Text("⏰", fontSize = 28.sp) },
+            title = { Text("Tu sesión venció") },
+            text = {
+                Text("Tu cuenta no se eliminó. Inicia sesión otra vez para eliminar tu cuenta.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    navController.navigate("login") {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                }) { Text("Iniciar sesión") }
             }
         )
     }
