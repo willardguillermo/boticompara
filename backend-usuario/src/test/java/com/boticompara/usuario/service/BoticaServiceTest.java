@@ -71,11 +71,11 @@ class BoticaServiceTest {
     @BeforeEach
     void sunatNoDisponible() {
         lenient().when(rucSunat.exigirValido(anyString())).thenAnswer(i -> new RucResponse(i.getArgument(0), true,
-                "RUC válido (no se pudo consultar SUNAT)", null, null, null, "LOCAL"));
+                "RUC válido (no se pudo consultar SUNAT)", null, null, null, "LOCAL", null, null));
     }
 
     private static RucResponse sunatActivo(String ruc) {
-        return new RucResponse(ruc, true, "RUC válido", "SALUD TOTAL FARMA S.A.C.", "ACTIVO", "HABIDO", "SUNAT");
+        return new RucResponse(ruc, true, "RUC válido", "SALUD TOTAL FARMA S.A.C.", "ACTIVO", "HABIDO", "SUNAT", null, null);
     }
 
     // ---------- H3: ubicación al registrar ----------
