@@ -145,17 +145,20 @@ Primero valida el formato y el dígito verificador. Si pasan, consulta el RUC en
 ```json
 // 200 OK — consultado en SUNAT
 { "ruc": "20601234565", "valido": true, "mensaje": "RUC válido",
-  "razonSocial": "SALUD TOTAL FARMA S.A.C.", "estado": "ACTIVO", "condicion": "HABIDO", "fuente": "SUNAT" }
+  "razonSocial": "SALUD TOTAL FARMA S.A.C.", "estado": "ACTIVO", "condicion": "HABIDO", "fuente": "SUNAT",
+  "direccion": "AV. LIMA SUR NRO. 450", "distrito": "LURIGANCHO" }
 ```
 ```json
 // 200 OK — SUNAT no respondió: solo validación local
 { "ruc": "20601234565", "valido": true, "mensaje": "RUC válido (no se pudo consultar SUNAT)",
-  "razonSocial": null, "estado": null, "condicion": null, "fuente": "LOCAL" }
+  "razonSocial": null, "estado": null, "condicion": null, "fuente": "LOCAL",
+  "direccion": null, "distrito": null }
 ```
 `valido` es `false`, con el motivo en `mensaje`, si el formato o el dígito verificador son incorrectos (no se consulta SUNAT), si el RUC no existe en SUNAT, o si `estado` no es `ACTIVO` o `condicion` no es `HABIDO`.
 
 - `fuente`: `SUNAT` si se consultó; `LOCAL` si solo se validó el formato (RUC mal escrito, o SUNAT no respondió en 5 s o falló).
 - Sin sesión de dueño de botica (sin token o con otro rol) solo se hace la validación local (`fuente: LOCAL`), para cuidar la cuota del servicio.
+- `direccion` y `distrito`: domicilio **fiscal** que figura en SUNAT, no necesariamente el local de la botica. Son opcionales: `null` si SUNAT no los da o si `fuente` es `LOCAL`. La web los usa solo como sugerencia; `POST` y `PUT /boticas` siguen guardando la dirección que envía el dueño.
 - Cada consulta a SUNAT se guarda 24 h en memoria
 
 **Algoritmo del dígito verificador:**
@@ -376,6 +379,44 @@ Público (no necesita token). Devuelve el detalle de un producto que el comprado
 ```
 `boticaTelefono` es `null` si la botica no lo registró.
 Errores: 400 (`id` no numérico), 404 (el producto no existe, está dado de baja, no tiene stock, su botica no está aprobada, o su medicamento está oculto o con el registro sanitario vencido).
+
+### `GET /productos/{id}/alternativas` — H36, H37, H38, H41
+
+Público (no necesita token). Devuelve los productos que el comprador puede usar en lugar del consultado, para comparar precios.
+```json
+// 200 OK
+{
+  "productoId": 7,
+  "sinEquivalentes": false,
+  "alternativas": [
+    {
+      "productoId": 13,
+      "nombreComercial": "Paracetamol Genérico",
+      "principioActivo": "Paracetamol",
+      "presentacion": "Tableta 500 mg x 10",
+      "precio": 2.20,
+      "stock": 90,
+      "boticaId": 2,
+      "boticaNombre": "FarmaVida",
+      "boticaDireccion": "Jr. Trujillo 210",
+      "boticaDistrito": "Lurigancho-Chosica",
+      "tipoCoincidencia": "EQUIVALENTE",
+      "ahorroPorcentaje": 73.2
+    }
+  ]
+}
+```
+**Cómo se buscan las alternativas (H36):**
+- Si el producto está enlazado a un medicamento (H31) que pertenece a un grupo de equivalencia, las alternativas son los productos de los medicamentos de ese grupo: `tipoCoincidencia` = `EQUIVALENTE`.
+- Si el producto no está enlazado, o su medicamento no está en ningún grupo, se usan los productos con el mismo principio activo, sin distinguir mayúsculas ni espacios de más: `tipoCoincidencia` = `PRINCIPIO_ACTIVO`.
+- Solo salen productos que el comprador puede ver: activos, con stock > 0, de boticas `APROBADO` y sin medicamento oculto ni registro sanitario vencido (H38, H39). El producto consultado no aparece entre sus alternativas.
+- Orden: de menor a mayor precio, y a igual precio por nombre de botica. Máximo 20 resultados.
+
+**`ahorroPorcentaje` (H37):** `(precio consultado − precio de la alternativa) / precio consultado × 100`, con 1 decimal. Es `null` si la alternativa no es más barata que el consultado.
+
+**`sinEquivalentes` (H41):** `true` cuando `alternativas` viene vacía (la app muestra que no hay equivalentes).
+
+Errores: 400 (`id` no numérico), 404 (el producto consultado no existe o no es visible: los mismos casos que `GET /productos/{id}`).
 
 ---
 

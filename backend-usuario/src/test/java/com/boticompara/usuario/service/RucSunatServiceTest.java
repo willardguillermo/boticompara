@@ -93,6 +93,30 @@ class RucSunatServiceTest {
     }
 
     @Test
+    void encontradoConDireccion_laDevuelveConElDistrito() {
+        cliente.respuesta = ResultadoSunat.encontrado("SUNAT", "ACTIVO", "HABIDO",
+                "AV. GARCILASO DE LA VEGA NRO. 1472", "LIMA");
+
+        RucResponse r = service.verificar(RUC);
+
+        assertTrue(r.valido());
+        assertEquals("AV. GARCILASO DE LA VEGA NRO. 1472", r.direccion());
+        assertEquals("LIMA", r.distrito());
+    }
+
+    @Test
+    void encontradoSinDireccion_laDejaEnNull() {
+        cliente.respuesta = ResultadoSunat.encontrado("SUNAT", "ACTIVO", "HABIDO");
+
+        RucResponse r = service.verificar(RUC);
+
+        assertTrue(r.valido());
+        assertEquals("SUNAT", r.fuente());
+        assertNull(r.direccion());
+        assertNull(r.distrito());
+    }
+
+    @Test
     void rucQueNoExiste_noEsValido() {
         cliente.respuesta = ResultadoSunat.noExiste();
 
@@ -132,6 +156,8 @@ class RucSunatServiceTest {
         assertEquals("RUC válido (no se pudo consultar SUNAT)", r.mensaje());
         assertEquals("LOCAL", r.fuente());
         assertNull(r.razonSocial());
+        assertNull(r.direccion());
+        assertNull(r.distrito());
     }
 
     @Test
@@ -174,6 +200,19 @@ class RucSunatServiceTest {
         service.verificar(RUC);
 
         assertEquals(1, cliente.llamadas);
+    }
+
+    @Test
+    void cache_conservaLaDireccion() {
+        cliente.respuesta = ResultadoSunat.encontrado("SUNAT", "ACTIVO", "HABIDO",
+                "AV. GARCILASO DE LA VEGA NRO. 1472", "LIMA");
+
+        service.verificar(RUC);
+        RucResponse r = service.verificar(RUC);
+
+        assertEquals(1, cliente.llamadas);
+        assertEquals("AV. GARCILASO DE LA VEGA NRO. 1472", r.direccion());
+        assertEquals("LIMA", r.distrito());
     }
 
     @Test
