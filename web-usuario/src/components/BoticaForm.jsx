@@ -1,6 +1,7 @@
 // Formulario de datos de la botica, compartido por el registro (H1) y la corrección (H7).
 // H2 - Validación del RUC: en vivo con el dígito verificador y, cuando pasa, una sola consulta
-//      a GET /boticas/validar-ruc/{ruc} (SUNAT) que trae la razón social, el estado y la condición
+//      a GET /boticas/validar-ruc/{ruc} (SUNAT) que trae la razón social, el estado y la condición;
+//      la dirección fiscal y el distrito se sugieren en sus campos, que siguen siendo editables
 // H3 - Ubicación de la botica marcada en un mapa (latitud y longitud opcionales)
 import { useRef, useState } from 'react'
 import { api } from '../services/index.js'
@@ -18,6 +19,54 @@ const DISTRITOS = [
   'San Juan de Miraflores', 'San Luis', 'San Martín de Porres', 'San Miguel', 'Santa Anita',
   'Santiago de Surco', 'Surquillo', 'Villa El Salvador', 'Villa María del Triunfo',
 ]
+
+const SIN_SUGERENCIAS = { direccion: null, distrito: null }
+
+const sinTildes = (texto) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+/** SUNAT manda la dirección con espacios de más: se recortan y se reducen a uno. */
+function limpiarDireccion(direccion) {
+  return direccion?.trim().replace(/\s+/g, ' ') || null
+}
+
+/**
+ * SUNAT manda el distrito en mayúsculas ("SAN ISIDRO", "LURIGANCHO"). Devuelve el nombre de DISTRITOS
+ * que coincide sin distinguir mayúsculas ni tildes, o el primero que empiece con ese texto; si no, null.
+ */
+function distritoDeLista(distrito) {
+  const buscado = distrito ? sinTildes(distrito) : ''
+  if (!buscado) return null
+  return (
+    DISTRITOS.find((d) => sinTildes(d) === buscado) ??
+    DISTRITOS.find((d) => sinTildes(d).startsWith(buscado)) ??
+    null
+  )
+}
+
+/** Sugerencias de dirección y distrito de una respuesta de validar-ruc (solo SUNAT y válido). */
+function sugerenciasDe(resultado) {
+  if (!resultado?.valido || resultado.fuente !== 'SUNAT') return SIN_SUGERENCIAS
+  return { direccion: limpiarDireccion(resultado.direccion), distrito: distritoDeLista(resultado.distrito) }
+}
+
+/** Pone cada sugerencia solo si el campo está vacío o todavía tiene la sugerencia anterior de SUNAT. */
+function aplicarSugerencias(d, anteriores, sugerencias) {
+  const cambios = {}
+  for (const campo of ['direccion', 'distrito']) {
+    const esNuestro = !d[campo].trim() || d[campo] === anteriores[campo]
+    if (sugerencias[campo] && esNuestro) cambios[campo] = sugerencias[campo]
+  }
+  return cambios
+}
+
+/** Borra los campos que todavía tienen la sugerencia de SUNAT (lo escrito por el usuario se queda). */
+function quitarSugerencias(d, sugerencias) {
+  const cambios = {}
+  for (const campo of ['direccion', 'distrito']) {
+    if (sugerencias[campo] && d[campo] === sugerencias[campo]) cambios[campo] = ''
+  }
+  return cambios
+}
 
 const DATOS_VACIOS = { nombreComercial: '', ruc: '', razonSocial: '', direccion: '', distrito: '', telefono: '' }
 
@@ -79,6 +128,9 @@ export default function BoticaForm({
   const ultimaConsulta = useRef(null)
   const consultaEnCurso = useRef(null)
   const rucActual = useRef(inicial.ruc)
+  // Última dirección y distrito que pusimos desde SUNAT: un campo con otro valor lo escribió el usuario
+  // o venía cargado (H7), y no se toca
+  const sugeridos = useRef(SIN_SUGERENCIAS)
 
   /** Devuelve la respuesta de validar-ruc, reutilizando la última o la que está en curso. */
   function consultarRuc(ruc) {
@@ -102,8 +154,20 @@ export default function BoticaForm({
     if (rucActual.current !== ruc) return
     setConsulta({ ruc, resultado })
     if (resultado.valido && resultado.fuente === 'SUNAT') {
-      setDatos((d) => ({ ...d, razonSocial: resultado.razonSocial }))
-      setErrores((er) => ({ ...er, razonSocial: undefined }))
+      const anteriores = sugeridos.current
+      const sugerencias = sugerenciasDe(resultado)
+      sugeridos.current = sugerencias
+      setDatos((d) => ({
+        ...d,
+        razonSocial: resultado.razonSocial,
+        ...aplicarSugerencias(d, anteriores, sugerencias),
+      }))
+      setErrores((er) => ({
+        ...er,
+        razonSocial: undefined,
+        ...(sugerencias.direccion && { direccion: undefined }),
+        ...(sugerencias.distrito && { distrito: undefined }),
+      }))
       setRazonDeSunat(true)
     }
   }
@@ -112,11 +176,16 @@ export default function BoticaForm({
     if (ruc === rucActual.current) return
     rucActual.current = ruc
     setConsulta(null)
-    // La razón social vuelve a ser editable; se borra solo si la habíamos puesto desde SUNAT
-    if (razonDeSunat) {
-      setDatos((d) => ({ ...d, razonSocial: '' }))
-      setRazonDeSunat(false)
-    }
+    // La razón social vuelve a ser editable; ella, la dirección y el distrito se borran solo si los
+    // habíamos puesto desde SUNAT
+    const anteriores = sugeridos.current
+    sugeridos.current = SIN_SUGERENCIAS
+    setDatos((d) => ({
+      ...d,
+      ...(razonDeSunat && { razonSocial: '' }),
+      ...quitarSugerencias(d, anteriores),
+    }))
+    setRazonDeSunat(false)
     if (!validarRuc(ruc).valido) return
 
     if (ultimaConsulta.current?.ruc === ruc) {
@@ -191,6 +260,12 @@ export default function BoticaForm({
   else if (consulta.cargando) rucEnVivo = { ayuda: 'Consultando SUNAT...' }
   else rucEnVivo = estadoRucConsultado(consulta.resultado)
 
+  const direccionSunat = consulta?.ruc === datos.ruc ? sugerenciasDe(consulta.resultado).direccion : null
+  const ayudaDireccion =
+    direccionSunat && datos.direccion === direccionSunat
+      ? 'Dirección fiscal según SUNAT. Cámbiala si tu local está en otra dirección.'
+      : undefined
+
   return (
     <form className="tarjeta formulario" onSubmit={enviar} noValidate>
       <Alerta tipo="error">{error && <p>{error}</p>}</Alerta>
@@ -232,7 +307,7 @@ export default function BoticaForm({
         />
       </Campo>
 
-      <Campo id="direccion" etiqueta="Dirección" error={errores.direccion}>
+      <Campo id="direccion" etiqueta="Dirección" error={errores.direccion} ayuda={ayudaDireccion}>
         <input
           {...propsError('direccion', errores.direccion)}
           autoComplete="street-address"
