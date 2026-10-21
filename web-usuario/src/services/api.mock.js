@@ -8,6 +8,12 @@ import { obtenerToken } from './sesion.js'
 
 const PASSWORD_PRUEBA = 'Boti2026!'
 const STOCK_MINIMO_DEFECTO = 5 // H12: igual que el default de la columna stock_minimo
+// H2: único RUC que el modo simulado "encuentra" en SUNAT
+const RUC_SUNAT = {
+  ruc: '20601030013', razonSocial: 'REXTIE S.A.C.', estado: 'ACTIVO', condicion: 'HABIDO',
+  // Como la manda SUNAT: en mayúsculas y con un espacio al final
+  direccion: 'CAL. LAS CAMELIAS NRO 256 INT. 701A URB. JARDIN ', distrito: 'SAN ISIDRO',
+}
 
 const db = {
   usuarios: [
@@ -333,10 +339,16 @@ export const apiMock = {
   },
 
   // ---------- 3. Botica ----------
+  // H2: simula la consulta a SUNAT solo para RUC_SUNAT; los demás RUC válidos salen como LOCAL
   async validarRuc(ruc) {
     await esperar()
     const { valido, mensaje } = validarRuc(ruc)
-    return { ruc, valido, mensaje }
+    if (valido && ruc === RUC_SUNAT.ruc) return { ...RUC_SUNAT, valido, mensaje, fuente: 'SUNAT' }
+    return {
+      ruc, valido,
+      mensaje: valido ? 'RUC válido (no se pudo consultar SUNAT)' : mensaje,
+      razonSocial: null, estado: null, condicion: null, fuente: 'LOCAL', direccion: null, distrito: null,
+    }
   },
 
   async registrarBotica(datos) {
