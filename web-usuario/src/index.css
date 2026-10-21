@@ -274,6 +274,12 @@ a {
   font: inherit;
 }
 
+/* H2: razón social tomada de SUNAT */
+.campo input[readonly] {
+  background: var(--color-fondo);
+  color: var(--color-texto-suave);
+}
+
 .campo input[aria-invalid='true'] {
   border-color: var(--error);
   background: #fffafa;

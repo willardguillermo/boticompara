@@ -1,8 +1,8 @@
 // Formulario de datos de la botica, compartido por el registro (H1) y la corrección (H7).
-// H2 - Validación del RUC: en vivo con el dígito verificador y confirmada con
-//      GET /boticas/validar-ruc/{ruc} antes de enviar
+// H2 - Validación del RUC: en vivo con el dígito verificador y, cuando pasa, una sola consulta
+//      a GET /boticas/validar-ruc/{ruc} (SUNAT) que trae la razón social, el estado y la condición
 // H3 - Ubicación de la botica marcada en un mapa (latitud y longitud opcionales)
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { api } from '../services/index.js'
 import { validarRuc } from '../utils/ruc.js'
 import { propsError, telefonoInvalido } from '../utils/validacion.js'
@@ -44,6 +44,15 @@ function estadoRucEnVivo(ruc) {
     : { ayuda: resultado.mensaje }
 }
 
+/** Mensaje del RUC según la respuesta de GET /boticas/validar-ruc/{ruc}. */
+function estadoRucConsultado(resultado) {
+  if (!resultado.valido) return { error: resultado.mensaje || 'El RUC no es válido.' }
+  if (resultado.fuente === 'SUNAT') {
+    return { ok: `✓ Verificado en SUNAT: ${resultado.razonSocial} · ${resultado.estado} · ${resultado.condicion}` }
+  }
+  return { ok: 'RUC válido. No se pudo consultar SUNAT ahora; se verificará al enviar.' }
+}
+
 /**
  * onGuardar(payload) recibe el cuerpo de POST /boticas ya validado y con el RUC confirmado.
  * Si lanza un ApiError, el formulario lo muestra (en el campo RUC cuando corresponde).
@@ -62,11 +71,71 @@ export default function BoticaForm({
   const [errores, setErrores] = useState({})
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState('')
+  // H2: { ruc, cargando: true } mientras se consulta, luego { ruc, resultado }
+  const [consulta, setConsulta] = useState(null)
+  const [razonDeSunat, setRazonDeSunat] = useState(false)
+  // SUNAT (Decolecta) tiene 100 consultas al mes: se guarda el último RUC consultado y la
+  // consulta en curso para no repetir la llamada
+  const ultimaConsulta = useRef(null)
+  const consultaEnCurso = useRef(null)
+  const rucActual = useRef(inicial.ruc)
+
+  /** Devuelve la respuesta de validar-ruc, reutilizando la última o la que está en curso. */
+  function consultarRuc(ruc) {
+    if (ultimaConsulta.current?.ruc === ruc) return Promise.resolve(ultimaConsulta.current.resultado)
+    if (consultaEnCurso.current?.ruc === ruc) return consultaEnCurso.current.promesa
+    const promesa = api
+      .validarRuc(ruc)
+      .then((resultado) => {
+        ultimaConsulta.current = { ruc, resultado }
+        return resultado
+      })
+      .finally(() => {
+        if (consultaEnCurso.current?.promesa === promesa) consultaEnCurso.current = null
+      })
+    consultaEnCurso.current = { ruc, promesa }
+    return promesa
+  }
+
+  /** Muestra la respuesta solo si el RUC no cambió mientras se consultaba. */
+  function aplicarConsulta(ruc, resultado) {
+    if (rucActual.current !== ruc) return
+    setConsulta({ ruc, resultado })
+    if (resultado.valido && resultado.fuente === 'SUNAT') {
+      setDatos((d) => ({ ...d, razonSocial: resultado.razonSocial }))
+      setErrores((er) => ({ ...er, razonSocial: undefined }))
+      setRazonDeSunat(true)
+    }
+  }
+
+  function cambiarRuc(ruc) {
+    if (ruc === rucActual.current) return
+    rucActual.current = ruc
+    setConsulta(null)
+    // La razón social vuelve a ser editable; se borra solo si la habíamos puesto desde SUNAT
+    if (razonDeSunat) {
+      setDatos((d) => ({ ...d, razonSocial: '' }))
+      setRazonDeSunat(false)
+    }
+    if (!validarRuc(ruc).valido) return
+
+    if (ultimaConsulta.current?.ruc === ruc) {
+      aplicarConsulta(ruc, ultimaConsulta.current.resultado)
+      return
+    }
+    setConsulta({ ruc, cargando: true })
+    consultarRuc(ruc).then(
+      (resultado) => aplicarConsulta(ruc, resultado),
+      // Si falla la red se muestra solo la validación local; al enviar se vuelve a intentar
+      () => rucActual.current === ruc && setConsulta(null),
+    )
+  }
 
   const cambiar = (campo) => (e) => {
     const valor = campo === 'ruc' ? e.target.value.replace(/\D/g, '').slice(0, 11) : e.target.value
     setDatos((d) => ({ ...d, [campo]: valor }))
     setErrores((er) => ({ ...er, [campo]: undefined }))
+    if (campo === 'ruc') cambiarRuc(valor)
   }
 
   // H3: completa dirección y distrito con lo que devuelve el mapa (solo los campos que vengan)
@@ -80,21 +149,27 @@ export default function BoticaForm({
     const nuevos = validar(datos)
     setErrores(nuevos)
     setError('')
-    if (Object.keys(nuevos).length) return
+    // La razón social puede faltar todavía si SUNAT la va a completar
+    const { razonSocial: errorRazonSocial, ...otrosErrores } = nuevos
+    if (Object.keys(otrosErrores).length) return
 
     try {
       setEnviando('Verificando RUC...')
-      const verificacion = await api.validarRuc(datos.ruc)
+      // Reutiliza la consulta hecha al escribir el RUC (o la que sigue en curso)
+      const verificacion = await consultarRuc(datos.ruc)
+      aplicarConsulta(datos.ruc, verificacion)
       if (!verificacion.valido) {
         setErrores({ ruc: verificacion.mensaje || 'El RUC no es válido.' })
         return
       }
+      const deSunat = verificacion.fuente === 'SUNAT'
+      if (errorRazonSocial && !deSunat) return
 
       setEnviando(textoEnviando)
       await onGuardar({
         nombreComercial: datos.nombreComercial.trim(),
         ruc: datos.ruc,
-        razonSocial: datos.razonSocial.trim(),
+        razonSocial: deSunat ? verificacion.razonSocial : datos.razonSocial.trim(),
         direccion: datos.direccion.trim(),
         distrito: datos.distrito.trim(),
         telefono: datos.telefono.trim() || null,
@@ -110,7 +185,11 @@ export default function BoticaForm({
     }
   }
 
-  const rucEnVivo = errores.ruc ? { error: errores.ruc } : estadoRucEnVivo(datos.ruc)
+  let rucEnVivo
+  if (errores.ruc) rucEnVivo = { error: errores.ruc }
+  else if (consulta?.ruc !== datos.ruc) rucEnVivo = estadoRucEnVivo(datos.ruc)
+  else if (consulta.cargando) rucEnVivo = { ayuda: 'Consultando SUNAT...' }
+  else rucEnVivo = estadoRucConsultado(consulta.resultado)
 
   return (
     <form className="tarjeta formulario" onSubmit={enviar} noValidate>
@@ -138,9 +217,15 @@ export default function BoticaForm({
         </Campo>
       </div>
 
-      <Campo id="razonSocial" etiqueta="Razón social" error={errores.razonSocial}>
+      <Campo
+        id="razonSocial"
+        etiqueta="Razón social"
+        error={errores.razonSocial}
+        ayuda={razonDeSunat ? 'Tomada de SUNAT' : undefined}
+      >
         <input
           {...propsError('razonSocial', errores.razonSocial)}
+          readOnly={razonDeSunat}
           value={datos.razonSocial}
           onChange={cambiar('razonSocial')}
           placeholder="Salud Total Farma S.A.C."
