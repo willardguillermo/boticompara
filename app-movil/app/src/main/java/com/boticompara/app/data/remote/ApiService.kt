@@ -41,6 +41,23 @@ data class ProductoResponse(
     val boticaDistrito: String
 )
 
+// ---- Detalle de Producto (H28, H36, H37, H41) ----
+data class ProductoDetalleResponse(
+    val productoId: Long,
+    val nombreComercial: String,
+    val principioActivo: String,
+    val presentacion: String,
+    val precio: Double,
+    val stock: Int,
+    val boticaId: Long,
+    val boticaNombre: String,
+    val boticaDireccion: String,
+    val boticaDistrito: String,
+    val fabricante: String? = null,
+    val requerimientoReceta: Boolean? = false,
+    val alternativas: List<ProductoResponse>? = null // Mapea las alternativas genéricas si el backend las envía
+)
+
 interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
@@ -73,4 +90,11 @@ interface ApiService {
         @Query("tipo") tipo: String = "nombre",    // "nombre" o "principio"
         @Query("orden") orden: String = "precio_asc"
     ): Response<List<ProductoResponse>>
+
+    // H28: Detalle del producto por ID
+    @GET("productos/{id}")
+    suspend fun obtenerDetalleProducto(
+        @Header("Authorization") auth: String,
+        @Path("id") id: Long
+    ): Response<ProductoDetalleResponse>
 }

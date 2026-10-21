@@ -184,7 +184,11 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                         contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
                         itemsIndexed(vm.productos, key = { _, p -> p.productoId }) { indice, producto ->
-                            ResultadoCard(producto = producto, esMasBarato = indice == 0)
+                            ResultadoCard(
+                                producto = producto,
+                                esMasBarato = indice == 0,
+                                onClick = { navController.navigate("detalle/${producto.productoId}") }
+                            )
                         }
                     }
                 }
@@ -214,8 +218,13 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
 
 // ===================== TARJETA DE RESULTADO (H25) =====================
 @Composable
-fun ResultadoCard(producto: ProductoResponse, esMasBarato: Boolean) {
+fun ResultadoCard(
+    producto: ProductoResponse,
+    esMasBarato: Boolean,
+    onClick: () -> Unit = {}
+) {
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
