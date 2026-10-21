@@ -64,8 +64,8 @@ class DecolectaRucClientTest {
     @Test
     void respuesta200_devuelveLosDatosYEnviaTokenYNumero() {
         responder(200, "{\"razon_social\":\"SUNAT\",\"numero_documento\":\"20131312955\","
-                + "\"estado\":\"ACTIVO\",\"condicion\":\"HABIDO\",\"direccion\":\"AV. GARCILASO\","
-                + "\"locales_anexos\":[{\"distrito\":\"CALLAO\"}]}");
+                + "\"estado\":\"ACTIVO\",\"condicion\":\"HABIDO\",\"direccion\":\" AV. GARCILASO DE LA VEGA NRO. 1472 \","
+                + "\"distrito\":\"LIMA\",\"locales_anexos\":[{\"distrito\":\"CALLAO\"}]}");
 
         ResultadoSunat r = cliente("token-prueba").consultar(RUC);
 
@@ -73,8 +73,33 @@ class DecolectaRucClientTest {
         assertEquals("SUNAT", r.razonSocial());
         assertEquals("ACTIVO", r.estado());
         assertEquals("HABIDO", r.condicion());
+        assertEquals("AV. GARCILASO DE LA VEGA NRO. 1472", r.direccion());
+        assertEquals("LIMA", r.distrito());
         assertEquals("Bearer token-prueba", authRecibido);
         assertEquals("numero=" + RUC, queryRecibida);
+    }
+
+    @Test
+    void respuesta200_sinDireccionNiDistrito_igualEsEncontrado() {
+        responder(200, "{\"razon_social\":\"SUNAT\",\"estado\":\"ACTIVO\",\"condicion\":\"HABIDO\"}");
+
+        ResultadoSunat r = cliente("token-prueba").consultar(RUC);
+
+        assertEquals(Tipo.ENCONTRADO, r.tipo());
+        assertNull(r.direccion());
+        assertNull(r.distrito());
+    }
+
+    @Test
+    void respuesta200_conDireccionYDistritoVacios_quedanEnNull() {
+        responder(200, "{\"razon_social\":\"SUNAT\",\"estado\":\"ACTIVO\",\"condicion\":\"HABIDO\","
+                + "\"direccion\":\"  \",\"distrito\":null}");
+
+        ResultadoSunat r = cliente("token-prueba").consultar(RUC);
+
+        assertEquals(Tipo.ENCONTRADO, r.tipo());
+        assertNull(r.direccion());
+        assertNull(r.distrito());
     }
 
     @Test

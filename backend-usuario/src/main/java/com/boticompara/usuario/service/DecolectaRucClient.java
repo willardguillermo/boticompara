@@ -15,7 +15,8 @@ import java.time.Duration;
 
 /**
  * H2: consulta el RUC en Decolecta (GET {url}?numero={ruc}).
- * 200 → datos; 404 o 422 → no existe; cualquier otra cosa (timeout, 401, 429, 5xx...) → no disponible.
+ * 200 → datos (razon_social, estado y condicion obligatorios; direccion y distrito opcionales);
+ * 404 o 422 → no existe; cualquier otra cosa (timeout, 401, 429, 5xx...) → no disponible.
  * Nunca escribe el token en el log.
  */
 @Slf4j
@@ -67,7 +68,9 @@ public class DecolectaRucClient implements ConsultaRucClient {
                 log.warn("Decolecta devolvió una respuesta incompleta para el RUC {}", ruc);
                 return ResultadoSunat.noDisponible();
             }
-            return ResultadoSunat.encontrado(razonSocial, estado, condicion);
+            // Domicilio fiscal: si falta, igual se acepta la respuesta
+            return ResultadoSunat.encontrado(razonSocial, estado, condicion,
+                    texto(datos, "direccion"), texto(datos, "distrito"));
         } catch (IOException e) {
             // Incluye el timeout (HttpTimeoutException) y un JSON inválido
             log.warn("No se pudo consultar el RUC {} en Decolecta: {}", ruc, e.toString());

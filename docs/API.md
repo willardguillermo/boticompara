@@ -145,17 +145,20 @@ Primero valida el formato y el dígito verificador. Si pasan, consulta el RUC en
 ```json
 // 200 OK — consultado en SUNAT
 { "ruc": "20601234565", "valido": true, "mensaje": "RUC válido",
-  "razonSocial": "SALUD TOTAL FARMA S.A.C.", "estado": "ACTIVO", "condicion": "HABIDO", "fuente": "SUNAT" }
+  "razonSocial": "SALUD TOTAL FARMA S.A.C.", "estado": "ACTIVO", "condicion": "HABIDO", "fuente": "SUNAT",
+  "direccion": "AV. LIMA SUR NRO. 450", "distrito": "LURIGANCHO" }
 ```
 ```json
 // 200 OK — SUNAT no respondió: solo validación local
 { "ruc": "20601234565", "valido": true, "mensaje": "RUC válido (no se pudo consultar SUNAT)",
-  "razonSocial": null, "estado": null, "condicion": null, "fuente": "LOCAL" }
+  "razonSocial": null, "estado": null, "condicion": null, "fuente": "LOCAL",
+  "direccion": null, "distrito": null }
 ```
 `valido` es `false`, con el motivo en `mensaje`, si el formato o el dígito verificador son incorrectos (no se consulta SUNAT), si el RUC no existe en SUNAT, o si `estado` no es `ACTIVO` o `condicion` no es `HABIDO`.
 
 - `fuente`: `SUNAT` si se consultó; `LOCAL` si solo se validó el formato (RUC mal escrito, o SUNAT no respondió en 5 s o falló).
 - Sin sesión de dueño de botica (sin token o con otro rol) solo se hace la validación local (`fuente: LOCAL`), para cuidar la cuota del servicio.
+- `direccion` y `distrito`: domicilio **fiscal** que figura en SUNAT, no necesariamente el local de la botica. Son opcionales: `null` si SUNAT no los da o si `fuente` es `LOCAL`. La web los usa solo como sugerencia; `POST` y `PUT /boticas` siguen guardando la dirección que envía el dueño.
 - Cada consulta a SUNAT se guarda 24 h en memoria
 
 **Algoritmo del dígito verificador:**

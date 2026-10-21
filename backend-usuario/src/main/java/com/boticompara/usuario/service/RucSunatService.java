@@ -60,13 +60,13 @@ public class RucSunatService {
         ResultadoSunat r = consultar(ruc);
         return switch (r.tipo()) {
             case NO_DISPONIBLE -> new RucResponse(ruc, true, "RUC válido (no se pudo consultar SUNAT)",
-                    null, null, null, "LOCAL");
+                    null, null, null, "LOCAL", null, null);
             case NO_EXISTE -> new RucResponse(ruc, false, "El RUC no existe en SUNAT",
-                    null, null, null, "SUNAT");
+                    null, null, null, "SUNAT", null, null);
             case ENCONTRADO -> {
                 String motivo = motivoRechazo(r);
                 yield new RucResponse(ruc, motivo == null, motivo == null ? "RUC válido" : motivo,
-                        r.razonSocial(), r.estado(), r.condicion(), "SUNAT");
+                        r.razonSocial(), r.estado(), r.condicion(), "SUNAT", r.direccion(), r.distrito());
             }
         };
     }
