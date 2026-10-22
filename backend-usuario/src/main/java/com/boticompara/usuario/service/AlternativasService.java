@@ -5,6 +5,7 @@ import com.boticompara.usuario.dto.AlternativasResponse;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.util.Ahorro;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.List;
 
 /**
@@ -19,7 +21,10 @@ import java.util.List;
  * Todo sale de la vista v_producto_busqueda, así que ya excluye lo que el comprador no puede ver:
  * productos inactivos o sin stock (H38), de boticas no aprobadas, o con medicamento oculto o
  * registro vencido (H39). Se lee con JDBC, igual que la búsqueda.
+ * H42: cada consulta de un producto visible se registra en consulta_comparacion. No hay @Transactional a
+ * propósito: el insert es independiente de las lecturas y, si falla, no debe afectar la respuesta.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AlternativasService {
@@ -45,7 +50,7 @@ public class AlternativasService {
      * de ese grupo (EQUIVALENTE). Si el producto no está enlazado, o su medicamento no está en ningún grupo,
      * se usa el mismo principio activo, sin distinguir mayúsculas ni espacios de más (PRINCIPIO_ACTIVO).
      */
-    public AlternativasResponse alternativas(Long id) {
+    public AlternativasResponse alternativas(Long id, Long usuarioId) {
         Consultado consultado = consultado(id);
         List<AlternativaResponse> filas = consultado.grupoId() != null
                 ? delGrupo(consultado)
@@ -53,7 +58,24 @@ public class AlternativasService {
         List<AlternativaResponse> alternativas = filas.stream()
                 .map(a -> a.conAhorro(Ahorro.porcentaje(consultado.precio(), a.precio())))
                 .toList();
-        return new AlternativasResponse(id, alternativas.isEmpty(), alternativas);
+        AlternativasResponse respuesta = new AlternativasResponse(id, alternativas.isEmpty(), alternativas);
+        registrarConsulta(id, usuarioId);
+        return respuesta;
+    }
+
+    /**
+     * H42: guarda la consulta con el usuario de la sesión (null si no hay sesión). Solo se llama para productos
+     * visibles, así que las consultas con 404 no se registran. Si falla, solo queda un aviso en el log.
+     */
+    private void registrarConsulta(Long productoId, Long usuarioId) {
+        try {
+            jdbc.update("insert into consulta_comparacion (producto_id, usuario_id) values (:producto, :usuario)",
+                    new MapSqlParameterSource()
+                            .addValue("producto", productoId, Types.BIGINT)
+                            .addValue("usuario", usuarioId, Types.BIGINT));
+        } catch (RuntimeException e) {
+            log.warn("No se pudo registrar la consulta de alternativas del producto {}: {}", productoId, e.toString());
+        }
     }
 
     private Consultado consultado(Long id) {

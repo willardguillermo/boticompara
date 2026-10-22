@@ -380,7 +380,7 @@ Público (no necesita token). Devuelve el detalle de un producto que el comprado
 `boticaTelefono` es `null` si la botica no lo registró.
 Errores: 400 (`id` no numérico), 404 (el producto no existe, está dado de baja, no tiene stock, su botica no está aprobada, o su medicamento está oculto o con el registro sanitario vencido).
 
-### `GET /productos/{id}/alternativas` — H36, H37, H38, H41
+### `GET /productos/{id}/alternativas` — H36, H37, H38, H41, H42
 
 Público (no necesita token). Devuelve los productos que el comprador puede usar en lugar del consultado, para comparar precios.
 ```json
@@ -415,6 +415,8 @@ Público (no necesita token). Devuelve los productos que el comprador puede usar
 **`ahorroPorcentaje` (H37):** `(precio consultado − precio de la alternativa) / precio consultado × 100`, con 1 decimal. Es `null` si la alternativa no es más barata que el consultado.
 
 **`sinEquivalentes` (H41):** `true` cuando `alternativas` viene vacía (la app muestra que no hay equivalentes).
+
+**Registro de la consulta (H42):** cada consulta de un producto visible queda registrada (producto, fecha y, si la petición trae un token válido, el usuario) para saber qué productos se comparan más. Sin sesión se guarda sin usuario. Si el registro falla, la respuesta no se ve afectada. Las consultas a un producto que no existe o no es visible (404) no se registran.
 
 Errores: 400 (`id` no numérico), 404 (el producto consultado no existe o no es visible: los mismos casos que `GET /productos/{id}`).
 
