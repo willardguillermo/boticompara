@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db.models import Count
 from django.forms.models import BaseInlineFormSet
 from django.utils.html import format_html
@@ -70,6 +70,7 @@ class MedicamentoAdmin(admin.ModelAdmin):
     search_fields = ('nombre_comercial', 'principio_activo__nombre', 'registro_sanitario')
     list_select_related = ('principio_activo', 'categoria', 'grupo_asignado__grupo')
     autocomplete_fields = ('principio_activo', 'categoria')
+    actions = ['ocultar_del_catalogo', 'mostrar_en_catalogo']
 
     @admin.display(description='grupo de equivalencia', ordering='grupo_asignado__grupo__nombre')
     def grupo_equivalencia(self, obj):
@@ -86,6 +87,18 @@ class MedicamentoAdmin(admin.ModelAdmin):
             ' white-space: nowrap;">{}</span>',
             COLORES_VIGENCIA[estado], vigencia.ETIQUETAS[estado],
         )
+
+    # H35: solo se cuentan los que realmente cambian, no los que ya estaban así
+    @admin.action(description='Ocultar del catálogo (sin registro válido)', permissions=['change'])
+    def ocultar_del_catalogo(self, request, queryset):
+        cambiados = queryset.filter(oculto=False).update(oculto=True)
+        self.message_user(request, f'{cambiados} medicamento(s) ocultado(s) del catálogo.', messages.SUCCESS)
+
+    @admin.action(description='Volver a mostrar en el catálogo', permissions=['change'])
+    def mostrar_en_catalogo(self, request, queryset):
+        cambiados = queryset.filter(oculto=True).update(oculto=False)
+        self.message_user(request, f'{cambiados} medicamento(s) visible(s) otra vez en el catálogo.',
+                          messages.SUCCESS)
 
 
 class MiembroGrupoFormSet(BaseInlineFormSet):

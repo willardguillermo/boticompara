@@ -42,6 +42,7 @@ class MedicamentoForm(forms.ModelForm):
                   'registro_sanitario', 'fecha_vencimiento_registro', 'oculto')
         help_texts = {
             'registro_sanitario': 'Opcional. Si se indica, no puede repetirse en otro medicamento.',
+            'oculto': 'Al ocultarlo, sus productos dejan de aparecer en la búsqueda y en las alternativas (H39).',
         }
 
     def clean_registro_sanitario(self):
