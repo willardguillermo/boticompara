@@ -12,6 +12,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -44,6 +45,7 @@ class AlternativasServiceTest {
     private static final String CONSULTADO = "select v.producto_id, v.precio";
     private static final String GRUPO = "medicamento_grupo g where g.grupo_id = :grupo";
     private static final String PRINCIPIO = "lower(trim(v.principio_activo))";
+    private static final String INSERT = "insert into consulta_comparacion (producto_id, usuario_id)";
 
     @Mock
     NamedParameterJdbcTemplate jdbc;
@@ -106,7 +108,7 @@ class AlternativasServiceTest {
     void productoNoVisible_responde404YNoBuscaAlternativas() {
         consultadoEs(List.of());
 
-        ApiException ex = assertThrows(ApiException.class, () -> service.alternativas(99L));
+        ApiException ex = assertThrows(ApiException.class, () -> service.alternativas(99L, null));
 
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
         assertEquals("Producto no encontrado", ex.getMessage());
@@ -119,7 +121,7 @@ class AlternativasServiceTest {
         consultadoEs(List.of(consultado(5L)));
         delGrupoEs(List.of(alt(13, "2.20", "EQUIVALENTE")));
 
-        AlternativasResponse r = service.alternativas(7L);
+        AlternativasResponse r = service.alternativas(7L, null);
 
         assertEquals(7L, r.productoId());
         assertFalse(r.sinEquivalentes());
@@ -138,7 +140,7 @@ class AlternativasServiceTest {
         consultadoEs(List.of(consultado(null)));
         delPrincipioEs(List.of(alt(13, "2.20", "PRINCIPIO_ACTIVO")));
 
-        AlternativasResponse r = service.alternativas(7L);
+        AlternativasResponse r = service.alternativas(7L, null);
 
         assertEquals("PRINCIPIO_ACTIVO", r.alternativas().get(0).tipoCoincidencia());
         ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
@@ -155,7 +157,7 @@ class AlternativasServiceTest {
         delGrupoEs(List.of(alt(1, "8.00", "EQUIVALENTE"), alt(2, "10.00", "EQUIVALENTE"),
                 alt(3, "12.00", "EQUIVALENTE")));
 
-        List<AlternativaResponse> a = service.alternativas(7L).alternativas();
+        List<AlternativaResponse> a = service.alternativas(7L, null).alternativas();
 
         assertEquals(new BigDecimal("20.0"), a.get(0).ahorroPorcentaje());
         assertNull(a.get(1).ahorroPorcentaje());
@@ -167,7 +169,7 @@ class AlternativasServiceTest {
         consultadoEs(List.of(consultado(null)));
         delPrincipioEs(List.of());
 
-        AlternativasResponse r = service.alternativas(7L);
+        AlternativasResponse r = service.alternativas(7L, null);
 
         assertTrue(r.sinEquivalentes());
         assertTrue(r.alternativas().isEmpty());
@@ -178,7 +180,7 @@ class AlternativasServiceTest {
         consultadoEs(List.of(consultado(5L)));
         delGrupoEs(List.of());
 
-        service.alternativas(7L);
+        service.alternativas(7L, null);
 
         ArgumentCaptor<String> consultas = ArgumentCaptor.forClass(String.class);
         verify(jdbc, times(2)).query(consultas.capture(), any(SqlParameterSource.class),
@@ -197,7 +199,7 @@ class AlternativasServiceTest {
     void mapeaLasColumnasDelGrupoConTipoEquivalente() throws SQLException {
         consultadoEs(List.of(consultado(5L)));
         delGrupoEs(List.of());
-        service.alternativas(7L);
+        service.alternativas(7L, null);
         verify(jdbc).query(contains(GRUPO), any(SqlParameterSource.class), mapperAlternativa.capture());
 
         AlternativaResponse r = mapperAlternativa.getValue().mapRow(filaDeVista(), 0);
@@ -209,7 +211,7 @@ class AlternativasServiceTest {
     void mapeaLasColumnasDelRespaldoConTipoPrincipioActivo() throws SQLException {
         consultadoEs(List.of(consultado(null)));
         delPrincipioEs(List.of());
-        service.alternativas(7L);
+        service.alternativas(7L, null);
         verify(jdbc).query(contains(PRINCIPIO), any(SqlParameterSource.class), mapperAlternativa.capture());
 
         AlternativaResponse r = mapperAlternativa.getValue().mapRow(filaDeVista(), 0);
@@ -221,7 +223,7 @@ class AlternativasServiceTest {
     void mapeaElConsultadoConYSinGrupo() throws SQLException {
         consultadoEs(List.of(consultado(null)));
         delPrincipioEs(List.of());
-        service.alternativas(7L);
+        service.alternativas(7L, null);
         verify(jdbc).query(contains(CONSULTADO), any(SqlParameterSource.class), mapperConsultado.capture());
 
         ResultSet sinGrupo = mock(ResultSet.class);
@@ -239,5 +241,66 @@ class AlternativasServiceTest {
 
         assertEquals(consultado(null), mapperConsultado.getValue().mapRow(sinGrupo, 0));
         assertEquals(consultado(5L), mapperConsultado.getValue().mapRow(conGrupo, 0));
+    }
+
+    // ---------- H42: registro de la consulta ----------
+
+    @Test
+    void registraLaConsultaConElUsuarioDeLaSesion() {
+        consultadoEs(List.of(consultado(5L)));
+        delGrupoEs(List.of(alt(13, "2.20", "EQUIVALENTE")));
+
+        service.alternativas(7L, 42L);
+
+        ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbc).update(contains(INSERT), params.capture());
+        assertEquals(7L, params.getValue().getValue("producto"));
+        assertEquals(42L, params.getValue().getValue("usuario"));
+    }
+
+    @Test
+    void sinSesion_registraLaConsultaSinUsuario() {
+        consultadoEs(List.of(consultado(5L)));
+        delGrupoEs(List.of(alt(13, "2.20", "EQUIVALENTE")));
+
+        service.alternativas(7L, null);
+
+        ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbc).update(contains(INSERT), params.capture());
+        assertEquals(7L, params.getValue().getValue("producto"));
+        assertNull(params.getValue().getValue("usuario"));
+    }
+
+    @Test
+    void tambienRegistraLaConsultaCuandoNoHayEquivalentes() {
+        consultadoEs(List.of(consultado(null)));
+        delPrincipioEs(List.of());
+
+        AlternativasResponse r = service.alternativas(7L, null);
+
+        assertTrue(r.sinEquivalentes());
+        verify(jdbc).update(contains(INSERT), any(SqlParameterSource.class));
+    }
+
+    @Test
+    void productoNoVisible_noRegistraNada() {
+        consultadoEs(List.of());
+
+        assertThrows(ApiException.class, () -> service.alternativas(99L, 42L));
+
+        verify(jdbc, never()).update(anyString(), any(SqlParameterSource.class));
+    }
+
+    @Test
+    void siFallaElRegistro_laRespuestaSigueIgual() {
+        consultadoEs(List.of(consultado(5L)));
+        delGrupoEs(List.of(alt(13, "2.20", "EQUIVALENTE")));
+        when(jdbc.update(anyString(), any(SqlParameterSource.class)))
+                .thenThrow(new DataAccessResourceFailureException("base caida"));
+
+        AlternativasResponse r = service.alternativas(7L, 42L);
+
+        assertEquals(1, r.alternativas().size());
+        assertFalse(r.sinEquivalentes());
     }
 }
