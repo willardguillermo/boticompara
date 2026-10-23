@@ -18,12 +18,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.boticompara.app.data.local.TokenManager
 import com.boticompara.app.ui.theme.BotiComparaAppTheme
 import com.boticompara.app.vistas.LoginScreen
+import com.boticompara.app.vistas.ProductoDetalleScreen
 import com.boticompara.app.vistas.ProfileScreen
 import com.boticompara.app.vistas.RecuperarScreen
 import com.boticompara.app.vistas.RegisterScreen
@@ -89,6 +92,15 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("busqueda") { SearchScreen(navController) }
                         composable("perfil") { ProfileScreen(navController) }
+
+                        // H28: Ruta para el detalle del producto por ID
+                        composable(
+                            route = "detalle/{productoId}",
+                            arguments = listOf(navArgument("productoId") { type = NavType.LongType })
+                        ) { backStackEntry ->
+                            val productoId = backStackEntry.arguments?.getLong("productoId") ?: 0L
+                            ProductoDetalleScreen(productoId = productoId, navController = navController)
+                        }
                     }
                 }
             }
