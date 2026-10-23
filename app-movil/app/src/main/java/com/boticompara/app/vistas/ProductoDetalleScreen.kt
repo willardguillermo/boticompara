@@ -1,5 +1,7 @@
 package com.boticompara.app.vistas
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,6 +30,7 @@ fun ProductoDetalleScreen(
     detalleViewModel: ProductoDetalleViewModel = viewModel()
 ) {
     val vm = detalleViewModel
+    val context = LocalContext.current
 
     LaunchedEffect(productoId) {
         vm.cargarDetalle(productoId)
@@ -213,6 +217,21 @@ fun ProductoDetalleScreen(
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
                                         )
+                                    }
+                                }
+
+                                // Teléfono de la botica: abre el marcador del celular (no pide permisos)
+                                if (!producto.boticaTelefono.isNullOrBlank()) {
+                                    Spacer(Modifier.height(16.dp))
+                                    OutlinedButton(
+                                        onClick = {
+                                            context.startActivity(
+                                                Intent(Intent.ACTION_DIAL, Uri.parse("tel:${producto.boticaTelefono}"))
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("📞 Llamar · ${producto.boticaTelefono}")
                                     }
                                 }
                             }

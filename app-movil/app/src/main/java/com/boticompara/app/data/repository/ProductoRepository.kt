@@ -19,7 +19,8 @@ sealed interface ResultadoBusqueda {
 sealed interface ResultadoDetalle {
     data class Exito(val producto: ProductoDetalleResponse) : ResultadoDetalle
     data object SesionVencida : ResultadoDetalle   // 401: token vencido
-    data object ErrorServidor : ResultadoDetalle   // cualquier otro código HTTP o producto no encontrado
+    data object NoDisponible : ResultadoDetalle    // 404: sin stock, dado de baja u oculto
+    data object ErrorServidor : ResultadoDetalle   // cualquier otro código HTTP
     data object SinConexion : ResultadoDetalle     // no se pudo llegar al backend
 }
 
@@ -64,6 +65,7 @@ class ProductoRepository(context: Context) {
                     tokenManager.clearSession()
                     ResultadoDetalle.SesionVencida
                 }
+                response.code() == 404 -> ResultadoDetalle.NoDisponible
                 else -> ResultadoDetalle.ErrorServidor
             }
         } catch (e: CancellationException) {

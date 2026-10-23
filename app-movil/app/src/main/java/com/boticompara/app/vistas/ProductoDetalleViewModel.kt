@@ -33,6 +33,9 @@ class ProductoDetalleViewModel(application: Application) : AndroidViewModel(appl
                     productoDetalle = resultado.producto
                 }
                 ResultadoDetalle.SesionVencida -> sesionVencida = true
+                ResultadoDetalle.NoDisponible -> {
+                    mensajeError = "Este producto ya no está disponible"
+                }
                 ResultadoDetalle.SinConexion -> {
                     mensajeError = "No se pudo conectar con el servidor"
                 }

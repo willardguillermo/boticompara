@@ -41,7 +41,7 @@ data class ProductoResponse(
     val boticaDistrito: String
 )
 
-// ---- Detalle de Producto (H28, H36, H37, H41) ----
+// ---- Detalle de Producto (H28) ----
 data class ProductoDetalleResponse(
     val productoId: Long,
     val nombreComercial: String,
@@ -53,9 +53,9 @@ data class ProductoDetalleResponse(
     val boticaNombre: String,
     val boticaDireccion: String,
     val boticaDistrito: String,
+    val boticaTelefono: String? = null,   // null si la botica no lo registró
     val fabricante: String? = null,
-    val requerimientoReceta: Boolean? = false,
-    val alternativas: List<ProductoResponse>? = null // Mapea las alternativas genéricas si el backend las envía
+    val requerimientoReceta: Boolean? = false
 )
 
 interface ApiService {
