@@ -79,7 +79,7 @@ class MedicamentoAdmin(admin.ModelAdmin):
         except MedicamentoGrupo.DoesNotExist:
             return None
 
-    @admin.display(description='registro sanitario', ordering='fecha_vencimiento_registro')
+    @admin.display(description='vigencia', ordering='fecha_vencimiento_registro')
     def estado_registro(self, obj):
         estado = vigencia.estado(obj.fecha_vencimiento_registro)
         return format_html(
