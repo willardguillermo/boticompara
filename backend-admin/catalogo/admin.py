@@ -1,6 +1,9 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db.models import Count
 from django.forms.models import BaseInlineFormSet
+from django.utils.html import format_html
+
+from . import vigencia
 
 from .forms import (CategoriaForm, GrupoEquivalenciaForm, MedicamentoForm, MiembroGrupoForm,
                     PrincipioActivoForm)
@@ -34,15 +37,40 @@ class PrincipioActivoAdmin(ConConteoMedicamentosAdmin):
     ordering = ('nombre',)
 
 
+class VigenciaRegistroFilter(admin.SimpleListFilter):
+    """H34: filtra por el estado del registro sanitario (catalogo/vigencia.py)."""
+    title = 'vigencia del registro'
+    parameter_name = 'vigencia'
+
+    def lookups(self, request, model_admin):
+        return list(vigencia.ETIQUETAS.items())
+
+    def queryset(self, request, queryset):
+        if self.value() in vigencia.ETIQUETAS:
+            return queryset.filter(vigencia.condicion(self.value()))
+        return queryset
+
+
+# Mismos colores que usa el admin de Django para mensajes de éxito, aviso y error
+COLORES_VIGENCIA = {
+    vigencia.VIGENTE: '#2e7d32',
+    vigencia.POR_VENCER: '#b26a00',
+    vigencia.VENCIDO: '#ba2121',
+    vigencia.SIN_FECHA: '#757575',
+}
+
+
 @admin.register(Medicamento)
 class MedicamentoAdmin(admin.ModelAdmin):
     form = MedicamentoForm
     list_display = ('nombre_comercial', 'presentacion', 'concentracion', 'principio_activo', 'categoria',
-                    'registro_sanitario', 'fecha_vencimiento_registro', 'grupo_equivalencia', 'oculto')
-    list_filter = ('categoria', 'oculto')
+                    'registro_sanitario', 'fecha_vencimiento_registro', 'estado_registro',
+                    'grupo_equivalencia', 'oculto')
+    list_filter = (VigenciaRegistroFilter, 'categoria', 'oculto')
     search_fields = ('nombre_comercial', 'principio_activo__nombre', 'registro_sanitario')
     list_select_related = ('principio_activo', 'categoria', 'grupo_asignado__grupo')
     autocomplete_fields = ('principio_activo', 'categoria')
+    actions = ['ocultar_del_catalogo', 'mostrar_en_catalogo']
 
     @admin.display(description='grupo de equivalencia', ordering='grupo_asignado__grupo__nombre')
     def grupo_equivalencia(self, obj):
@@ -50,6 +78,27 @@ class MedicamentoAdmin(admin.ModelAdmin):
             return obj.grupo_asignado.grupo
         except MedicamentoGrupo.DoesNotExist:
             return None
+
+    @admin.display(description='vigencia', ordering='fecha_vencimiento_registro')
+    def estado_registro(self, obj):
+        estado = vigencia.estado(obj.fecha_vencimiento_registro)
+        return format_html(
+            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
+            ' white-space: nowrap;">{}</span>',
+            COLORES_VIGENCIA[estado], vigencia.ETIQUETAS[estado],
+        )
+
+    # H35: solo se cuentan los que realmente cambian, no los que ya estaban así
+    @admin.action(description='Ocultar del catálogo (sin registro válido)', permissions=['change'])
+    def ocultar_del_catalogo(self, request, queryset):
+        cambiados = queryset.filter(oculto=False).update(oculto=True)
+        self.message_user(request, f'{cambiados} medicamento(s) ocultado(s) del catálogo.', messages.SUCCESS)
+
+    @admin.action(description='Volver a mostrar en el catálogo', permissions=['change'])
+    def mostrar_en_catalogo(self, request, queryset):
+        cambiados = queryset.filter(oculto=True).update(oculto=False)
+        self.message_user(request, f'{cambiados} medicamento(s) visible(s) otra vez en el catálogo.',
+                          messages.SUCCESS)
 
 
 class MiembroGrupoFormSet(BaseInlineFormSet):
