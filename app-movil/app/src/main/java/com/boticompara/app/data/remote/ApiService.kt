@@ -27,7 +27,7 @@ data class PerfilResponse(
 )
 data class PerfilRequest(val nombre: String, val telefono: String?, val direccion: String?)
 
-// ---- Búsqueda (H22–H24) ----
+// ---- Búsqueda (H22–H27) ----
 data class ProductoResponse(
     val productoId: Long,
     val nombreComercial: String,
@@ -38,7 +38,8 @@ data class ProductoResponse(
     val boticaId: Long,
     val boticaNombre: String,
     val boticaDireccion: String,
-    val boticaDistrito: String
+    val boticaDistrito: String,
+    val distanciaKm: Double? = null   // H27: null si no se envió la ubicación
 )
 
 // ---- Detalle de Producto (H28) ----
@@ -88,7 +89,10 @@ interface ApiService {
         @Header("Authorization") auth: String,
         @Query("q") query: String,                 // mínimo 2 caracteres
         @Query("tipo") tipo: String = "nombre",    // "nombre" o "principio"
-        @Query("orden") orden: String = "precio_asc"
+        @Query("orden") orden: String = "precio_asc",
+        @Query("lat") lat: Double? = null,         // H27: van juntos o ninguno
+        @Query("lng") lng: Double? = null,
+        @Query("radioKm") radioKm: Double? = null  // H27: mayor que 0 y hasta 50
     ): Response<List<ProductoResponse>>
 
     // H28: Detalle del producto por ID

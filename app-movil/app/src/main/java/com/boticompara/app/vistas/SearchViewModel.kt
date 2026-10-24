@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.boticompara.app.data.local.UbicacionProvider
 import com.boticompara.app.data.remote.ProductoResponse
 import com.boticompara.app.data.repository.ProductoRepository
 import com.boticompara.app.data.repository.ResultadoBusqueda
@@ -16,6 +17,7 @@ import kotlinx.coroutines.launch
 // ViewModel (MVVM) de la búsqueda: valida, llama al Repository y expone el estado a la vista
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ProductoRepository(application)
+    private val ubicacionProvider = UbicacionProvider(application)
 
     // H26: tiempo de espera desde la última tecla antes de buscar
     private val esperaDebounceMs = 500L
@@ -36,6 +38,15 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var searchType by mutableStateOf("nombre")   // "nombre" (H22) o "principio" (H23)
         private set
+
+    // H27: ordenar por cercanía
+    var ordenCercanas by mutableStateOf(false)
+        private set
+    var buscandoUbicacion by mutableStateOf(false)
+        private set
+    var mensajeUbicacion by mutableStateOf<String?>(null)
+        private set
+    private var ubicacion: UbicacionProvider.Coordenadas? = null
 
     // H26: cada tecla reinicia la espera; solo se busca cuando el usuario deja de escribir
     fun onQueryChange(texto: String) {
@@ -89,6 +100,38 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         isRefreshing = false
     }
 
+    // ---------- H27: ubicación y "Más cercanas" ----------
+    fun tienePermisoUbicacion(): Boolean = ubicacionProvider.tienePermiso()
+
+    // Se llama cuando ya hay permiso: obtiene la ubicación y reordena por distancia
+    fun activarCercanas() {
+        viewModelScope.launch {
+            buscandoUbicacion = true
+            mensajeUbicacion = null
+            val coordenadas = ubicacionProvider.obtener()
+            buscandoUbicacion = false
+            if (coordenadas == null) {
+                ordenCercanas = false
+                mensajeUbicacion = "No pudimos obtener tu ubicación. Activa el GPS e inténtalo de nuevo"
+            } else {
+                ubicacion = coordenadas
+                ordenCercanas = true
+                if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
+            }
+        }
+    }
+
+    fun desactivarCercanas() {
+        ordenCercanas = false
+        mensajeUbicacion = null
+        if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
+    }
+
+    fun permisoDenegado() {
+        ordenCercanas = false
+        mensajeUbicacion = "Sin permiso de ubicación no podemos ordenar por cercanía"
+    }
+
     private fun programarBusqueda(inmediata: Boolean) {
         busquedaJob?.cancel()   // cancela la búsqueda anterior si todavía no terminó
         isRefreshing = false
@@ -108,7 +151,13 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun ejecutarBusqueda(query: String) {
         isLoading = true
         mensaje = null
-        when (val resultado = repository.buscar(query, searchType, "precio_asc")) {   // H24
+        val coordenadas = ubicacion
+        val resultado = if (ordenCercanas && coordenadas != null) {
+            repository.buscar(query, searchType, "distancia", coordenadas.lat, coordenadas.lng)   // H27
+        } else {
+            repository.buscar(query, searchType, "precio_asc")   // H24
+        }
+        when (resultado) {
             is ResultadoBusqueda.Exito -> {
                 productos = resultado.productos
                 if (productos.isEmpty()) mensaje = "No encontramos ese medicamento"
