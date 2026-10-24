@@ -2,6 +2,7 @@ package com.boticompara.app.data.repository
 
 import android.content.Context
 import com.boticompara.app.data.local.TokenManager
+import com.boticompara.app.data.remote.AlternativasResponse
 import com.boticompara.app.data.remote.ProductoDetalleResponse
 import com.boticompara.app.data.remote.ProductoResponse
 import com.boticompara.app.data.remote.RetrofitClient
@@ -24,7 +25,15 @@ sealed interface ResultadoDetalle {
     data object SinConexion : ResultadoDetalle     // no se pudo llegar al backend
 }
 
-// Repository (MVVM): única capa que habla con la API para la búsqueda de productos (H22–H27) y detalle (H28)
+// Resultado de las alternativas del producto (H36, H37, H41)
+sealed interface ResultadoAlternativas {
+    data class Exito(val datos: AlternativasResponse) : ResultadoAlternativas
+    data object ErrorServidor : ResultadoAlternativas   // cualquier otro código HTTP
+    data object SinConexion : ResultadoAlternativas     // no se pudo llegar al backend
+}
+
+// Repository (MVVM): única capa que habla con la API para la búsqueda (H22–H27), el detalle (H28)
+// y las alternativas (H36, H37, H41)
 class ProductoRepository(context: Context) {
     private val api = RetrofitClient.getInstance(context)
     private val tokenManager = TokenManager(context)
@@ -82,5 +91,21 @@ class ProductoRepository(context: Context) {
             throw e
         } catch (e: Exception) {
             ResultadoDetalle.SinConexion
+        }
+
+    // GET /productos/{id}/alternativas (H36, H37, H41)
+    suspend fun obtenerAlternativas(id: Long): ResultadoAlternativas =
+        try {
+            val response = api.obtenerAlternativas(
+                auth = tokenManager.getBearer(),
+                id = id
+            )
+            if (response.isSuccessful && response.body() != null)
+                ResultadoAlternativas.Exito(response.body()!!)
+            else ResultadoAlternativas.ErrorServidor
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            ResultadoAlternativas.SinConexion
         }
 }
