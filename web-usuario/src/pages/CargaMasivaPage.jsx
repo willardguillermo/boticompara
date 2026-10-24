@@ -147,8 +147,9 @@ export default function CargaMasivaPage() {
         <p className="texto-suave">
           Usa la plantilla: columnas <code>nombreComercial</code>, <code>principioActivo</code>,{' '}
           <code>presentacion</code>, <code>precio</code> (con punto decimal), <code>stock</code> y{' '}
-          <code>stockMinimo</code> (opcional; si lo dejas vacío queda en 5). En Excel, guárdalo como
-          &quot;CSV UTF-8 (delimitado por comas)&quot;. Máximo 1000 productos.
+          <code>stockMinimo</code> (opcional; si lo dejas vacío queda en 5). Si la llenas en Excel, puedes subirla tal cual como
+          .xlsx o, si prefieres CSV, guardarla como &quot;CSV UTF-8 (delimitado por comas)&quot;. Máximo 1000
+          productos.
         </p>
         <button type="button" className="btn btn-secundario" onClick={descargarPlantilla}>
           <Icono nombre="bajar" /> Descargar plantilla
