@@ -2757,6 +2757,924 @@
           }
         }
       ]
+    },
+    {
+      "name": "8. Segunda mitad del Sprint 2 (H2, H28, H31, H36-H44)",
+      "description": "Endpoints nuevos del Sprint 2. Ejecuta la carpeta completa con Run folder, en orden: el paso 2 guarda el producto que usan los demás. Los favoritos se agregan y se quitan dentro de la misma carpeta, y ningún request crea productos. No usa la cuenta de Carlos.",
+      "item": [
+        {
+          "name": "1. Login de Rosa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "pm.collectionVariables.set(\"tokenRosa\", j.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"rosa@boticasalud.pe\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2. Busca paracetamol y guarda el más caro (para probar el ahorro)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Hay al menos 2 productos\", function () { pm.expect(r.length).to.be.at.least(2); });",
+                  "pm.collectionVariables.set(\"h8Id\", String(r[0].productoId));",
+                  "pm.collectionVariables.set(\"h8Precio\", String(r[0].precio));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&orden=precio_desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "orden",
+                  "value": "precio_desc"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H28 · Detalle del producto, sin token (público)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Es el producto pedido\", function () { pm.expect(String(j.productoId)).to.eql(pm.collectionVariables.get(\"h8Id\")); });",
+                  "pm.test(\"Trae los datos del producto y de la botica\", function () {",
+                  "  [\"nombreComercial\", \"principioActivo\", \"presentacion\", \"precio\", \"stock\", \"boticaId\", \"boticaNombre\", \"boticaDireccion\", \"boticaDistrito\"].forEach(function (c) { pm.expect(j).to.have.property(c); });",
+                  "});",
+                  "pm.test(\"boticaTelefono viene en la respuesta (puede ser null)\", function () { pm.expect(j).to.have.property(\"boticaTelefono\"); });",
+                  "pm.test(\"Solo se ven productos con stock\", function () { pm.expect(j.stock).to.be.above(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h8Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h8Id}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H28 · Detalle de un producto que no existe (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "999999"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H28 · Detalle con id no numérico (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "abc"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H36 · Alternativas, sin token (público)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "const alts = j.alternativas;",
+                  "pm.test(\"Trae productoId, sinEquivalentes y la lista\", function () {",
+                  "  pm.expect(String(j.productoId)).to.eql(pm.collectionVariables.get(\"h8Id\"));",
+                  "  pm.expect(j.sinEquivalentes).to.be.a(\"boolean\");",
+                  "  pm.expect(alts).to.be.an(\"array\");",
+                  "});",
+                  "pm.test(\"sinEquivalentes es true solo si la lista viene vacía (H41)\", function () { pm.expect(j.sinEquivalentes).to.eql(alts.length === 0); });",
+                  "pm.test(\"Máximo 20 y el consultado no aparece entre ellas\", function () {",
+                  "  pm.expect(alts.length).to.be.at.most(20);",
+                  "  pm.expect(alts.map(function (a) { return String(a.productoId); })).to.not.include(pm.collectionVariables.get(\"h8Id\"));",
+                  "});",
+                  "pm.test(\"tipoCoincidencia es EQUIVALENTE o PRINCIPIO_ACTIVO\", function () {",
+                  "  alts.forEach(function (a) { pm.expect([\"EQUIVALENTE\", \"PRINCIPIO_ACTIVO\"]).to.include(a.tipoCoincidencia); });",
+                  "});",
+                  "pm.test(\"Ordenadas de menor a mayor precio\", function () {",
+                  "  for (let i = 1; i < alts.length; i++) { pm.expect(alts[i].precio).to.be.at.least(alts[i - 1].precio); }",
+                  "});",
+                  "pm.test(\"ahorroPorcentaje es null o un número positivo (H37)\", function () {",
+                  "  alts.forEach(function (a) { if (a.ahorroPorcentaje !== null) { pm.expect(a.ahorroPorcentaje).to.be.above(0); } });",
+                  "});",
+                  "pm.test(\"El ahorro de la más barata sale de la fórmula, con 1 decimal (H37)\", function () {",
+                  "  pm.expect(alts.length).to.be.at.least(1);",
+                  "  const consultado = Number(pm.collectionVariables.get(\"h8Precio\"));",
+                  "  const esperado = Math.round(((consultado - alts[0].precio) / consultado) * 1000) / 10;",
+                  "  pm.expect(alts[0].ahorroPorcentaje).to.eql(esperado);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h8Id}}/alternativas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h8Id}}",
+                "alternativas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "El producto consultado es el paracetamol más caro (paso 2), así que su alternativa más barata debe tener ahorro."
+          }
+        },
+        {
+          "name": "H36 · Alternativas con un token inválido (la ruta es pública, 200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer token-invalido"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h8Id}}/alternativas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h8Id}}",
+                "alternativas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H36 · Alternativas de un producto que no existe (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/999999/alternativas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "999999",
+                "alternativas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H36 · Alternativas con id no numérico (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/abc/alternativas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "abc",
+                "alternativas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H31 · Buscar medicamentos en el catálogo maestro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Es una lista de 20 como máximo\", function () { pm.expect(r).to.be.an(\"array\"); pm.expect(r.length).to.be.at.most(20); });",
+                  "pm.test(\"Cada medicamento trae id, nombre, principio activo y presentación\", function () {",
+                  "  r.forEach(function (m) { [\"id\", \"nombreComercial\", \"principioActivo\", \"presentacion\"].forEach(function (c) { pm.expect(m).to.have.property(c); }); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/medicamentos?q=para",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicamentos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "para"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Buscar con 1 solo carácter (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/medicamentos?q=p",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicamentos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "p"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Crear producto con un medicamento que no existe (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400, no se crea nada\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba Postman medicamento\",\n  \"principioActivo\": \"Paracetamol\",\n  \"presentacion\": \"Tableta ZZ\",\n  \"precio\": 1.0,\n  \"stock\": 1,\n  \"medicamentoId\": 999999\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Debe responder 400 y no crear el producto. Si responde 201, hay que borrar a mano el producto ZZ."
+          }
+        },
+        {
+          "name": "H43 · Favoritos sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H43 · Agregar el producto a favoritos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201 (guardado) o 200 (ya estaba)\", function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve el producto con su fecha\", function () {",
+                  "  pm.expect(String(j.productoId)).to.eql(pm.collectionVariables.get(\"h8Id\"));",
+                  "  pm.expect(j.fecha).to.be.a(\"string\");",
+                  "  pm.expect(j).to.have.property(\"nombreComercial\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"productoId\": {{h8Id}} }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H44 · Listar favoritos: el producto aparece",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "pm.test(\"Incluye el producto guardado\", function () {",
+                  "  pm.expect(pm.response.json().map(function (f) { return String(f.productoId); })).to.include(pm.collectionVariables.get(\"h8Id\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H43 · Agregar un producto que no existe (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"productoId\": 999999 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H43 · Agregar sin productoId (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H44 · Quitar el producto de favoritos (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/{{h8Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "{{h8Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H44 · Listar favoritos: el producto ya no está",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "pm.test(\"No incluye el producto quitado\", function () {",
+                  "  pm.expect(pm.response.json().map(function (f) { return String(f.productoId); })).to.not.include(pm.collectionVariables.get(\"h8Id\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H44 · Quitar otra vez también responde 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/{{h8Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "{{h8Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H2 · Validar RUC sin sesión: solo validación local (no gasta cuota de SUNAT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"El RUC es válido y la fuente es LOCAL\", function () { pm.expect(j.valido).to.eql(true); pm.expect(j.fuente).to.eql(\"LOCAL\"); });",
+                  "pm.test(\"Sin consulta a SUNAT, los datos fiscales vienen en null\", function () {",
+                  "  [\"razonSocial\", \"estado\", \"condicion\", \"direccion\", \"distrito\"].forEach(function (c) { pm.expect(j).to.have.property(c, null); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/validar-ruc/20601234565",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "validar-ruc",
+                "20601234565"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Sin token no se consulta SUNAT, para cuidar la cuota de Decolecta (100 consultas al mes)."
+          }
+        }
+      ]
     }
   ]
 }
