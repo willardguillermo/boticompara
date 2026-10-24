@@ -1,4 +1,4 @@
-// H11 - Carga masiva de productos con CSV (POST /productos/carga-masiva)
+// H11 - Carga masiva de productos con CSV o Excel .xlsx (POST /productos/carga-masiva)
 // Solo con la botica APROBADO (guardia SoloAprobada en App.jsx).
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -7,7 +7,7 @@ import Campo from '../components/Campo.jsx'
 import Icono from '../components/Icono.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../services/index.js'
-import { ACCEPT_CSV, propsError, validarArchivoCsv } from '../utils/validacion.js'
+import { ACCEPT_CARGA, propsError, validarArchivoCarga } from '../utils/validacion.js'
 
 const PLANTILLA = [
   'nombreComercial,principioActivo,presentacion,precio,stock,stockMinimo',
@@ -96,12 +96,12 @@ export default function CargaMasivaPage() {
     const elegido = evento.target.files?.[0] ?? null
     setArchivo(elegido)
     setErrorApi('')
-    setErrorArchivo(elegido ? validarArchivoCsv(elegido) : '')
+    setErrorArchivo(elegido ? validarArchivoCarga(elegido) : '')
   }
 
   async function subir(evento) {
     evento.preventDefault()
-    const error = validarArchivoCsv(archivo)
+    const error = validarArchivoCarga(archivo)
     if (error) {
       setErrorArchivo(error)
       return
@@ -133,7 +133,7 @@ export default function CargaMasivaPage() {
         <div>
           <h1>Carga masiva</h1>
           <p className="texto-suave">
-            Agrega o actualiza muchos productos a la vez con un archivo CSV. Si un producto ya existe (mismo
+            Agrega o actualiza muchos productos a la vez con un archivo CSV o Excel. Si un producto ya existe (mismo
             nombre comercial y presentación), se actualizan su precio y su stock.
           </p>
         </div>
@@ -153,19 +153,20 @@ export default function CargaMasivaPage() {
         <button type="button" className="btn btn-secundario" onClick={descargarPlantilla}>
           <Icono nombre="bajar" /> Descargar plantilla
         </button>
+        <p className="texto-suave">También puedes llenarla en Excel y subirla como .xlsx.</p>
       </section>
 
       <section className="tarjeta" aria-labelledby="titulo-subir">
         <h2 id="titulo-subir">2. Sube el archivo</h2>
         <form className="formulario" onSubmit={subir} noValidate>
-          <Campo id="archivoCsv" etiqueta="Archivo CSV" error={errorArchivo} ayuda="Solo .csv, máximo 5 MB.">
+          <Campo id="archivoCarga" etiqueta="Archivo CSV o Excel" error={errorArchivo} ayuda="CSV o .xlsx, máximo 5 MB.">
             <input
               key={claveInput}
               type="file"
-              accept={ACCEPT_CSV}
+              accept={ACCEPT_CARGA}
               onChange={elegir}
               disabled={cargando}
-              {...propsError('archivoCsv', errorArchivo)}
+              {...propsError('archivoCarga', errorArchivo)}
             />
           </Campo>
 
