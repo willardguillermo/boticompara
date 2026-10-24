@@ -29,14 +29,24 @@ class ProductoRepository(context: Context) {
     private val api = RetrofitClient.getInstance(context)
     private val tokenManager = TokenManager(context)
 
-    // GET /productos/buscar
-    suspend fun buscar(query: String, tipo: String, orden: String = "precio_asc"): ResultadoBusqueda =
+    // GET /productos/buscar (H22–H24, H27)
+    suspend fun buscar(
+        query: String,
+        tipo: String,
+        orden: String = "precio_asc",
+        lat: Double? = null,
+        lng: Double? = null,
+        radioKm: Double? = null
+    ): ResultadoBusqueda =
         try {
             val response = api.buscarProductos(
                 auth = tokenManager.getBearer(),
                 query = query,
                 tipo = tipo,
-                orden = orden
+                orden = orden,
+                lat = lat,
+                lng = lng,
+                radioKm = radioKm
             )
             when {
                 response.isSuccessful -> ResultadoBusqueda.Exito(response.body() ?: emptyList())

@@ -1,5 +1,8 @@
 package com.boticompara.app.vistas
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,11 +29,18 @@ import androidx.navigation.NavController
 import com.boticompara.app.data.remote.ProductoResponse
 import java.util.Locale
 
-// ===================== BÚSQUEDA (H22, H23, H24, H25, H26, H40) =====================
+// ===================== BÚSQUEDA (H22, H23, H24, H25, H26, H27, H40) =====================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel = viewModel()) {
     val vm = searchViewModel
+
+    // H27: pide el permiso de ubicación y, si lo dan, activa "Más cercanas"
+    val permisoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { resultado ->
+        if (resultado.values.any { it }) vm.activarCercanas() else vm.permisoDenegado()
+    }
 
     // Si el token venció, volver al login limpiando la navegación
     LaunchedEffect(vm.sesionVencida) {
@@ -133,6 +143,36 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                         shape = RoundedCornerShape(50)
                     )
                 }
+                Spacer(Modifier.height(8.dp))
+
+                // H27: ordenar por cercanía
+                FilterChip(
+                    selected = vm.ordenCercanas,
+                    onClick = {
+                        when {
+                            vm.ordenCercanas -> vm.desactivarCercanas()
+                            vm.tienePermisoUbicacion() -> vm.activarCercanas()
+                            else -> permisoLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        }
+                    },
+                    label = {
+                        Text(if (vm.buscandoUbicacion) "Obteniendo ubicación…" else "📍 Más cercanas")
+                    },
+                    shape = RoundedCornerShape(50)
+                )
+                if (vm.mensajeUbicacion != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        vm.mensajeUbicacion!!,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
 
                 // H26: indicador de carga (no se muestra si la carga viene de deslizar, ahí sale el círculo)
@@ -166,11 +206,14 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
             // Hay resultados: se muestran aunque se esté actualizando (no "parpadea")
             vm.productos.isNotEmpty() -> {
                 Text(
-                    "${vm.productos.size} resultados · del más barato al más caro",
+                    "${vm.productos.size} resultados · " +
+                            if (vm.ordenCercanas) "de la más cercana a la más lejana" else "del más barato al más caro",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
+
+                val precioMinimo = vm.productos.minOf { it.precio }
 
                 // H40: deslizar hacia abajo para actualizar
                 PullToRefreshBox(
@@ -186,7 +229,8 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                         itemsIndexed(vm.productos, key = { _, p -> p.productoId }) { indice, producto ->
                             ResultadoCard(
                                 producto = producto,
-                                esMasBarato = indice == 0,
+                                // "Más barato" es el de menor precio, aunque se ordene por cercanía
+                                esMasBarato = if (vm.ordenCercanas) producto.precio == precioMinimo else indice == 0,
                                 onClick = { navController.navigate("detalle/${producto.productoId}") }
                             )
                         }
@@ -216,7 +260,7 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
     }
 }
 
-// ===================== TARJETA DE RESULTADO (H25) =====================
+// ===================== TARJETA DE RESULTADO (H25, H27) =====================
 @Composable
 fun ResultadoCard(
     producto: ProductoResponse,
@@ -332,6 +376,15 @@ fun ResultadoCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                    // H27: distancia desde la ubicación del comprador
+                    if (producto.distanciaKm != null) {
+                        Text(
+                            "🚶 a ${String.format(Locale.US, "%.1f", producto.distanciaKm)} km de ti",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
