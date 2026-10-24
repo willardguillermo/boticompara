@@ -2370,6 +2370,393 @@
           }
         }
       ]
+    },
+    {
+      "name": "7. Flujo de cambio de precio y stock (H40)",
+      "description": "H40: el dueño cambia el precio y el stock de un producto y el comprador lo ve al instante (la búsqueda lee la vista en vivo, sin caché). Ejecuta la carpeta completa con Run folder, en orden. Usa 'Paracetamol Genérico' de Rosa (seed.sql): lo cambia unos segundos y lo restaura en el paso 6. No crea productos, así que no deja nada que limpiar. Si la ejecución se corta antes del paso 6, vuelve a ejecutarla completa: conserva los valores originales guardados y los restaura al terminar. Escribe en la base compartida: avisa al grupo si la corres mientras otros prueban.",
+      "item": [
+        {
+          "name": "1. Login de Rosa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "pm.collectionVariables.set(\"tokenRosa\", j.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"rosa@boticasalud.pe\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2. Mi catálogo: guarda los valores originales de Paracetamol Genérico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const p = pm.response.json().find(function (x) { return x.nombreComercial === \"Paracetamol Genérico\"; });",
+                  "pm.test(\"Rosa tiene Paracetamol Genérico\", function () { pm.expect(p).to.be.an(\"object\"); });",
+                  "if (p) {",
+                  "  pm.collectionVariables.set(\"h40Id\", String(p.id));",
+                  "  pm.collectionVariables.set(\"h40Nombre\", p.nombreComercial);",
+                  "  pm.collectionVariables.set(\"h40Principio\", p.principioActivo);",
+                  "  pm.collectionVariables.set(\"h40Presentacion\", p.presentacion);",
+                  "  pm.collectionVariables.set(\"h40Minimo\", String(p.stockMinimo));",
+                  "  pm.collectionVariables.set(\"h40Medicamento\", String(p.medicamentoId));",
+                  "  // Si una ejecucion anterior se cortó antes de restaurar, se conservan los originales de entonces",
+                  "  if (pm.collectionVariables.get(\"h40Pendiente\") !== \"true\") {",
+                  "    pm.collectionVariables.set(\"h40PrecioOrig\", String(p.precio));",
+                  "    pm.collectionVariables.set(\"h40StockOrig\", String(p.stock));",
+                  "    pm.collectionVariables.set(\"h40Pendiente\", \"true\");",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=Paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Paracetamol"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Rosa sube el precio (+1.00) y el stock (+7)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const precio = Number(pm.collectionVariables.get(\"h40PrecioOrig\"));",
+                  "const stock = Number(pm.collectionVariables.get(\"h40StockOrig\"));",
+                  "pm.collectionVariables.set(\"h40PrecioNuevo\", (Math.round((precio + 1) * 100) / 100).toFixed(2));",
+                  "pm.collectionVariables.set(\"h40StockNuevo\", String(stock + 7));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"La respuesta trae el precio nuevo\", function () { pm.expect(j.precio).to.eql(Number(pm.collectionVariables.get(\"h40PrecioNuevo\"))); });",
+                  "pm.test(\"La respuesta trae el stock nuevo\", function () { pm.expect(j.stock).to.eql(Number(pm.collectionVariables.get(\"h40StockNuevo\"))); });",
+                  "pm.test(\"Se conservan el stock mínimo y el enlace al catálogo (no se enviaron)\", function () {",
+                  "  pm.expect(String(j.stockMinimo)).to.eql(pm.collectionVariables.get(\"h40Minimo\"));",
+                  "  pm.expect(String(j.medicamentoId)).to.eql(pm.collectionVariables.get(\"h40Medicamento\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h40Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h40Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"{{h40Nombre}}\",\n  \"principioActivo\": \"{{h40Principio}}\",\n  \"presentacion\": \"{{h40Presentacion}}\",\n  \"precio\": {{h40PrecioNuevo}},\n  \"stock\": {{h40StockNuevo}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4. Búsqueda del comprador: ve el precio y el stock nuevos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const mio = pm.response.json().find(function (p) { return String(p.productoId) === pm.collectionVariables.get(\"h40Id\"); });",
+                  "pm.test(\"El producto aparece en la búsqueda\", function () { pm.expect(mio).to.be.an(\"object\"); });",
+                  "pm.test(\"Con el precio nuevo\", function () { pm.expect(mio.precio).to.eql(Number(pm.collectionVariables.get(\"h40PrecioNuevo\"))); });",
+                  "pm.test(\"Con el stock nuevo\", function () { pm.expect(mio.stock).to.eql(Number(pm.collectionVariables.get(\"h40StockNuevo\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=nombre",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "nombre"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "5. Detalle público (sin token): también muestra lo nuevo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Con el precio nuevo\", function () { pm.expect(j.precio).to.eql(Number(pm.collectionVariables.get(\"h40PrecioNuevo\"))); });",
+                  "pm.test(\"Con el stock nuevo\", function () { pm.expect(j.stock).to.eql(Number(pm.collectionVariables.get(\"h40StockNuevo\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h40Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h40Id}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "6. Rosa restaura los valores originales",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Vuelve el precio original\", function () { pm.expect(j.precio).to.eql(Number(pm.collectionVariables.get(\"h40PrecioOrig\"))); });",
+                  "pm.test(\"Vuelve el stock original\", function () { pm.expect(j.stock).to.eql(Number(pm.collectionVariables.get(\"h40StockOrig\"))); });",
+                  "// Solo si se restauró bien se borra la marca de pendiente",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set(\"h40Pendiente\", \"false\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h40Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h40Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"{{h40Nombre}}\",\n  \"principioActivo\": \"{{h40Principio}}\",\n  \"presentacion\": \"{{h40Presentacion}}\",\n  \"precio\": {{h40PrecioOrig}},\n  \"stock\": {{h40StockOrig}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "7. Búsqueda del comprador: ya muestra los valores originales",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const mio = pm.response.json().find(function (p) { return String(p.productoId) === pm.collectionVariables.get(\"h40Id\"); });",
+                  "pm.test(\"El producto aparece en la búsqueda\", function () { pm.expect(mio).to.be.an(\"object\"); });",
+                  "pm.test(\"Con el precio original\", function () { pm.expect(mio.precio).to.eql(Number(pm.collectionVariables.get(\"h40PrecioOrig\"))); });",
+                  "pm.test(\"Con el stock original\", function () { pm.expect(mio.stock).to.eql(Number(pm.collectionVariables.get(\"h40StockOrig\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=nombre",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "nombre"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
     }
   ]
 }
