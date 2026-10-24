@@ -6,12 +6,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.boticompara.app.data.remote.AlternativasResponse
 import com.boticompara.app.data.remote.ProductoDetalleResponse
 import com.boticompara.app.data.repository.ProductoRepository
+import com.boticompara.app.data.repository.ResultadoAlternativas
 import com.boticompara.app.data.repository.ResultadoDetalle
 import kotlinx.coroutines.launch
 
-// ViewModel (MVVM) para la Pantalla de Detalle del Producto (H28)
+// ViewModel (MVVM) del detalle del producto (H28) y sus alternativas (H36, H37, H41)
 class ProductoDetalleViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ProductoRepository(application)
 
@@ -24,13 +26,24 @@ class ProductoDetalleViewModel(application: Application) : AndroidViewModel(appl
     var sesionVencida by mutableStateOf(false)
         private set
 
+    // H36, H37, H41
+    var alternativas by mutableStateOf<AlternativasResponse?>(null)
+        private set
+    var cargandoAlternativas by mutableStateOf(false)
+        private set
+    var errorAlternativas by mutableStateOf(false)
+        private set
+
     fun cargarDetalle(productoId: Long) {
         viewModelScope.launch {
             isLoading = true
             mensajeError = null
-            when (val resultado = repository.obtenerDetalle(productoId)) {
+            val resultado = repository.obtenerDetalle(productoId)
+            isLoading = false
+            when (resultado) {
                 is ResultadoDetalle.Exito -> {
                     productoDetalle = resultado.producto
+                    cargarAlternativas(productoId)   // el detalle ya se ve mientras llegan las alternativas
                 }
                 ResultadoDetalle.SesionVencida -> sesionVencida = true
                 ResultadoDetalle.NoDisponible -> {
@@ -43,7 +56,17 @@ class ProductoDetalleViewModel(application: Application) : AndroidViewModel(appl
                     mensajeError = "No se pudo obtener el detalle del producto"
                 }
             }
-            isLoading = false
         }
+    }
+
+    // Si las alternativas fallan, el detalle se sigue viendo
+    private suspend fun cargarAlternativas(productoId: Long) {
+        cargandoAlternativas = true
+        errorAlternativas = false
+        when (val resultado = repository.obtenerAlternativas(productoId)) {
+            is ResultadoAlternativas.Exito -> alternativas = resultado.datos
+            else -> errorAlternativas = true
+        }
+        cargandoAlternativas = false
     }
 }
