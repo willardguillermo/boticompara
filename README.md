@@ -171,8 +171,8 @@ En español, cortos y explicativos:
 tipo(capa): qué se hizo
 ```
 
-- **tipo:** `feat` (funcionalidad), `fix` (corrección), `docs` (documentación), `refactor`,
-  `test`, `chore` (configuración o estructura)
+- **tipo:** `feat` (funcionalidad), `fix` (corrección), `docs` (documentación), `style` (formato o estilo),
+  `refactor`, `test`, `build` (dependencias o configuración). Nunca usar `chore`.
 - **capa:** `bd`, `api`, `backend`, `admin`, `web`, `movil`, `estructura`
 
 Ejemplos:
