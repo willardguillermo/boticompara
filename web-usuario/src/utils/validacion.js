@@ -40,18 +40,26 @@ export function validarArchivoLicencia(archivo) {
   return ''
 }
 
-// H11: CSV de carga masiva (docs/API.md, POST /productos/carga-masiva)
-export const MAX_BYTES_CSV = 5 * 1024 * 1024
-export const ACCEPT_CSV = '.csv,text/csv'
+// H11: CSV o Excel .xlsx de carga masiva (docs/API.md, POST /productos/carga-masiva)
+export const MAX_BYTES_CARGA = 5 * 1024 * 1024
+export const ACCEPT_CARGA = [
+  '.csv',
+  'text/csv',
+  '.xlsx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+].join(',')
 
-/** Devuelve el mensaje de error del CSV de productos o '' si es válido. */
-export function validarArchivoCsv(archivo) {
+/** Devuelve el mensaje de error del archivo de productos o '' si es válido. */
+export function validarArchivoCarga(archivo) {
   if (!archivo) return 'Selecciona un archivo.'
   // Por extensión: según el sistema, el navegador informa text/csv, application/vnd.ms-excel o nada
   const extension = archivo.name?.split('.').pop()?.toLowerCase() ?? ''
-  if (extension !== 'csv') return 'Formato no permitido. Sube un archivo .csv.'
+  if (extension === 'xls') {
+    return 'Los archivos .xls (Excel 97-2003) no se admiten. Guárdalo como .xlsx o como CSV UTF-8.'
+  }
+  if (extension !== 'csv' && extension !== 'xlsx') return 'Formato no permitido. Sube un archivo .csv o .xlsx.'
   if (archivo.size === 0) return 'El archivo está vacío.'
-  if (archivo.size > MAX_BYTES_CSV) {
+  if (archivo.size > MAX_BYTES_CARGA) {
     const mb = (Math.ceil((archivo.size / (1024 * 1024)) * 10) / 10).toFixed(1)
     return `El archivo pesa ${mb} MB; el máximo es 5 MB.`
   }

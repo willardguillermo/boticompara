@@ -2,7 +2,7 @@
 // con los usuarios, boticas y productos de prueba de database/seed.sql.
 // Los datos se reinician al recargar la página.
 import { validarRuc } from '../utils/ruc.js'
-import { MAX_BYTES_CSV, validarArchivoLicencia } from '../utils/validacion.js'
+import { MAX_BYTES_CARGA, validarArchivoLicencia } from '../utils/validacion.js'
 import { crearError } from './ApiError.js'
 import { obtenerToken } from './sesion.js'
 
@@ -246,8 +246,19 @@ function leerCsv(contenido) {
 /** Problemas del archivo completo lanzan 400; los de cada fila van en `errores`. */
 async function leerFilasProductos(archivo) {
   if (!archivo) throw crearError(400, "Falta el archivo: envíalo en el campo 'archivo'")
-  if (archivo.size > MAX_BYTES_CSV) throw crearError(400, 'El archivo supera el máximo de 5 MB')
+  if (archivo.size > MAX_BYTES_CARGA) throw crearError(400, 'El archivo supera el máximo de 5 MB')
   if (archivo.size === 0) throw crearError(400, 'El archivo está vacío')
+  // El backend lee .xlsx, pero aquí no hay una librería para abrirlo en el navegador
+  if (archivo.name?.toLowerCase().endsWith('.xlsx')) {
+    return {
+      validas: [],
+      errores: [{
+        fila: 1,
+        mensaje: 'En modo simulado solo se procesa CSV: el archivo .xlsx no se leyó. ' +
+          'Prueba con la plantilla CSV o usa el backend real (VITE_USE_MOCK=false).',
+      }],
+    }
+  }
   let contenido
   try {
     // TextDecoder quita el BOM que agrega Excel al guardar como "CSV UTF-8"
