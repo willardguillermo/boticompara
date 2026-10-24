@@ -422,6 +422,54 @@ Errores: 400 (`id` no numérico), 404 (el producto consultado no existe o no es 
 
 ---
 
+## 6. Favoritos (cualquier usuario con sesión)
+
+Productos que el comprador guarda para volver a verlos. Los tres endpoints piden token (cualquier rol) y cada usuario solo ve y modifica sus propios favoritos.
+
+### `POST /favoritos` 🔒 — H43, H44
+```json
+// Request
+{ "productoId": 9 }
+```
+```json
+// 201 Created (200 OK si el producto ya estaba en los favoritos)
+{
+  "productoId": 9,
+  "nombreComercial": "Paracetamol Genérico",
+  "principioActivo": "Paracetamol",
+  "presentacion": "Tableta 500 mg x 10",
+  "precio": 2.20,
+  "stock": 90,
+  "boticaId": 2,
+  "boticaNombre": "FarmaVida",
+  "boticaDireccion": "Jr. Trujillo 210",
+  "boticaDistrito": "Lurigancho-Chosica",
+  "fecha": "2026-10-23T15:30:00.123456Z"
+}
+```
+Solo se pueden guardar productos que el comprador ve hoy: activos, con stock, de boticas `APROBADO` y sin medicamento oculto ni registro sanitario vencido. Guardar dos veces el mismo producto no lo duplica.
+Errores: 400 (falta `productoId`), 401 (sin token), 404 (el producto no existe o no se ve).
+
+### `GET /favoritos` 🔒 — H43, H44
+Devuelve los favoritos del usuario, del más reciente al más antiguo, con los mismos campos de la búsqueda (sin `distanciaKm`) y la `fecha` en que se guardó. Si un producto deja de verse (sin stock, de baja, oculto o con registro vencido) no aparece en la lista, pero su favorito se conserva: si vuelve a estar disponible, reaparece.
+```json
+// 200 OK
+[
+  { "productoId": 9, "nombreComercial": "Paracetamol Genérico", "principioActivo": "Paracetamol",
+    "presentacion": "Tableta 500 mg x 10", "precio": 2.20, "stock": 90, "boticaId": 2,
+    "boticaNombre": "FarmaVida", "boticaDireccion": "Jr. Trujillo 210",
+    "boticaDistrito": "Lurigancho-Chosica", "fecha": "2026-10-23T15:30:00.123456Z" }
+]
+```
+Sin favoritos → `200` con `[]`.
+Errores: 401 (sin token).
+
+### `DELETE /favoritos/{productoId}` 🔒 — H43, H44
+Quita el producto de los favoritos. Responde `204` sin cuerpo, también si el producto no estaba guardado.
+Errores: 400 (`productoId` no numérico), 401 (sin token).
+
+---
+
 ## Usuarios de prueba (seed.sql)
 
 Contraseña de todos: `Boti2026!`
