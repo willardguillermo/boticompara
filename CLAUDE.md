@@ -37,8 +37,9 @@ Todas las aplicaciones comparten **una sola base PostgreSQL en Supabase**.
   elegidos con `VITE_USE_MOCK` en `src/services/index.js`. **Todo endpoint nuevo se agrega en los dos.**
   Las pantallas solo importan `api` desde `services/index.js`.
 - Commits en español, cortos, formato `tipo(capa): qué se hizo (Hxx)`, por ejemplo
-  `feat(web): agrega carga de licencia (H4)`. Tipos: `feat`, `fix`, `docs`, `refactor`, `test`,
-  `chore`. Capas: `bd`, `api`, `backend`, `admin`, `web`, `movil`, `estructura`.
+  `feat(web): agrega carga de licencia (H4)`. Tipos: `feat`, `fix`, `docs`, `style`, `refactor`,
+  `test`, `build`. Nunca usar el tipo chore (al profesor le molesta): para dependencias o configuración usar build.
+  Capas: `bd`, `api`, `backend`, `admin`, `web`, `movil`, `estructura`.
   **Sin `Co-Authored-By` ni firmas.**
 - Una rama por grupo de historias; nunca commits directos a `main`. Se integra por Pull Request.
 - Nunca subir `.env` ni claves (contraseñas de BD, `JWT_SECRET`, claves de Supabase).
