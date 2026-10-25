@@ -15,7 +15,6 @@ import androidx.compose.material.icons.rounded.LocalPharmacy
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.NearMe
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SearchOff
@@ -27,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -56,7 +56,7 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
         }
     }
 
-    // H40: cada vez que la pantalla vuelve a estar visible (ej. al regresar del perfil) se recarga
+    // H40: cada vez que la pantalla vuelve a estar visible (ej. al regresar del detalle) se recarga
     LifecycleResumeEffect(Unit) {
         vm.recargarAlVolver()
         onPauseOrDispose { }
@@ -80,12 +80,6 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                },
-                actions = {
-                    FilledTonalIconButton(onClick = { navController.navigate("perfil") }) {
-                        Icon(Icons.Rounded.Person, contentDescription = "Perfil")
-                    }
-                    Spacer(Modifier.width(8.dp))
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
@@ -316,7 +310,7 @@ fun ResultadoCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         producto.presentacion,
