@@ -36,4 +36,10 @@ public class ProductoController {
     public void eliminar(@AuthenticationPrincipal UsuarioAutenticado yo, @PathVariable Long id) {
         productos.eliminar(yo.id(), id);
     }
+    /** H31: quita el enlace del producto con el catálogo maestro (idempotente). */
+    @DeleteMapping("/{id}/medicamento")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void desenlazarMedicamento(@AuthenticationPrincipal UsuarioAutenticado yo, @PathVariable Long id) {
+        productos.desenlazarMedicamento(yo.id(), id);
+    }
 }

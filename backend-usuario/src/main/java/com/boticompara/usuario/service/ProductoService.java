@@ -86,4 +86,17 @@ public class ProductoService {
             medicamentos.validarEnlazable(r.medicamentoId());
         }
     }
+    /**
+     * H31: quita el enlace del producto con el catálogo maestro. Es idempotente: si no estaba enlazado,
+     * no pasa nada. El producto sigue activo y conserva todos sus datos.
+     */
+    @Transactional
+    public void desenlazarMedicamento(Long usuarioId, Long id) {
+        Botica botica = boticaAprobada(usuarioId);
+        Producto p = propio(id, botica);
+        if (p.getMedicamentoId() != null) {
+            p.setMedicamentoId(null);
+            productos.save(p);
+        }
+    }
 }

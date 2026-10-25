@@ -5,6 +5,8 @@ import com.boticompara.usuario.dto.ProductoResponse;
 import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
+import org.springframework.http.HttpStatus;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
 import org.junit.jupiter.api.Test;
@@ -175,5 +177,59 @@ class ProductoServiceTest {
 
         assertEquals(15L, r.medicamentoId());
         verify(medicamentos).validarEnlazable(15L);
+    }
+
+
+    // ---------- H31: quitar el enlace (DELETE /productos/{id}/medicamento) ----------
+
+    @Test
+    void desenlazarMedicamento_quitaElEnlaceYConservaElProducto() {
+        conBoticaAprobada();
+        Producto existente = productoExistente(9);
+        existente.setMedicamentoId(12L);
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(existente));
+
+        service.desenlazarMedicamento(10L, 7L);
+
+        assertNull(existente.getMedicamentoId());
+        assertTrue(existente.isActivo());
+        assertEquals("Panadol", existente.getNombreComercial());
+        assertEquals(new BigDecimal("8.50"), existente.getPrecio());
+        verify(productos).save(existente);
+    }
+
+    @Test
+    void desenlazarMedicamento_sinEnlace_noHaceNadaYNoFalla() {
+        conBoticaAprobada();
+        Producto existente = productoExistente(9);
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(existente));
+
+        service.desenlazarMedicamento(10L, 7L);
+
+        assertNull(existente.getMedicamentoId());
+        verify(productos, never()).save(any(Producto.class));
+    }
+
+    @Test
+    void desenlazarMedicamento_productoAjenoOInexistente_responde404() {
+        conBoticaAprobada();
+        when(productos.findByIdAndBoticaIdAndActivoTrue(99L, 1L)).thenReturn(Optional.empty());
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.desenlazarMedicamento(10L, 99L));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+        assertEquals("Producto no encontrado", ex.getMessage());
+        verify(productos, never()).save(any(Producto.class));
+    }
+
+    @Test
+    void desenlazarMedicamento_sinBoticaAprobada_responde403() {
+        when(boticas.findByUsuarioId(10L)).thenReturn(Optional.empty());
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.desenlazarMedicamento(10L, 7L));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+        verify(productos, never()).findByIdAndBoticaIdAndActivoTrue(any(), any());
+        verify(productos, never()).save(any(Producto.class));
     }
 }
