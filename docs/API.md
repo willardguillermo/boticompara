@@ -272,10 +272,15 @@ Respuesta: 201 con el producto creado. Validaciones: `precio > 0`, `stock >= 0`,
 `medicamentoId` es opcional (H31): enlaza el producto con un medicamento del catálogo maestro, elegido con `GET /medicamentos`. Si el medicamento no existe o está oculto → 400.
 
 ### `PUT /productos/{id}` 🔒 — H9
-Mismo cuerpo que el POST. Si no se envía `medicamentoId`, se conserva el enlace actual (H31). Respuesta: 200 con el producto actualizado. 404 si no es de su botica.
+Mismo cuerpo que el POST. Si no se envía `medicamentoId`, se conserva el enlace actual (H31); para quitarlo se usa `DELETE /productos/{id}/medicamento` (enviar `null` no lo borra). Respuesta: 200 con el producto actualizado. 404 si no es de su botica.
 
 ### `DELETE /productos/{id}` 🔒 — H10
 Baja lógica (`activo = false`): deja de aparecer en listados y búsquedas. Respuesta: 204 sin cuerpo.
+
+### `DELETE /productos/{id}/medicamento` 🔒 — H31
+Quita el enlace del producto con el catálogo maestro (`medicamentoId` pasa a `null`). El producto sigue activo y conserva su nombre, precio, stock y principio activo. Respuesta: 204 sin cuerpo, también si el producto no estaba enlazado (se puede repetir sin error).
+Sin enlace, el producto deja de depender del medicamento: sus alternativas salen por el mismo principio activo (`PRINCIPIO_ACTIVO`) y no lo afecta que ese medicamento esté oculto o con el registro vencido (H39).
+Errores: 400 (`id` no numérico), 401 (sin token), 403 (sin botica o botica no aprobada), 404 (el producto no existe, está dado de baja o es de otra botica).
 
 ### `POST /productos/carga-masiva` 🔒 — H11
 Carga o actualiza muchos productos con un archivo CSV o Excel (`.xlsx`). Es `multipart/form-data` con un campo `archivo`. Requiere botica `APROBADO` (si no → 403).
