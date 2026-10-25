@@ -11,6 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.LocalPharmacy
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Medication
@@ -22,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -32,7 +35,7 @@ import androidx.navigation.NavController
 import com.boticompara.app.data.remote.AlternativaResponse
 import java.util.Locale
 
-// ===================== PANTALLA DETALLE DEL PRODUCTO (H28, H36, H37, H41) =====================
+// ===================== PANTALLA DETALLE DEL PRODUCTO (H28, H36, H37, H41, H43, H45) =====================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductoDetalleScreen(
@@ -42,6 +45,7 @@ fun ProductoDetalleScreen(
 ) {
     val vm = detalleViewModel
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(productoId) {
         vm.cargarDetalle(productoId)
@@ -55,6 +59,14 @@ fun ProductoDetalleScreen(
         }
     }
 
+    // Aviso al guardar o quitar el favorito
+    LaunchedEffect(vm.mensajeFavorito) {
+        vm.mensajeFavorito?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.mensajeFavoritoMostrado()
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
@@ -65,11 +77,30 @@ fun ProductoDetalleScreen(
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
                     }
                 },
+                actions = {
+                    // H43 y H45: guardar o quitar de favoritos
+                    if (vm.productoDetalle != null) {
+                        IconButton(
+                            onClick = { vm.alternarFavorito() },
+                            enabled = !vm.procesandoFavorito
+                        ) {
+                            Icon(
+                                imageVector = if (vm.esFavorito) Icons.Rounded.Favorite
+                                else Icons.Rounded.FavoriteBorder,
+                                contentDescription = if (vm.esFavorito) "Quitar de favoritos"
+                                else "Guardar en favoritos",
+                                tint = if (vm.esFavorito) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -381,7 +412,7 @@ private fun AlternativaCard(alternativa: AlternativaResponse, onClick: () -> Uni
 // ===================== SIN ALTERNATIVAS / ERROR (H41) =====================
 @Composable
 private fun SinAlternativasCard(
-    icono: androidx.compose.ui.graphics.vector.ImageVector,
+    icono: ImageVector,
     titulo: String,
     detalle: String
 ) {
