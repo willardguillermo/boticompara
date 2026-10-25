@@ -59,6 +59,28 @@ data class ProductoDetalleResponse(
     val requerimientoReceta: Boolean? = false
 )
 
+// ---- Alternativas del producto (H36, H37, H41) ----
+data class AlternativaResponse(
+    val productoId: Long,
+    val nombreComercial: String,
+    val principioActivo: String,
+    val presentacion: String,
+    val precio: Double,
+    val stock: Int,
+    val boticaId: Long,
+    val boticaNombre: String,
+    val boticaDireccion: String,
+    val boticaDistrito: String,
+    val tipoCoincidencia: String,          // "EQUIVALENTE" o "PRINCIPIO_ACTIVO"
+    val ahorroPorcentaje: Double? = null   // H37: null si no es más barata que el consultado
+)
+
+data class AlternativasResponse(
+    val productoId: Long,
+    val sinEquivalentes: Boolean,          // H41: true cuando no hay alternativas
+    val alternativas: List<AlternativaResponse> = emptyList()
+)
+
 interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
@@ -101,4 +123,11 @@ interface ApiService {
         @Header("Authorization") auth: String,
         @Path("id") id: Long
     ): Response<ProductoDetalleResponse>
+
+    // H36, H37, H41: alternativas del producto (público; con token queda registrado el usuario, H42)
+    @GET("productos/{id}/alternativas")
+    suspend fun obtenerAlternativas(
+        @Header("Authorization") auth: String,
+        @Path("id") id: Long
+    ): Response<AlternativasResponse>
 }

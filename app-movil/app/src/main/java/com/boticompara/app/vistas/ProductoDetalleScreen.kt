@@ -5,23 +5,34 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.LocalPharmacy
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.Medication
+import androidx.compose.material.icons.rounded.Savings
+import androidx.compose.material.icons.rounded.SearchOff
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.boticompara.app.data.remote.AlternativaResponse
 import java.util.Locale
 
-// ===================== PANTALLA DETALLE DEL PRODUCTO (H28) =====================
+// ===================== PANTALLA DETALLE DEL PRODUCTO (H28, H36, H37, H41) =====================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductoDetalleScreen(
@@ -45,12 +56,13 @@ fun ProductoDetalleScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
                 title = { Text("Detalle del producto", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Text("←", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Volver")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -84,7 +96,7 @@ fun ProductoDetalleScreen(
                 }
 
                 vm.mensajeError != null -> {
-                    EstadoVacio("⚠️", vm.mensajeError!!)
+                    EstadoVacio(Icons.Rounded.Warning, vm.mensajeError!!)
                 }
 
                 vm.productoDetalle != null -> {
@@ -97,7 +109,7 @@ fun ProductoDetalleScreen(
                     ) {
                         Spacer(Modifier.height(8.dp))
 
-                        // Tarjeta Principal del Producto
+                        // Tarjeta principal del producto
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(20.dp),
@@ -108,8 +120,7 @@ fun ProductoDetalleScreen(
                                 Text(
                                     producto.nombreComercial,
                                     style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    fontWeight = FontWeight.Bold
                                 )
                                 Text(
                                     producto.presentacion,
@@ -118,17 +129,7 @@ fun ProductoDetalleScreen(
                                 )
                                 Spacer(Modifier.height(12.dp))
 
-                                Surface(
-                                    color = MaterialTheme.colorScheme.secondaryContainer,
-                                    shape = RoundedCornerShape(50)
-                                ) {
-                                    Text(
-                                        "💊 ${producto.principioActivo}",
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                    )
-                                }
+                                Etiqueta(texto = producto.principioActivo, icono = Icons.Rounded.Medication)
 
                                 if (!producto.fabricante.isNullOrEmpty()) {
                                     Spacer(Modifier.height(8.dp))
@@ -143,7 +144,7 @@ fun ProductoDetalleScreen(
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                                 Spacer(Modifier.height(16.dp))
 
-                                // Precio y Stock
+                                // Precio y stock
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column {
                                         Text(
@@ -159,28 +160,14 @@ fun ProductoDetalleScreen(
                                         )
                                     }
                                     Spacer(Modifier.weight(1f))
-                                    val pocoStock = producto.stock <= 10
-                                    Surface(
-                                        color = if (pocoStock) MaterialTheme.colorScheme.tertiaryContainer
-                                        else MaterialTheme.colorScheme.primaryContainer,
-                                        shape = RoundedCornerShape(50)
-                                    ) {
-                                        Text(
-                                            if (pocoStock) "⚠️ Quedan ${producto.stock}" else "✅ Stock: ${producto.stock}",
-                                            color = if (pocoStock) MaterialTheme.colorScheme.onTertiaryContainer
-                                            else MaterialTheme.colorScheme.onPrimaryContainer,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                        )
-                                    }
+                                    EtiquetaStock(producto.stock)
                                 }
                             }
                         }
 
                         Spacer(Modifier.height(16.dp))
 
-                        // Tarjeta de Información de la Botica
+                        // Tarjeta de la botica
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(20.dp),
@@ -195,14 +182,7 @@ fun ProductoDetalleScreen(
                                 )
                                 Spacer(Modifier.height(12.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(48.dp)
-                                            .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("🏪", fontSize = 24.sp)
-                                    }
+                                    IconoCircular(icono = Icons.Rounded.LocalPharmacy, tamano = 48.dp)
                                     Spacer(Modifier.width(16.dp))
                                     Column {
                                         Text(
@@ -210,12 +190,10 @@ fun ProductoDetalleScreen(
                                             style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.Bold
                                         )
-                                        Text(
-                                            "📍 ${producto.boticaDireccion}, ${producto.boticaDistrito}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
+                                        LineaConIcono(
+                                            icono = Icons.Rounded.LocationOn,
+                                            texto = "${producto.boticaDireccion}, ${producto.boticaDistrito}",
+                                            estilo = MaterialTheme.typography.bodyMedium
                                         )
                                     }
                                 }
@@ -223,7 +201,7 @@ fun ProductoDetalleScreen(
                                 // Teléfono de la botica: abre el marcador del celular (no pide permisos)
                                 if (!producto.boticaTelefono.isNullOrBlank()) {
                                     Spacer(Modifier.height(16.dp))
-                                    OutlinedButton(
+                                    FilledTonalButton(
                                         onClick = {
                                             context.startActivity(
                                                 Intent(Intent.ACTION_DIAL, Uri.parse("tel:${producto.boticaTelefono}"))
@@ -231,7 +209,81 @@ fun ProductoDetalleScreen(
                                         },
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text("📞 Llamar · ${producto.boticaTelefono}")
+                                        Icon(
+                                            Icons.Rounded.Call,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(ButtonDefaults.IconSize)
+                                        )
+                                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                                        Text("Llamar · ${producto.boticaTelefono}")
+                                    }
+                                }
+                            }
+                        }
+
+                        // ---------- Alternativas (H36, H37, H41) ----------
+                        Spacer(Modifier.height(24.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconoCircular(icono = Icons.Rounded.Savings, tamano = 40.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    "Alternativas",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "Otras opciones para el mismo medicamento",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+
+                        val datosAlternativas = vm.alternativas
+                        when {
+                            vm.cargandoAlternativas -> {
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(50))
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    "Buscando alternativas…",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            vm.errorAlternativas || datosAlternativas == null -> {
+                                SinAlternativasCard(
+                                    icono = Icons.Rounded.Warning,
+                                    titulo = "No pudimos cargar las alternativas",
+                                    detalle = "Revisa tu conexión e inténtalo de nuevo más tarde."
+                                )
+                            }
+
+                            // H41: no hay genéricos ni equivalentes
+                            datosAlternativas.sinEquivalentes || datosAlternativas.alternativas.isEmpty() -> {
+                                SinAlternativasCard(
+                                    icono = Icons.Rounded.SearchOff,
+                                    titulo = "No hay genéricos registrados",
+                                    detalle = "Por ahora no encontramos otra opción para este medicamento."
+                                )
+                            }
+
+                            else -> {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    datosAlternativas.alternativas.forEach { alternativa ->
+                                        AlternativaCard(
+                                            alternativa = alternativa,
+                                            onClick = {
+                                                navController.navigate("detalle/${alternativa.productoId}")
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -239,6 +291,127 @@ fun ProductoDetalleScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+// ===================== TARJETA DE ALTERNATIVA (H36, H37) =====================
+@Composable
+private fun AlternativaCard(alternativa: AlternativaResponse, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Nombre + etiqueta de ahorro (H37)
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        alternativa.nombreComercial,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        alternativa.presentacion,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                // H37: solo aparece si la alternativa es más barata que el producto consultado
+                if (alternativa.ahorroPorcentaje != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Etiqueta(
+                        texto = "Ahorras ${String.format(Locale.US, "%.1f", alternativa.ahorroPorcentaje)} %",
+                        icono = Icons.Rounded.Savings,
+                        fondo = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // Tipo de coincidencia (H36)
+            if (alternativa.tipoCoincidencia == "EQUIVALENTE") {
+                Etiqueta(texto = "Genérico equivalente", icono = Icons.Rounded.CheckCircle)
+            } else {
+                Etiqueta(texto = "Mismo principio activo", icono = Icons.Rounded.Medication)
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // Precio + stock
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "S/ ${String.format(Locale.US, "%.2f", alternativa.precio)}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.weight(1f))
+                EtiquetaStock(alternativa.stock)
+            }
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(12.dp))
+
+            // Botica
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconoCircular(icono = Icons.Rounded.LocalPharmacy, tamano = 40.dp)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        alternativa.boticaNombre,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    LineaConIcono(
+                        icono = Icons.Rounded.LocationOn,
+                        texto = "${alternativa.boticaDireccion}, ${alternativa.boticaDistrito}"
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ===================== SIN ALTERNATIVAS / ERROR (H41) =====================
+@Composable
+private fun SinAlternativasCard(
+    icono: androidx.compose.ui.graphics.vector.ImageVector,
+    titulo: String,
+    detalle: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            IconoCircular(icono = icono, tamano = 64.dp)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                titulo,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                detalle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
