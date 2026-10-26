@@ -1,72 +1,14 @@
 // Formulario de datos de la botica, compartido por el registro (H1) y la corrección (H7).
-// H2 - Validación del RUC: en vivo con el dígito verificador y, cuando pasa, una sola consulta
-//      a GET /boticas/validar-ruc/{ruc} (SUNAT) que trae la razón social, el estado y la condición;
-//      la dirección fiscal y el distrito se sugieren en sus campos, que siguen siendo editables
+// H2 - Validación del RUC con SUNAT: en el hook useVerificacionRuc
 // H3 - Ubicación de la botica marcada en un mapa (latitud y longitud opcionales)
-import { useRef, useState } from 'react'
-import { api } from '../services/index.js'
+import { useState } from 'react'
+import { cuerpoBotica, esErrorDeRuc, useVerificacionRuc } from '../hooks/useVerificacionRuc.js'
+import { DISTRITOS } from '../utils/distritos.js'
 import { validarRuc } from '../utils/ruc.js'
 import { propsError, telefonoInvalido } from '../utils/validacion.js'
 import Alerta from './Alerta.jsx'
 import Campo from './Campo.jsx'
 import MapaUbicacion from './MapaUbicacion.jsx'
-
-const DISTRITOS = [
-  'Ate', 'Barranco', 'Breña', 'Carabayllo', 'Chaclacayo', 'Chorrillos', 'Cieneguilla', 'Comas',
-  'El Agustino', 'Independencia', 'Jesús María', 'La Molina', 'La Victoria', 'Lima', 'Lince',
-  'Los Olivos', 'Lurigancho-Chosica', 'Lurín', 'Magdalena del Mar', 'Miraflores', 'Pueblo Libre',
-  'Puente Piedra', 'Rímac', 'San Borja', 'San Isidro', 'San Juan de Lurigancho',
-  'San Juan de Miraflores', 'San Luis', 'San Martín de Porres', 'San Miguel', 'Santa Anita',
-  'Santiago de Surco', 'Surquillo', 'Villa El Salvador', 'Villa María del Triunfo',
-]
-
-const SIN_SUGERENCIAS = { direccion: null, distrito: null }
-
-const sinTildes = (texto) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
-
-/** SUNAT manda la dirección con espacios de más: se recortan y se reducen a uno. */
-function limpiarDireccion(direccion) {
-  return direccion?.trim().replace(/\s+/g, ' ') || null
-}
-
-/**
- * SUNAT manda el distrito en mayúsculas ("SAN ISIDRO", "LURIGANCHO"). Devuelve el nombre de DISTRITOS
- * que coincide sin distinguir mayúsculas ni tildes, o el primero que empiece con ese texto; si no, null.
- */
-function distritoDeLista(distrito) {
-  const buscado = distrito ? sinTildes(distrito) : ''
-  if (!buscado) return null
-  return (
-    DISTRITOS.find((d) => sinTildes(d) === buscado) ??
-    DISTRITOS.find((d) => sinTildes(d).startsWith(buscado)) ??
-    null
-  )
-}
-
-/** Sugerencias de dirección y distrito de una respuesta de validar-ruc (solo SUNAT y válido). */
-function sugerenciasDe(resultado) {
-  if (!resultado?.valido || resultado.fuente !== 'SUNAT') return SIN_SUGERENCIAS
-  return { direccion: limpiarDireccion(resultado.direccion), distrito: distritoDeLista(resultado.distrito) }
-}
-
-/** Pone cada sugerencia solo si el campo está vacío o todavía tiene la sugerencia anterior de SUNAT. */
-function aplicarSugerencias(d, anteriores, sugerencias) {
-  const cambios = {}
-  for (const campo of ['direccion', 'distrito']) {
-    const esNuestro = !d[campo].trim() || d[campo] === anteriores[campo]
-    if (sugerencias[campo] && esNuestro) cambios[campo] = sugerencias[campo]
-  }
-  return cambios
-}
-
-/** Borra los campos que todavía tienen la sugerencia de SUNAT (lo escrito por el usuario se queda). */
-function quitarSugerencias(d, sugerencias) {
-  const cambios = {}
-  for (const campo of ['direccion', 'distrito']) {
-    if (sugerencias[campo] && d[campo] === sugerencias[campo]) cambios[campo] = ''
-  }
-  return cambios
-}
 
 const DATOS_VACIOS = { nombreComercial: '', ruc: '', razonSocial: '', direccion: '', distrito: '', telefono: '' }
 
@@ -80,26 +22,6 @@ function validar(datos) {
   if (!datos.distrito.trim()) errores.distrito = 'Ingresa el distrito.'
   if (telefonoInvalido(datos.telefono)) errores.telefono = 'Usa solo números (6 a 15 dígitos).'
   return errores
-}
-
-/** Mensaje del RUC mientras se escribe: ayuda, error u OK. */
-function estadoRucEnVivo(ruc) {
-  if (!ruc) return { ayuda: '11 dígitos. Empieza con 10, 15, 17 o 20.' }
-  const resultado = validarRuc(ruc)
-  if (resultado.valido) return { ok: '✓ RUC válido' }
-  // Mientras faltan dígitos no es un error todavía, salvo que el prefijo ya sea incorrecto
-  return resultado.completo || resultado.mensaje.startsWith('El RUC debe empezar')
-    ? { error: resultado.mensaje }
-    : { ayuda: resultado.mensaje }
-}
-
-/** Mensaje del RUC según la respuesta de GET /boticas/validar-ruc/{ruc}. */
-function estadoRucConsultado(resultado) {
-  if (!resultado.valido) return { error: resultado.mensaje || 'El RUC no es válido.' }
-  if (resultado.fuente === 'SUNAT') {
-    return { ok: `✓ Verificado en SUNAT: ${resultado.razonSocial} · ${resultado.estado} · ${resultado.condicion}` }
-  }
-  return { ok: 'RUC válido. No se pudo consultar SUNAT ahora; se verificará al enviar.' }
 }
 
 /**
@@ -120,91 +42,14 @@ export default function BoticaForm({
   const [errores, setErrores] = useState({})
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState('')
-  // H2: { ruc, cargando: true } mientras se consulta, luego { ruc, resultado }
-  const [consulta, setConsulta] = useState(null)
-  const [razonDeSunat, setRazonDeSunat] = useState(false)
-  // SUNAT (Decolecta) tiene 100 consultas al mes: se guarda el último RUC consultado y la
-  // consulta en curso para no repetir la llamada
-  const ultimaConsulta = useRef(null)
-  const consultaEnCurso = useRef(null)
-  const rucActual = useRef(inicial.ruc)
-  // Última dirección y distrito que pusimos desde SUNAT: un campo con otro valor lo escribió el usuario
-  // o venía cargado (H7), y no se toca
-  const sugeridos = useRef(SIN_SUGERENCIAS)
-
-  /** Devuelve la respuesta de validar-ruc, reutilizando la última o la que está en curso. */
-  function consultarRuc(ruc) {
-    if (ultimaConsulta.current?.ruc === ruc) return Promise.resolve(ultimaConsulta.current.resultado)
-    if (consultaEnCurso.current?.ruc === ruc) return consultaEnCurso.current.promesa
-    const promesa = api
-      .validarRuc(ruc)
-      .then((resultado) => {
-        ultimaConsulta.current = { ruc, resultado }
-        return resultado
-      })
-      .finally(() => {
-        if (consultaEnCurso.current?.promesa === promesa) consultaEnCurso.current = null
-      })
-    consultaEnCurso.current = { ruc, promesa }
-    return promesa
-  }
-
-  /** Muestra la respuesta solo si el RUC no cambió mientras se consultaba. */
-  function aplicarConsulta(ruc, resultado) {
-    if (rucActual.current !== ruc) return
-    setConsulta({ ruc, resultado })
-    if (resultado.valido && resultado.fuente === 'SUNAT') {
-      const anteriores = sugeridos.current
-      const sugerencias = sugerenciasDe(resultado)
-      sugeridos.current = sugerencias
-      setDatos((d) => ({
-        ...d,
-        razonSocial: resultado.razonSocial,
-        ...aplicarSugerencias(d, anteriores, sugerencias),
-      }))
-      setErrores((er) => ({
-        ...er,
-        razonSocial: undefined,
-        ...(sugerencias.direccion && { direccion: undefined }),
-        ...(sugerencias.distrito && { distrito: undefined }),
-      }))
-      setRazonDeSunat(true)
-    }
-  }
-
-  function cambiarRuc(ruc) {
-    if (ruc === rucActual.current) return
-    rucActual.current = ruc
-    setConsulta(null)
-    // La razón social vuelve a ser editable; ella, la dirección y el distrito se borran solo si los
-    // habíamos puesto desde SUNAT
-    const anteriores = sugeridos.current
-    sugeridos.current = SIN_SUGERENCIAS
-    setDatos((d) => ({
-      ...d,
-      ...(razonDeSunat && { razonSocial: '' }),
-      ...quitarSugerencias(d, anteriores),
-    }))
-    setRazonDeSunat(false)
-    if (!validarRuc(ruc).valido) return
-
-    if (ultimaConsulta.current?.ruc === ruc) {
-      aplicarConsulta(ruc, ultimaConsulta.current.resultado)
-      return
-    }
-    setConsulta({ ruc, cargando: true })
-    consultarRuc(ruc).then(
-      (resultado) => aplicarConsulta(ruc, resultado),
-      // Si falla la red se muestra solo la validación local; al enviar se vuelve a intentar
-      () => rucActual.current === ruc && setConsulta(null),
-    )
-  }
+  const ruc = useVerificacionRuc({ rucInicial: inicial.ruc, setDatos, setErrores })
+  const { razonDeSunat } = ruc
 
   const cambiar = (campo) => (e) => {
     const valor = campo === 'ruc' ? e.target.value.replace(/\D/g, '').slice(0, 11) : e.target.value
     setDatos((d) => ({ ...d, [campo]: valor }))
     setErrores((er) => ({ ...er, [campo]: undefined }))
-    if (campo === 'ruc') cambiarRuc(valor)
+    if (campo === 'ruc') ruc.cambiarRuc(valor)
   }
 
   // H3: completa dirección y distrito con lo que devuelve el mapa (solo los campos que vengan)
@@ -225,46 +70,25 @@ export default function BoticaForm({
     try {
       setEnviando('Verificando RUC...')
       // Reutiliza la consulta hecha al escribir el RUC (o la que sigue en curso)
-      const verificacion = await consultarRuc(datos.ruc)
-      aplicarConsulta(datos.ruc, verificacion)
+      const verificacion = await ruc.verificar(datos.ruc)
       if (!verificacion.valido) {
         setErrores({ ruc: verificacion.mensaje || 'El RUC no es válido.' })
         return
       }
-      const deSunat = verificacion.fuente === 'SUNAT'
-      if (errorRazonSocial && !deSunat) return
+      if (errorRazonSocial && verificacion.fuente !== 'SUNAT') return
 
       setEnviando(textoEnviando)
-      await onGuardar({
-        nombreComercial: datos.nombreComercial.trim(),
-        ruc: datos.ruc,
-        razonSocial: deSunat ? verificacion.razonSocial : datos.razonSocial.trim(),
-        direccion: datos.direccion.trim(),
-        distrito: datos.distrito.trim(),
-        telefono: datos.telefono.trim() || null,
-        // H3: el backend exige ambas coordenadas o ninguna
-        ...(ubicacion && { latitud: ubicacion.latitud, longitud: ubicacion.longitud }),
-      })
+      await onGuardar(cuerpoBotica(datos, verificacion, ubicacion))
     } catch (err) {
-      if (err.status === 400 && /ruc/i.test(err.mensaje)) setErrores({ ruc: err.mensaje })
-      else if (err.status === 409 && /ruc/i.test(err.mensaje)) setErrores({ ruc: err.mensaje })
+      if (esErrorDeRuc(err)) setErrores({ ruc: err.mensaje })
       else setError(err.mensaje ?? errorGenerico)
     } finally {
       setEnviando('')
     }
   }
 
-  let rucEnVivo
-  if (errores.ruc) rucEnVivo = { error: errores.ruc }
-  else if (consulta?.ruc !== datos.ruc) rucEnVivo = estadoRucEnVivo(datos.ruc)
-  else if (consulta.cargando) rucEnVivo = { ayuda: 'Consultando SUNAT...' }
-  else rucEnVivo = estadoRucConsultado(consulta.resultado)
-
-  const direccionSunat = consulta?.ruc === datos.ruc ? sugerenciasDe(consulta.resultado).direccion : null
-  const ayudaDireccion =
-    direccionSunat && datos.direccion === direccionSunat
-      ? 'Dirección fiscal según SUNAT. Cámbiala si tu local está en otra dirección.'
-      : undefined
+  const rucEnVivo = ruc.estadoRuc(datos.ruc, errores.ruc)
+  const ayudaDireccion = ruc.ayudaDireccion(datos.ruc, datos.direccion)
 
   return (
     <form className="tarjeta formulario" onSubmit={enviar} noValidate>
