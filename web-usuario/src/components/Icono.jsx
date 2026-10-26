@@ -18,6 +18,7 @@ const TRAZOS = {
   subir: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" /></>,
   bajar: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></>,
   flecha: <><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></>,
+  'flecha-atras': <><path d="M19 12H5" /><path d="M11 6l-6 6 6 6" /></>,
 }
 
 export default function Icono({ nombre, className = '' }) {

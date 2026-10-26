@@ -56,6 +56,8 @@ export default function RegistroBoticaPage() {
   const [archivo, setArchivo] = useState(null)
   const [errorLicencia, setErrorLicencia] = useState('')
   const [confirmado, setConfirmado] = useState(false)
+  // Eligió "Lo haré después" en el paso 4 (se olvida si luego elige un archivo)
+  const [licenciaDespues, setLicenciaDespues] = useState(false)
   // Paso 6: la licencia quedó pendiente (no se eligió o falló la subida)
   const [licenciaPendiente, setLicenciaPendiente] = useState(false)
   const ruc = useVerificacionRuc({ setDatos, setErrores })
@@ -133,6 +135,7 @@ export default function RegistroBoticaPage() {
     const mensaje = validarArchivoLicencia(elegido)
     setErrorLicencia(mensaje)
     setArchivo(mensaje ? null : elegido)
+    if (!mensaje) setLicenciaDespues(false)
   }
 
   function siguienteLicencia(e) {
@@ -144,11 +147,15 @@ export default function RegistroBoticaPage() {
     irA(5)
   }
 
-  function licenciaDespues() {
+  function dejarLicenciaParaDespues() {
     setArchivo(null)
     setErrorLicencia('')
+    setLicenciaDespues(true)
     irA(5)
   }
+
+  // Lista de pasos: el paso 4 avisa que la licencia quedó para después
+  const descripciones = licenciaDespues ? { 4: 'Pendiente: la subirás después' } : undefined
 
   /**
    * Registra la botica (misma llamada y manejo de errores que antes) y, si hay archivo, sube la licencia.
@@ -215,6 +222,7 @@ export default function RegistroBoticaPage() {
     return (
       <RegistroPasos
         paso={2}
+        descripciones={descripciones}
         pie={
           // Cada botón del pie lleva su key: si React reutilizara el mismo <button> al cambiar de paso,
           // el clic en "Atrás" terminaría como submit del formulario del paso 2 y regresaría al paso 3
@@ -292,10 +300,12 @@ export default function RegistroBoticaPage() {
     return (
       <RegistroPasos
         paso={3}
+        descripciones={descripciones}
         onIrAPaso={irA}
         pie={
           <>
-            <button key="atras" type="button" className="btn btn-secundario" onClick={() => irA(2)}>
+            <button key="atras-ubicacion" type="button" className="btn btn-secundario" onClick={() => irA(2)}>
+              <Icono nombre="flecha-atras" />
               Atrás
             </button>
             <button key="siguiente-ubicacion" type="submit" form="form-botica-ubicacion" className="btn btn-primario">
@@ -360,16 +370,23 @@ export default function RegistroBoticaPage() {
     return (
       <RegistroPasos
         paso={4}
+        descripciones={descripciones}
         onIrAPaso={irA}
         pie={
           <>
-            <button key="despues" type="button" className="btn btn-secundario" onClick={licenciaDespues}>
-              Lo haré después
+            <button key="atras-licencia" type="button" className="btn btn-secundario" onClick={() => irA(3)}>
+              <Icono nombre="flecha-atras" />
+              Atrás
             </button>
-            <button key="subir" type="submit" form="form-licencia" className="btn btn-primario">
-              Subir y continuar
-              <Icono nombre="flecha" />
-            </button>
+            <div key="acciones-licencia" className="pasos-pie-grupo">
+              <button type="button" className="btn btn-secundario" onClick={dejarLicenciaParaDespues}>
+                Lo haré después
+              </button>
+              <button type="submit" form="form-licencia" className="btn btn-primario">
+                Subir y continuar
+                <Icono nombre="flecha" />
+              </button>
+            </div>
           </>
         }
       >
@@ -397,17 +414,30 @@ export default function RegistroBoticaPage() {
     return (
       <RegistroPasos
         paso={5}
+        descripciones={descripciones}
         onIrAPaso={enviando ? undefined : irA}
         pie={
-          <button
-            key="enviar"
-            type="submit"
-            form="form-revision"
-            className="btn btn-primario"
-            disabled={!confirmado || Boolean(enviando)}
-          >
-            {enviando || 'Enviar solicitud'}
-          </button>
+          <>
+            <button
+              key="atras-revision"
+              type="button"
+              className="btn btn-secundario"
+              onClick={() => irA(4)}
+              disabled={Boolean(enviando)}
+            >
+              <Icono nombre="flecha-atras" />
+              Atrás
+            </button>
+            <button
+              key="enviar"
+              type="submit"
+              form="form-revision"
+              className="btn btn-primario"
+              disabled={!confirmado || Boolean(enviando)}
+            >
+              {enviando || 'Enviar solicitud'}
+            </button>
+          </>
         }
       >
         <div className="pasos-encabezado">
@@ -467,7 +497,10 @@ export default function RegistroBoticaPage() {
                     <p className="texto-suave">{formatoTamano(archivo.size)}</p>
                   </>
                 ) : (
-                  <p className="texto-pendiente">Pendiente</p>
+                  <>
+                    <p className="texto-pendiente">Pendiente</p>
+                    <p className="texto-suave">La subirás después desde Mi botica</p>
+                  </>
                 )}
               </div>
               <button type="button" className="btn btn-secundario btn-icono" onClick={() => irA(4)} disabled={Boolean(enviando)}>
@@ -502,6 +535,7 @@ export default function RegistroBoticaPage() {
   return (
     <RegistroPasos
       paso={6}
+      descripciones={descripciones}
       pie={
         <button key="panel" type="button" className="btn btn-primario" onClick={irAlPanel} disabled={Boolean(enviando)}>
           {enviando || 'Ir a mi panel'}

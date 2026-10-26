@@ -709,6 +709,15 @@ a {
   margin-left: auto;
 }
 
+/* Paso 4: "Lo haré después" y "Subir y continuar" juntos a la derecha */
+.pasos-pie-grupo {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
 /* H3: mapa del paso 3 */
 .pasos-tarjeta .mapa-ubicacion {
   height: 280px;
@@ -976,8 +985,14 @@ a {
     padding: 1rem 1.15rem;
   }
 
-  .pasos-pie > .btn {
+  .pasos-pie > .btn,
+  .pasos-pie-grupo,
+  .pasos-pie-grupo > .btn {
     flex: 1 1 auto;
+  }
+
+  .pasos-pie-grupo {
+    flex-wrap: wrap-reverse;
   }
 
   .pasos-campos {

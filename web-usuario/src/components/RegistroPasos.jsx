@@ -15,8 +15,9 @@ const PASOS = [
  * children: el contenido del paso. pie: los botones del pie (opcional).
  * onIrAPaso(numero): si se pasa, los pasos hechos se pueden clicar para volver a ellos,
  * salvo el paso 1, porque la cuenta ya existe.
+ * descripciones: textos que reemplazan la descripción de un paso, por número ({ 4: '...' }).
  */
-export default function RegistroPasos({ paso, pie, onIrAPaso, children }) {
+export default function RegistroPasos({ paso, pie, onIrAPaso, descripciones, children }) {
   const final = paso > PASOS.length
   const lista = useRef(null)
 
@@ -52,7 +53,9 @@ export default function RegistroPasos({ paso, pie, onIrAPaso, children }) {
                   </span>
                   <span className="paso-texto">
                     <span className="paso-nombre">{titulo}</span>
-                    <span className="paso-descripcion">{(estado === 'hecho' && hecho) || descripcion}</span>
+                    <span className="paso-descripcion">
+                      {descripciones?.[numero] ?? ((estado === 'hecho' && hecho) || descripcion)}
+                    </span>
                   </span>
                 </button>
               </li>
