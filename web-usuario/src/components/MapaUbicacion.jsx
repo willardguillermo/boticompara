@@ -2,6 +2,8 @@
 // Leaflet + OpenStreetMap: gratis y sin clave de API.
 // Clic en el mapa = marca la ubicación; el marcador se puede arrastrar para ajustarla.
 // Debajo se muestra la dirección aproximada del punto, que se puede usar en el formulario.
+// Con `recuadro` (registro por pasos), las coordenadas y la dirección van juntas en un recuadro
+// "Ubicación marcada".
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -20,7 +22,7 @@ const iconoBotica = L.divIcon({
   iconAnchor: [14, 34],
 })
 
-export default function MapaUbicacion({ valor, onCambio, onUsarDireccion }) {
+export default function MapaUbicacion({ valor, onCambio, onUsarDireccion, recuadro = false }) {
   const contenedor = useRef(null)
   const mapa = useRef(null)
   const marcador = useRef(null)
@@ -127,6 +129,25 @@ export default function MapaUbicacion({ valor, onCambio, onUsarDireccion }) {
     )
   }
 
+  const textoDireccion = (
+    <>
+      {direccion.estado === 'cargando' && <span className="ayuda">Buscando la dirección...</span>}
+      {direccion.estado === 'error' && (
+        <span className="ayuda">No pudimos obtener la dirección, pero la ubicación quedó marcada.</span>
+      )}
+      {direccion.estado === 'sin-datos' && <span className="ayuda">No hay una dirección conocida para este punto.</span>}
+    </>
+  )
+  const botonUsarDireccion = direccion.estado === 'ok' && onUsarDireccion && (direccion.direccion || direccion.distrito) && (
+    <button
+      type="button"
+      className="btn btn-secundario btn-icono"
+      onClick={() => onUsarDireccion({ direccion: direccion.direccion, distrito: direccion.distrito })}
+    >
+      Usar esta dirección
+    </button>
+  )
+
   return (
     <div className="selector-mapa">
       <p className="ayuda">
@@ -134,11 +155,13 @@ export default function MapaUbicacion({ valor, onCambio, onUsarDireccion }) {
       </p>
       <div ref={contenedor} className="mapa-ubicacion" role="application" aria-label="Mapa para marcar la ubicación de la botica" />
       <div className="mapa-pie">
-        <span className={valor ? 'ok-campo' : 'ayuda'}>
-          {valor
-            ? `✓ Ubicación marcada (${valor.latitud.toFixed(6)}, ${valor.longitud.toFixed(6)})`
-            : 'Aún no marcaste la ubicación.'}
-        </span>
+        {!(recuadro && valor) && (
+          <span className={valor ? 'ok-campo' : 'ayuda'}>
+            {valor
+              ? `✓ Ubicación marcada (${valor.latitud.toFixed(6)}, ${valor.longitud.toFixed(6)})`
+              : 'Aún no marcaste la ubicación.'}
+          </span>
+        )}
         <div className="mapa-acciones">
           <button type="button" className="btn btn-secundario btn-icono" onClick={usarMiUbicacion} disabled={buscando}>
             {buscando ? 'Buscando...' : 'Usar mi ubicación'}
@@ -150,29 +173,30 @@ export default function MapaUbicacion({ valor, onCambio, onUsarDireccion }) {
           )}
         </div>
       </div>
-      {valor && (
+      {valor && !recuadro && (
         <div className="mapa-direccion" aria-live="polite">
-          {direccion.estado === 'cargando' && <span className="ayuda">Buscando la dirección...</span>}
-          {direccion.estado === 'error' && (
-            <span className="ayuda">No pudimos obtener la dirección, pero la ubicación quedó marcada.</span>
-          )}
-          {direccion.estado === 'sin-datos' && <span className="ayuda">No hay una dirección conocida para este punto.</span>}
+          {textoDireccion}
           {direccion.estado === 'ok' && (
             <>
               <span>
                 <strong>Dirección aproximada:</strong> {direccion.completa}
               </span>
-              {onUsarDireccion && (direccion.direccion || direccion.distrito) && (
-                <button
-                  type="button"
-                  className="btn btn-secundario btn-icono"
-                  onClick={() => onUsarDireccion({ direccion: direccion.direccion, distrito: direccion.distrito })}
-                >
-                  Usar esta dirección
-                </button>
-              )}
+              {botonUsarDireccion}
             </>
           )}
+        </div>
+      )}
+      {valor && recuadro && (
+        <div className="mapa-recuadro" aria-live="polite">
+          <div className="mapa-recuadro-texto">
+            <strong>✓ Ubicación marcada</strong>
+            {textoDireccion}
+            {direccion.estado === 'ok' && <span>{direccion.completa}</span>}
+            <span className="mapa-coordenadas">
+              {valor.latitud.toFixed(6)}, {valor.longitud.toFixed(6)}
+            </span>
+          </div>
+          {botonUsarDireccion}
         </div>
       )}
       {errorGps && <span className="error-campo" role="alert">{errorGps}</span>}

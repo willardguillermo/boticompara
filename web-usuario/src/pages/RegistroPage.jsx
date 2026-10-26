@@ -1,10 +1,11 @@
-// H1 - Registro de la cuenta del dueño de botica (rol DUENO_BOTICA)
+// H1 - Registro de la cuenta del dueño de botica (rol DUENO_BOTICA): paso 1 del registro por pasos
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Campo from '../components/Campo.jsx'
 import Icono from '../components/Icono.jsx'
 import Marca from '../components/Marca.jsx'
+import RegistroPasos from '../components/RegistroPasos.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { CORREO_VALIDO, propsError, telefonoInvalido } from '../utils/validacion.js'
@@ -53,16 +54,28 @@ export default function RegistroPage() {
     }
   }
 
-  return (
-    <main className="acceso acceso-ancho">
-      <div className="tarjeta">
-        <Marca a="/login" />
-        <h1>Crea tu cuenta de botica</h1>
-        <p className="texto-suave">
-          Paso 1 de 2: tus datos como dueño. Luego registrarás tu botica para que sea revisada.
-        </p>
+  const pie = (
+    <>
+      <p>
+        ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
+      </p>
+      <button type="submit" form="form-cuenta" className="btn btn-primario" disabled={enviando}>
+        {enviando ? 'Creando cuenta...' : 'Crear cuenta y continuar'}
+        {!enviando && <Icono nombre="flecha" />}
+      </button>
+    </>
+  )
 
-        <form className="formulario" onSubmit={enviar} noValidate>
+  return (
+    <main className="registro-pagina">
+      <Marca a="/login" />
+      <RegistroPasos paso={1} pie={pie}>
+        <div className="pasos-encabezado">
+          <h1>Crea tu cuenta</h1>
+          <p>Con esta cuenta administrarás tu botica y tu catálogo.</p>
+        </div>
+
+        <form id="form-cuenta" className="formulario" onSubmit={enviar} noValidate>
           <Alerta tipo="error">{error && <p>{error}</p>}</Alerta>
 
           <Campo id="nombre" etiqueta="Nombre completo" error={errores.nombre}>
@@ -71,9 +84,10 @@ export default function RegistroPage() {
               autoComplete="name"
               value={datos.nombre}
               onChange={cambiar('nombre')}
+              placeholder="Como figura en tu DNI"
             />
           </Campo>
-          <div className="fila-campos">
+          <div className="pasos-campos">
             <Campo id="correo" etiqueta="Correo" error={errores.correo}>
               <input
                 {...propsError('correo', errores.correo)}
@@ -81,6 +95,7 @@ export default function RegistroPage() {
                 autoComplete="email"
                 value={datos.correo}
                 onChange={cambiar('correo')}
+                placeholder="tu@correo.com"
               />
             </Campo>
             <Campo id="telefono" etiqueta="Teléfono" opcional error={errores.telefono}>
@@ -91,10 +106,9 @@ export default function RegistroPage() {
                 autoComplete="tel"
                 value={datos.telefono}
                 onChange={cambiar('telefono')}
+                placeholder="987654321"
               />
             </Campo>
-          </div>
-          <div className="fila-campos">
             <Campo id="password" etiqueta="Contraseña" error={errores.password} ayuda="Mínimo 8 caracteres.">
               <input
                 {...propsError('password', errores.password)}
@@ -114,21 +128,13 @@ export default function RegistroPage() {
               />
             </Campo>
           </div>
-
-          <button type="submit" className="btn btn-primario btn-bloque" disabled={enviando}>
-            {enviando ? 'Creando cuenta...' : 'Crear cuenta'}
-          </button>
         </form>
 
         {/* H21: el registro solo pide datos de contacto y de acceso */}
         <p className="aviso-privacidad">
           <Icono nombre="candado" /> BotiCompara no te pide datos de salud ni historial clínico.
         </p>
-
-        <p className="acceso-pie">
-          ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
-        </p>
-      </div>
+      </RegistroPasos>
     </main>
   )
 }
