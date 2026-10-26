@@ -748,6 +748,192 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+/* H4: licencia del paso 4 */
+.zona-licencia {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 2px dashed var(--color-pendiente);
+  border-radius: var(--radio-grande);
+  background: var(--color-pie);
+}
+
+.zona-licencia.zona-arrastrando {
+  border-color: var(--color-primario);
+  background: var(--color-primario-suave);
+}
+
+.zona-licencia.zona-error {
+  border-color: var(--error);
+  background: #fffafa;
+}
+
+.zona-licencia .error-campo {
+  padding: 0 0.5rem 0.25rem;
+  font-size: 0.85rem;
+  color: var(--error);
+  text-align: center;
+}
+
+.zona-boton {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 1.75rem 1rem;
+  border: none;
+  border-radius: var(--radio);
+  background: transparent;
+  color: var(--color-texto);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.zona-boton:focus-visible {
+  outline: 3px solid rgb(15 118 110 / 35%);
+}
+
+.zona-boton > .icono {
+  width: 28px;
+  height: 28px;
+  color: var(--color-primario);
+}
+
+.zona-enlace {
+  color: var(--color-primario);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.zona-ayuda {
+  font-size: 0.85rem;
+  color: var(--color-texto-suave);
+}
+
+.archivo-elegido {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+}
+
+.archivo-elegido > .icono {
+  color: var(--exito);
+}
+
+.archivo-texto {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.archivo-nombre {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archivo-tamano {
+  font-size: 0.82rem;
+  color: var(--color-texto-suave);
+}
+
+/* Paso 5: resumen */
+.resumen-registro {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.resumen-tarjeta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+}
+
+.resumen-tarjeta > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.resumen-tarjeta h2 {
+  margin: 0 0 0.25rem;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-texto-suave);
+}
+
+.resumen-tarjeta p {
+  margin: 0;
+}
+
+.resumen-tarjeta .btn {
+  flex-shrink: 0;
+}
+
+.texto-pendiente {
+  font-weight: 700;
+  color: var(--aviso);
+}
+
+/* Más específico que .casilla (catálogo), que va después en este archivo */
+.pasos-tarjeta .casilla-confirmar {
+  align-items: flex-start;
+  font-weight: 400;
+}
+
+.pasos-tarjeta .casilla-confirmar input {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+/* Paso 6: solicitud enviada */
+.registro-final {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  text-align: center;
+}
+
+.registro-final h1 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.registro-final h1:focus {
+  outline: none;
+}
+
+.registro-final p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--color-texto-suave);
+}
+
+.final-icono {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--exito-fondo);
+  color: var(--exito);
+}
+
+.final-icono .icono {
+  width: 32px;
+  height: 32px;
+}
+
 /* Solo se animan transform, opacity y el ancho de la barra */
 .pasos-tarjeta .btn {
   transition: transform 150ms var(--curva);
@@ -784,8 +970,14 @@ a {
     padding: 1.25rem 1.15rem 1.5rem;
   }
 
+  /* Si los botones no caben en una fila, el principal (el último) queda arriba y a todo el ancho */
   .pasos-pie {
+    flex-wrap: wrap-reverse;
     padding: 1rem 1.15rem;
+  }
+
+  .pasos-pie > .btn {
+    flex: 1 1 auto;
   }
 
   .pasos-campos {

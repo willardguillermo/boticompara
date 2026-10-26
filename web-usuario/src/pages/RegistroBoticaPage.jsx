@@ -1,7 +1,9 @@
 // H1 - Registro de la botica del dueño (queda PENDIENTE hasta que el admin la aprueba), por pasos:
-//      paso 2 datos de la botica y paso 3 ubicación. Los datos viven aquí para no perderlos al ir y volver.
+//      2 datos, 3 ubicación, 4 licencia, 5 revisión y envío, 6 pantalla final.
+//      Los datos y el archivo viven aquí (en el navegador) para no perderlos al ir y volver.
 // H2 - Validación del RUC con SUNAT (hook useVerificacionRuc) en el paso 2
 // H3 - Dirección, distrito y ubicación en el mapa en el paso 3
+// H4 - Licencia de funcionamiento en el paso 4; se sube recién al enviar, después de crear la botica
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
@@ -9,13 +11,15 @@ import Campo from '../components/Campo.jsx'
 import Icono from '../components/Icono.jsx'
 import MapaUbicacion from '../components/MapaUbicacion.jsx'
 import RegistroPasos from '../components/RegistroPasos.jsx'
+import SelectorLicencia from '../components/SelectorLicencia.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import { useBotica } from '../context/BoticaContext.jsx'
-import { useToast } from '../context/ToastContext.jsx'
 import { cuerpoBotica, esErrorDeRuc, useVerificacionRuc } from '../hooks/useVerificacionRuc.js'
 import { api } from '../services/index.js'
 import { DISTRITOS, distritoDeLista } from '../utils/distritos.js'
+import { formatoTamano } from '../utils/formato.js'
 import { validarRuc } from '../utils/ruc.js'
-import { propsError, telefonoInvalido } from '../utils/validacion.js'
+import { propsError, telefonoInvalido, validarArchivoLicencia } from '../utils/validacion.js'
 
 const DATOS_VACIOS = { nombreComercial: '', ruc: '', razonSocial: '', direccion: '', distrito: '', telefono: '' }
 
@@ -39,8 +43,8 @@ function validarUbicacion(datos) {
 }
 
 export default function RegistroBoticaPage() {
+  const { usuario } = useAuth()
   const { recargar } = useBotica()
-  const toast = useToast()
   const navigate = useNavigate()
 
   const [paso, setPaso] = useState(2)
@@ -49,6 +53,11 @@ export default function RegistroBoticaPage() {
   const [errores, setErrores] = useState({})
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState('')
+  const [archivo, setArchivo] = useState(null)
+  const [errorLicencia, setErrorLicencia] = useState('')
+  const [confirmado, setConfirmado] = useState(false)
+  // Paso 6: la licencia quedó pendiente (no se eligió o falló la subida)
+  const [licenciaPendiente, setLicenciaPendiente] = useState(false)
   const ruc = useVerificacionRuc({ setDatos, setErrores })
   const titulo = useRef(null)
   const primerPaso = useRef(true)
@@ -65,6 +74,8 @@ export default function RegistroBoticaPage() {
 
   function irA(numero) {
     setError('')
+    // Si vuelve a editar algo, debe confirmar de nuevo en la revisión
+    if (numero < 5) setConfirmado(false)
     setPaso(numero)
   }
 
@@ -109,34 +120,63 @@ export default function RegistroBoticaPage() {
     }
   }
 
-  // PROVISIONAL hasta el paso 5: el paso 3 registra la botica como lo hacía el formulario anterior
-  async function enviar(e) {
+  function siguienteUbicacion(e) {
     e.preventDefault()
     const nuevos = validarUbicacion(datos)
     setErrores(nuevos)
     setError('')
-    if (Object.keys(nuevos).length) return
+    if (!Object.keys(nuevos).length) irA(4)
+  }
 
+  // H4: mismas reglas que SeccionLicencia (validarArchivoLicencia); solo se guarda si es válido
+  function elegirLicencia(elegido) {
+    const mensaje = validarArchivoLicencia(elegido)
+    setErrorLicencia(mensaje)
+    setArchivo(mensaje ? null : elegido)
+  }
+
+  function siguienteLicencia(e) {
+    e.preventDefault()
+    if (!archivo) {
+      setErrorLicencia(errorLicencia || validarArchivoLicencia(null))
+      return
+    }
+    irA(5)
+  }
+
+  function licenciaDespues() {
+    setArchivo(null)
+    setErrorLicencia('')
+    irA(5)
+  }
+
+  /**
+   * Registra la botica (misma llamada y manejo de errores que antes) y, si hay archivo, sube la licencia.
+   * No recarga la botica del contexto: si lo hiciera, SinBotica sacaría al usuario de esta ruta antes
+   * de ver el paso 6. Se recarga al pulsar "Ir a mi panel".
+   */
+  async function enviar(e) {
+    e.preventDefault()
+    if (!confirmado || enviando) return
+    setError('')
+    setEnviando('Enviando...')
     try {
-      setEnviando('Verificando RUC...')
       const verificacion = await ruc.verificar(datos.ruc)
       if (!verificacion.valido) {
+        setEnviando('')
         setErrores({ ruc: verificacion.mensaje || 'El RUC no es válido.' })
         irA(2)
         return
       }
       if (!datos.razonSocial.trim() && verificacion.fuente !== 'SUNAT') {
+        setEnviando('')
         setErrores({ razonSocial: 'Ingresa la razón social que figura en SUNAT.' })
         irA(2)
         return
       }
-
-      setEnviando('Registrando botica...')
       await api.registrarBotica(cuerpoBotica(datos, verificacion, ubicacion))
-      await recargar()
-      toast('Botica registrada. Quedó pendiente de aprobación.')
-      navigate('/panel/estado', { replace: true })
     } catch (err) {
+      setEnviando('')
       // Un RUC inválido o ya registrado (409) se corrige en el paso 2
       if (esErrorDeRuc(err)) {
         setErrores({ ruc: err.mensaje })
@@ -144,9 +184,28 @@ export default function RegistroBoticaPage() {
       } else {
         setError(err.mensaje ?? 'No se pudo registrar la botica.')
       }
-    } finally {
-      setEnviando('')
+      return
     }
+
+    // La botica ya existe: si la licencia no sube, queda pendiente y se sube desde Mi botica
+    let licenciaSubida = false
+    if (archivo) {
+      try {
+        await api.subirLicencia(archivo)
+        licenciaSubida = true
+      } catch {
+        licenciaSubida = false
+      }
+    }
+    setLicenciaPendiente(!licenciaSubida)
+    setEnviando('')
+    setPaso(6)
+  }
+
+  async function irAlPanel() {
+    setEnviando('Abriendo tu panel...')
+    await recargar()
+    navigate('/panel/estado', { replace: true })
   }
 
   const alerta = <Alerta tipo="error">{error && <p>{error}</p>}</Alerta>
@@ -229,68 +288,247 @@ export default function RegistroBoticaPage() {
     )
   }
 
-  return (
-    <RegistroPasos
-      paso={3}
-      onIrAPaso={irA}
-      pie={
-        <>
-          <button key="atras" type="button" className="btn btn-secundario" onClick={() => irA(2)} disabled={Boolean(enviando)}>
-            Atrás
-          </button>
-          <button key="enviar" type="submit" form="form-botica-ubicacion" className="btn btn-primario" disabled={Boolean(enviando)}>
+  if (paso === 3) {
+    return (
+      <RegistroPasos
+        paso={3}
+        onIrAPaso={irA}
+        pie={
+          <>
+            <button key="atras" type="button" className="btn btn-secundario" onClick={() => irA(2)}>
+              Atrás
+            </button>
+            <button key="siguiente-ubicacion" type="submit" form="form-botica-ubicacion" className="btn btn-primario">
+              Siguiente
+              <Icono nombre="flecha" />
+            </button>
+          </>
+        }
+      >
+        <div className="pasos-encabezado">
+          <h1 ref={titulo} tabIndex={-1}>
+            ¿Dónde está tu botica?
+          </h1>
+          <p>Marca el punto exacto en el mapa para que los compradores te encuentren.</p>
+        </div>
+
+        <form id="form-botica-ubicacion" className="formulario" onSubmit={siguienteUbicacion} noValidate>
+          {alerta}
+          <div className="pasos-campos">
+            <Campo
+              id="direccion"
+              etiqueta="Dirección"
+              error={errores.direccion}
+              ayuda={ruc.ayudaDireccion(datos.ruc, datos.direccion)}
+            >
+              <input
+                {...propsError('direccion', errores.direccion)}
+                autoComplete="street-address"
+                value={datos.direccion}
+                onChange={cambiar('direccion')}
+                placeholder="Av. Lima Sur 450"
+              />
+            </Campo>
+            <Campo id="distrito" etiqueta="Distrito" error={errores.distrito}>
+              <select {...propsError('distrito', errores.distrito)} value={datos.distrito} onChange={cambiar('distrito')}>
+                <option value="">Elige un distrito</option>
+                {/* Un distrito del mapa que no está en la lista se conserva como opción */}
+                {datos.distrito && !DISTRITOS.includes(datos.distrito) && (
+                  <option value={datos.distrito}>{datos.distrito}</option>
+                )}
+                {DISTRITOS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+          </div>
+
+          <div className="campo">
+            <span className="etiqueta-campo">
+              Ubicación en el mapa <span className="opcional">(opcional)</span>
+            </span>
+            <MapaUbicacion valor={ubicacion} onCambio={setUbicacion} onUsarDireccion={usarDireccionDelMapa} recuadro />
+          </div>
+        </form>
+      </RegistroPasos>
+    )
+  }
+
+  if (paso === 4) {
+    return (
+      <RegistroPasos
+        paso={4}
+        onIrAPaso={irA}
+        pie={
+          <>
+            <button key="despues" type="button" className="btn btn-secundario" onClick={licenciaDespues}>
+              Lo haré después
+            </button>
+            <button key="subir" type="submit" form="form-licencia" className="btn btn-primario">
+              Subir y continuar
+              <Icono nombre="flecha" />
+            </button>
+          </>
+        }
+      >
+        <div className="pasos-encabezado">
+          <h1 ref={titulo} tabIndex={-1}>
+            Licencia de funcionamiento
+          </h1>
+          <p>Sube una foto o PDF de tu licencia municipal. La revisaremos junto con tu solicitud.</p>
+        </div>
+
+        <form id="form-licencia" className="formulario" onSubmit={siguienteLicencia} noValidate>
+          <SelectorLicencia archivo={archivo} error={errorLicencia} onElegir={elegirLicencia} />
+          <Alerta tipo="info">
+            <p>
+              Si eliges «Lo haré después», podrás subirla desde Mi botica. Tu botica no será aprobada sin la
+              licencia.
+            </p>
+          </Alerta>
+        </form>
+      </RegistroPasos>
+    )
+  }
+
+  if (paso === 5) {
+    return (
+      <RegistroPasos
+        paso={5}
+        onIrAPaso={enviando ? undefined : irA}
+        pie={
+          <button
+            key="enviar"
+            type="submit"
+            form="form-revision"
+            className="btn btn-primario"
+            disabled={!confirmado || Boolean(enviando)}
+          >
             {enviando || 'Enviar solicitud'}
           </button>
-        </>
+        }
+      >
+        <div className="pasos-encabezado">
+          <h1 ref={titulo} tabIndex={-1}>
+            Revisa tu solicitud
+          </h1>
+          <p>Confirma que todo esté bien antes de enviarla.</p>
+        </div>
+
+        <form id="form-revision" className="formulario" onSubmit={enviar} noValidate>
+          {alerta}
+          <div className="resumen-registro">
+            <section className="resumen-tarjeta">
+              <div>
+                <h2>Cuenta</h2>
+                <p>Cuenta ya creada</p>
+                <p className="texto-suave">{usuario?.correo}</p>
+              </div>
+            </section>
+
+            <section className="resumen-tarjeta">
+              <div>
+                <h2>Botica</h2>
+                <p>{datos.nombreComercial}</p>
+                <p className="texto-suave">
+                  RUC {datos.ruc} · {datos.razonSocial}
+                </p>
+              </div>
+              <button type="button" className="btn btn-secundario btn-icono" onClick={() => irA(2)} disabled={Boolean(enviando)}>
+                <Icono nombre="editar" /> Editar
+              </button>
+            </section>
+
+            <section className="resumen-tarjeta">
+              <div>
+                <h2>Ubicación</h2>
+                <p>
+                  {datos.direccion}, {datos.distrito}
+                </p>
+                <p className="texto-suave">
+                  {ubicacion
+                    ? `${ubicacion.latitud.toFixed(6)}, ${ubicacion.longitud.toFixed(6)}`
+                    : 'Sin punto en el mapa'}
+                </p>
+              </div>
+              <button type="button" className="btn btn-secundario btn-icono" onClick={() => irA(3)} disabled={Boolean(enviando)}>
+                <Icono nombre="editar" /> Editar
+              </button>
+            </section>
+
+            <section className="resumen-tarjeta">
+              <div>
+                <h2>Licencia</h2>
+                {archivo ? (
+                  <>
+                    <p>{archivo.name}</p>
+                    <p className="texto-suave">{formatoTamano(archivo.size)}</p>
+                  </>
+                ) : (
+                  <p className="texto-pendiente">Pendiente</p>
+                )}
+              </div>
+              <button type="button" className="btn btn-secundario btn-icono" onClick={() => irA(4)} disabled={Boolean(enviando)}>
+                {archivo ? (
+                  <>
+                    <Icono nombre="editar" /> Editar
+                  </>
+                ) : (
+                  <>
+                    <Icono nombre="subir" /> Subir ahora
+                  </>
+                )}
+              </button>
+            </section>
+          </div>
+
+          <label className="casilla casilla-confirmar">
+            <input
+              type="checkbox"
+              checked={confirmado}
+              onChange={(e) => setConfirmado(e.target.checked)}
+              disabled={Boolean(enviando)}
+            />
+            Confirmo que los datos son correctos y que estoy autorizado para registrar esta botica.
+          </label>
+        </form>
+      </RegistroPasos>
+    )
+  }
+
+  // Paso 6: pantalla final. La botica ya existe, pero el contexto se recarga recién en "Ir a mi panel"
+  return (
+    <RegistroPasos
+      paso={6}
+      pie={
+        <button key="panel" type="button" className="btn btn-primario" onClick={irAlPanel} disabled={Boolean(enviando)}>
+          {enviando || 'Ir a mi panel'}
+          {!enviando && <Icono nombre="flecha" />}
+        </button>
       }
     >
-      <div className="pasos-encabezado">
+      <div className="registro-final">
+        <span className="final-icono">
+          <Icono nombre="check" />
+        </span>
         <h1 ref={titulo} tabIndex={-1}>
-          ¿Dónde está tu botica?
+          ¡Solicitud enviada!
         </h1>
-        <p>Marca el punto exacto en el mapa para que los compradores te encuentren.</p>
+        <span className="estado estado-PENDIENTE">
+          <Icono nombre="reloj" /> En revisión
+        </span>
+        <p>
+          Revisaremos los datos de tu botica y te avisaremos cuando esté aprobada. Mientras tanto puedes ver el
+          estado en tu panel.
+        </p>
       </div>
-
-      <form id="form-botica-ubicacion" className="formulario" onSubmit={enviar} noValidate>
-        {alerta}
-        <div className="pasos-campos">
-          <Campo
-            id="direccion"
-            etiqueta="Dirección"
-            error={errores.direccion}
-            ayuda={ruc.ayudaDireccion(datos.ruc, datos.direccion)}
-          >
-            <input
-              {...propsError('direccion', errores.direccion)}
-              autoComplete="street-address"
-              value={datos.direccion}
-              onChange={cambiar('direccion')}
-              placeholder="Av. Lima Sur 450"
-            />
-          </Campo>
-          <Campo id="distrito" etiqueta="Distrito" error={errores.distrito}>
-            <select {...propsError('distrito', errores.distrito)} value={datos.distrito} onChange={cambiar('distrito')}>
-              <option value="">Elige un distrito</option>
-              {/* Un distrito del mapa que no está en la lista se conserva como opción */}
-              {datos.distrito && !DISTRITOS.includes(datos.distrito) && (
-                <option value={datos.distrito}>{datos.distrito}</option>
-              )}
-              {DISTRITOS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </Campo>
-        </div>
-
-        <div className="campo">
-          <span className="etiqueta-campo">
-            Ubicación en el mapa <span className="opcional">(opcional)</span>
-          </span>
-          <MapaUbicacion valor={ubicacion} onCambio={setUbicacion} onUsarDireccion={usarDireccionDelMapa} recuadro />
-        </div>
-      </form>
+      {licenciaPendiente && (
+        <Alerta tipo="aviso">
+          <p>Falta tu licencia de funcionamiento. Súbela desde Mi botica para que podamos aprobar tu botica.</p>
+        </Alerta>
+      )}
     </RegistroPasos>
   )
 }
