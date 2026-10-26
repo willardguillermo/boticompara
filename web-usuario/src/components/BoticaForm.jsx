@@ -1,4 +1,4 @@
-// Formulario de datos de la botica, compartido por el registro (H1) y la corrección (H7).
+// Formulario de datos de la botica de la corrección (H7). El registro (H1) va por pasos en RegistroBoticaPage.
 // H2 - Validación del RUC con SUNAT: en el hook useVerificacionRuc
 // H3 - Ubicación de la botica marcada en un mapa (latitud y longitud opcionales)
 import { useState } from 'react'

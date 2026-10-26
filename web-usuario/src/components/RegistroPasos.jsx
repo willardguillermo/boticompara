@@ -11,9 +11,10 @@ const PASOS = [
 
 /**
  * paso: el paso actual (1 a 5). children: el contenido del paso. pie: los botones del pie (opcional).
- * Todavía no se puede saltar entre pasos; al paso 1 nunca se vuelve porque la cuenta ya existe.
+ * onIrAPaso(numero): si se pasa, los pasos hechos se pueden clicar para volver a ellos,
+ * salvo el paso 1, porque la cuenta ya existe.
  */
-export default function RegistroPasos({ paso, pie, children }) {
+export default function RegistroPasos({ paso, pie, onIrAPaso, children }) {
   return (
     <div className="registro-pasos">
       <nav className="pasos-lateral" aria-label="Pasos del registro">
@@ -23,13 +24,15 @@ export default function RegistroPasos({ paso, pie, children }) {
           {PASOS.map(({ titulo, descripcion, hecho }, i) => {
             const numero = i + 1
             const estado = numero < paso ? 'hecho' : numero === paso ? 'actual' : 'pendiente'
+            const visitable = Boolean(onIrAPaso) && estado === 'hecho' && numero > 1
             return (
               <li key={titulo}>
                 <button
                   type="button"
                   className={`paso paso-${estado}`}
                   aria-current={estado === 'actual' ? 'step' : undefined}
-                  disabled
+                  disabled={!visitable}
+                  onClick={visitable ? () => onIrAPaso(numero) : undefined}
                 >
                   <span className="paso-circulo">
                     {estado === 'hecho' ? <Icono nombre="check" /> : numero}
@@ -51,7 +54,10 @@ export default function RegistroPasos({ paso, pie, children }) {
         </div>
         <div className="pasos-cuerpo">
           <p className="pasos-contador">Paso {paso} de 5</p>
-          {children}
+          {/* La key hace que el contenido entre con un fundido al cambiar de paso */}
+          <div key={paso} className="pasos-contenido">
+            {children}
+          </div>
         </div>
         {pie && <div className="pasos-pie">{pie}</div>}
       </section>

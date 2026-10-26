@@ -626,6 +626,22 @@ a {
   padding: 1.75rem 2rem 2rem;
 }
 
+.pasos-contenido {
+  display: grid;
+  gap: 1.25rem;
+  animation: aparecer 180ms var(--curva);
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+}
+
+.pasos-encabezado h1:focus {
+  outline: none;
+}
+
 .pasos-contador {
   margin: 0 0 -0.75rem;
   font-size: 13px;
@@ -651,7 +667,17 @@ a {
   align-items: start;
 }
 
-.pasos-tarjeta .campo input:focus-visible {
+.pasos-campos > .campo-ancho {
+  grid-column: 1 / -1;
+}
+
+.pasos-tarjeta .campo select[aria-invalid='true'] {
+  border-color: var(--error);
+  background: #fffafa;
+}
+
+.pasos-tarjeta .campo input:focus-visible,
+.pasos-tarjeta .campo select:focus-visible {
   border-color: var(--color-primario);
   outline: none;
   box-shadow: 0 0 0 3px rgb(15 118 110 / 18%);
@@ -663,8 +689,7 @@ a {
   text-align: left;
 }
 
-.pasos-pie,
-.pasos-cuerpo > .formulario > .acciones-form {
+.pasos-pie {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -680,16 +705,47 @@ a {
   font-size: 0.95rem;
 }
 
-/* Paso 2 provisional: el BoticaForm de siempre, sin su propia tarjeta y con sus botones como pie */
-.pasos-cuerpo > .formulario.tarjeta {
-  padding: 0;
-  border: none;
-  box-shadow: none;
+.pasos-pie .btn-primario {
+  margin-left: auto;
 }
 
-.pasos-cuerpo > .formulario > .acciones-form {
-  justify-content: flex-end;
-  margin: 0.25rem -2rem -2rem;
+/* H3: mapa del paso 3 */
+.pasos-tarjeta .mapa-ubicacion {
+  height: 280px;
+  border-radius: 12px;
+}
+
+.mapa-recuadro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-pie);
+  font-size: 0.9rem;
+}
+
+.mapa-recuadro-texto {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.mapa-recuadro-texto strong {
+  color: var(--exito);
+}
+
+.mapa-recuadro .ayuda,
+.mapa-coordenadas {
+  color: var(--color-texto-suave);
+}
+
+.mapa-coordenadas {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Solo se animan transform, opacity y el ancho de la barra */
@@ -728,13 +784,8 @@ a {
     padding: 1.25rem 1.15rem 1.5rem;
   }
 
-  .pasos-pie,
-  .pasos-cuerpo > .formulario > .acciones-form {
+  .pasos-pie {
     padding: 1rem 1.15rem;
-  }
-
-  .pasos-cuerpo > .formulario > .acciones-form {
-    margin: 0.25rem -1.15rem -1.5rem;
   }
 
   .pasos-campos {
@@ -743,6 +794,10 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .pasos-contenido {
+    animation: none;
+  }
+
   .pasos-barra > div,
   .pasos-tarjeta .btn {
     transition: none;
