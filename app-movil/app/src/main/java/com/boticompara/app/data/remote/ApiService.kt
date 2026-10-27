@@ -81,6 +81,23 @@ data class AlternativasResponse(
     val alternativas: List<AlternativaResponse> = emptyList()
 )
 
+// ---- Favoritos (H43, H44, H45) ----
+data class FavoritoRequest(val productoId: Long)
+
+data class FavoritoResponse(
+    val productoId: Long,
+    val nombreComercial: String,
+    val principioActivo: String,
+    val presentacion: String,
+    val precio: Double,
+    val stock: Int,
+    val boticaId: Long,
+    val boticaNombre: String,
+    val boticaDireccion: String,
+    val boticaDistrito: String,
+    val fecha: String                      // fecha en que se guardó (ISO 8601)
+)
+
 interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
@@ -130,4 +147,24 @@ interface ApiService {
         @Header("Authorization") auth: String,
         @Path("id") id: Long
     ): Response<AlternativasResponse>
+
+    // H43: guardar un favorito (201 nuevo, 200 si ya estaba)
+    @POST("favoritos")
+    suspend fun agregarFavorito(
+        @Header("Authorization") auth: String,
+        @Body request: FavoritoRequest
+    ): Response<FavoritoResponse>
+
+    // H44: lista de favoritos, del más reciente al más antiguo
+    @GET("favoritos")
+    suspend fun obtenerFavoritos(
+        @Header("Authorization") auth: String
+    ): Response<List<FavoritoResponse>>
+
+    // H45: quitar un favorito (204 sin cuerpo, también si no estaba guardado)
+    @DELETE("favoritos/{productoId}")
+    suspend fun quitarFavorito(
+        @Header("Authorization") auth: String,
+        @Path("productoId") productoId: Long
+    ): Response<Unit>
 }
