@@ -2760,7 +2760,7 @@
     },
     {
       "name": "8. Segunda mitad del Sprint 2 (H2, H28, H31, H36-H44)",
-      "description": "Endpoints nuevos del Sprint 2. Ejecuta la carpeta completa con Run folder, en orden: el paso 2 guarda el producto que usan los demás. Los favoritos se agregan y se quitan dentro de la misma carpeta, y ningún request crea productos. No usa la cuenta de Carlos.",
+      "description": "Endpoints nuevos del Sprint 2. Ejecuta la carpeta completa con Run folder, en orden: el paso 2 guarda el producto que usan los demás. Los favoritos se agregan y se quitan dentro de la misma carpeta. Los requests de H31 al final le quitan el enlace al Paracetamol Genérico de Rosa y lo restauran; ningún request crea productos. No usa la cuenta de Carlos.",
       "item": [
         {
           "name": "1. Login de Rosa",
@@ -3672,6 +3672,467 @@
               "type": "noauth"
             },
             "description": "Sin token no se consulta SUNAT, para cuidar la cuota de Decolecta (100 consultas al mes)."
+          }
+        },
+        {
+          "name": "H31 · Guarda el Paracetamol Genérico de Rosa y su enlace original",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const p = pm.response.json().find(function (x) { return x.nombreComercial === \"Paracetamol Genérico\"; });",
+                  "pm.test(\"Rosa tiene Paracetamol Genérico\", function () { pm.expect(p).to.be.an(\"object\"); });",
+                  "if (p) {",
+                  "  const pendiente = pm.collectionVariables.get(\"h31Pendiente\") === \"true\";",
+                  "  pm.collectionVariables.set(\"h31Id\", String(p.id));",
+                  "  pm.collectionVariables.set(\"h31Nombre\", p.nombreComercial);",
+                  "  pm.collectionVariables.set(\"h31Principio\", p.principioActivo);",
+                  "  pm.collectionVariables.set(\"h31Presentacion\", p.presentacion);",
+                  "  pm.collectionVariables.set(\"h31Precio\", String(p.precio));",
+                  "  pm.collectionVariables.set(\"h31Stock\", String(p.stock));",
+                  "  // Si una ejecución anterior se cortó con el producto desenlazado, se conserva el enlace original de entonces",
+                  "  if (!pendiente) {",
+                  "    pm.test(\"El producto está enlazado al catálogo maestro\", function () { pm.expect(p.medicamentoId).to.not.equal(null); });",
+                  "    pm.collectionVariables.set(\"h31Medicamento\", String(p.medicamentoId));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=Paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Paracetamol"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Quitar el enlace sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h31Id}}/medicamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h31Id}}",
+                "medicamento"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H31 · Quitar el enlace de un producto que no existe (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/999999/medicamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "999999",
+                "medicamento"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Quitar el enlace con id no numérico (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/abc/medicamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "abc",
+                "medicamento"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Rosa quita el enlace del producto (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "// Marca pendiente: si la ejecución se corta aquí, el siguiente Run conserva el enlace original",
+                  "if (pm.response.code === 204) { pm.collectionVariables.set(\"h31Pendiente\", \"true\"); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h31Id}}/medicamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h31Id}}",
+                "medicamento"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Mi catálogo: el producto sigue activo y sin enlace",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const p = pm.response.json().find(function (x) { return String(x.id) === pm.collectionVariables.get(\"h31Id\"); });",
+                  "pm.test(\"El producto sigue en el catálogo de Rosa\", function () { pm.expect(p).to.be.an(\"object\"); });",
+                  "if (p) {",
+                  "  pm.test(\"medicamentoId ahora es null\", function () { pm.expect(p.medicamentoId).to.eql(null); });",
+                  "  pm.test(\"Conserva nombre, precio y stock\", function () {",
+                  "    pm.expect(p.nombreComercial).to.eql(pm.collectionVariables.get(\"h31Nombre\"));",
+                  "    pm.expect(String(p.precio)).to.eql(pm.collectionVariables.get(\"h31Precio\"));",
+                  "    pm.expect(String(p.stock)).to.eql(pm.collectionVariables.get(\"h31Stock\"));",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=Paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Paracetamol"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H36 · Sin enlace, las alternativas ya no son EQUIVALENTE (solo PRINCIPIO_ACTIVO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Ninguna alternativa es EQUIVALENTE\", function () {",
+                  "  j.alternativas.forEach(function (a) { pm.expect(a.tipoCoincidencia).to.eql(\"PRINCIPIO_ACTIVO\"); });",
+                  "});",
+                  "pm.test(\"sinEquivalentes es true solo si la lista viene vacía (H41)\", function () { pm.expect(j.sinEquivalentes).to.eql(j.alternativas.length === 0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h31Id}}/alternativas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h31Id}}",
+                "alternativas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H31 · Quitar el enlace otra vez también responde 204 (idempotente)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h31Id}}/medicamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h31Id}}",
+                "medicamento"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Rosa restaura el enlace original (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Vuelve el enlace original\", function () { pm.expect(String(j.medicamentoId)).to.eql(pm.collectionVariables.get(\"h31Medicamento\")); });",
+                  "pm.test(\"Se conservan precio y stock\", function () {",
+                  "  pm.expect(String(j.precio)).to.eql(pm.collectionVariables.get(\"h31Precio\"));",
+                  "  pm.expect(String(j.stock)).to.eql(pm.collectionVariables.get(\"h31Stock\"));",
+                  "});",
+                  "// Solo si se restauró bien se borra la marca de pendiente",
+                  "if (pm.response.code === 200) { pm.collectionVariables.set(\"h31Pendiente\", \"false\"); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h31Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h31Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"{{h31Nombre}}\",\n  \"principioActivo\": \"{{h31Principio}}\",\n  \"presentacion\": \"{{h31Presentacion}}\",\n  \"precio\": {{h31Precio}},\n  \"stock\": {{h31Stock}},\n  \"medicamentoId\": {{h31Medicamento}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Deja el producto como estaba. Si este request no corre, el producto de Rosa queda sin enlace: repetir el Run de la carpeta o enlazarlo a mano con este mismo PUT."
+          }
+        },
+        {
+          "name": "H31 · Mi catálogo: el enlace quedó como al inicio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const p = pm.response.json().find(function (x) { return String(x.id) === pm.collectionVariables.get(\"h31Id\"); });",
+                  "pm.test(\"El enlace original está restaurado\", function () { pm.expect(p).to.be.an(\"object\"); pm.expect(String(p.medicamentoId)).to.eql(pm.collectionVariables.get(\"h31Medicamento\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=Paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Paracetamol"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         }
       ]
