@@ -1,11 +1,15 @@
 from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count
 from django.forms.models import BaseInlineFormSet
+from django.template.response import TemplateResponse
+from django.urls import path
 from django.utils.html import format_html
 
 from . import vigencia
+from .digemid import importador, lector
 
-from .forms import (CategoriaForm, GrupoEquivalenciaForm, MedicamentoForm, MiembroGrupoForm,
+from .forms import (CategoriaForm, GrupoEquivalenciaForm, ImportarDigemidForm, MedicamentoForm, MiembroGrupoForm,
                     PrincipioActivoForm)
 from .models import Categoria, GrupoEquivalencia, Medicamento, MedicamentoGrupo, PrincipioActivo
 
@@ -71,6 +75,51 @@ class MedicamentoAdmin(admin.ModelAdmin):
     list_select_related = ('principio_activo', 'categoria', 'grupo_asignado__grupo')
     autocomplete_fields = ('principio_activo', 'categoria')
     actions = ['ocultar_del_catalogo', 'mostrar_en_catalogo']
+    # Agrega el botón "Importar catálogo DIGEMID" junto a "Añadir"
+    change_list_template = 'admin/catalogo/medicamento/change_list.html'
+
+    def get_urls(self):
+        urls = [
+            path('importar-digemid/', self.admin_site.admin_view(self.importar_digemid),
+                 name='catalogo_medicamento_importar_digemid'),
+        ]
+        return urls + super().get_urls()
+
+    def puede_importar(self, request):
+        # La carga crea y actualiza medicamentos
+        return self.has_add_permission(request) and self.has_change_permission(request)
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = {**(extra_context or {}), 'puede_importar': self.puede_importar(request)}
+        return super().changelist_view(request, extra_context)
+
+    def importar_digemid(self, request):
+        """H46: carga masiva del catálogo maestro desde un .xlsx o .csv de DIGEMID."""
+        if not self.puede_importar(request):
+            raise PermissionDenied
+        resultado = None
+        if request.method == 'POST':
+            form = ImportarDigemidForm(request.POST, request.FILES)
+            if form.is_valid():
+                archivo = form.cleaned_data['archivo']
+                try:
+                    resultado = importador.importar_archivo(archivo, archivo.name,
+                                                            simulacion=form.cleaned_data['simulacion'])
+                except lector.ArchivoInvalido as exc:
+                    form.add_error('archivo', str(exc))
+                else:
+                    nivel = messages.WARNING if resultado.errores or resultado.simulacion else messages.SUCCESS
+                    self.message_user(request, f'Carga de {archivo.name}: {resultado.resumen}', nivel)
+        else:
+            form = ImportarDigemidForm()
+        contexto = {
+            **self.admin_site.each_context(request),
+            'title': 'Importar catálogo DIGEMID',
+            'opts': self.model._meta,
+            'form': form,
+            'resultado': resultado,
+        }
+        return TemplateResponse(request, 'admin/catalogo/medicamento/importar_digemid.html', contexto)
 
     @admin.display(description='grupo de equivalencia', ordering='grupo_asignado__grupo__nombre')
     def grupo_equivalencia(self, obj):
