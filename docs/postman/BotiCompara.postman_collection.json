@@ -70,7 +70,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"correo\": \"carlos@correo.com\",\n  \"password\": \"Boti2026!\"\n}",
+              "raw": "{\n  \"correo\": \"carlos@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -115,7 +115,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"correo\": \"rosa@boticasalud.pe\",\n  \"password\": \"Boti2026!\"\n}",
+              "raw": "{\n  \"correo\": \"rosa@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -160,7 +160,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"correo\": \"lucia@boticanueva.pe\",\n  \"password\": \"Boti2026!\"\n}",
+              "raw": "{\n  \"correo\": \"lucia@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -203,7 +203,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"correo\": \"carlos@correo.com\",\n  \"password\": \"mala\"\n}",
+              "raw": "{\n  \"correo\": \"carlos@boticompara.nissidev.dev\",\n  \"password\": \"mala\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -246,7 +246,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"X\",\n  \"correo\": \"carlos@correo.com\",\n  \"password\": \"Boti2026!\",\n  \"rol\": \"COMPRADOR\"\n}",
+              "raw": "{\n  \"nombre\": \"X\",\n  \"correo\": \"carlos@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\",\n  \"rol\": \"COMPRADOR\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -399,7 +399,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
-                  "pm.test(\"Es Carlos\", function () { pm.expect(pm.response.json().correo).to.eql(\"carlos@correo.com\"); });"
+                  "pm.test(\"Es Carlos\", function () { pm.expect(pm.response.json().correo).to.eql(\"carlos@boticompara.nissidev.dev\"); });"
                 ]
               }
             }
@@ -2010,7 +2010,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"correo\": \"carlos@correo.com\"\n}",
+              "raw": "{\n  \"correo\": \"carlos@boticompara.nissidev.dev\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2412,7 +2412,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"correo\": \"rosa@boticasalud.pe\",\n  \"password\": \"Boti2026!\"\n}",
+              "raw": "{\n  \"correo\": \"rosa@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2802,7 +2802,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"correo\": \"rosa@boticasalud.pe\",\n  \"password\": \"Boti2026!\"\n}",
+              "raw": "{\n  \"correo\": \"rosa@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

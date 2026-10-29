@@ -9,20 +9,21 @@ truncate table public.producto, public.botica, public.usuario restart identity c
 
 -- Usuarios
 insert into public.usuario (nombre, correo, password_hash, telefono, direccion, rol, correo_verificado) values
-  ('Rosa Quispe',    'rosa@boticasalud.pe',  extensions.crypt('Boti2026!', extensions.gen_salt('bf', 10)), '987654321', null,                    'DUENO_BOTICA', true),
-  ('Jorge Mendoza',  'jorge@farmavida.pe',   extensions.crypt('Boti2026!', extensions.gen_salt('bf', 10)), '976543210', null,                    'DUENO_BOTICA', true),
-  ('Lucía Torres',   'lucia@boticanueva.pe', extensions.crypt('Boti2026!', extensions.gen_salt('bf', 10)), '965432109', null,                    'DUENO_BOTICA', true),
-  ('Carlos Ramírez', 'carlos@correo.com',    extensions.crypt('Boti2026!', extensions.gen_salt('bf', 10)), '954321098', 'Av. Lima 123, Chosica', 'COMPRADOR',    true);
+  ('Rosa Quispe',    'rosa@boticompara.nissidev.dev',   extensions.crypt('Boti2026!', extensions.gen_salt('bf', 10)), '987654321', null,                    'DUENO_BOTICA', true),
+  ('Jorge Mendoza',  'jorge@boticompara.nissidev.dev',  extensions.crypt('Boti2026!', extensions.gen_salt('bf', 10)), '976543210', null,                    'DUENO_BOTICA', true),
+  ('Lucía Torres',   'lucia@boticompara.nissidev.dev',  extensions.crypt('Boti2026!', extensions.gen_salt('bf', 10)), '965432109', null,                    'DUENO_BOTICA', true),
+  ('Carlos Ramírez', 'carlos@boticompara.nissidev.dev', extensions.crypt('Boti2026!', extensions.gen_salt('bf', 10)), '954321098', 'Av. Lima 123, Chosica', 'COMPRADOR',    true);
 
 -- Boticas (RUC con dígito verificador válido)
--- Salud Total y FarmaVida aprobadas; Nueva Era pendiente para probar la aprobación en Django
-insert into public.botica (usuario_id, nombre_comercial, ruc, razon_social, direccion, distrito, telefono, estado)
-select u.id, b.nombre_comercial, b.ruc, b.razon_social, b.direccion, b.distrito, b.telefono, b.estado
+-- Salud Total y FarmaVida aprobadas; Nueva Era rechazada para probar la corrección y el reenvío (H7)
+insert into public.botica (usuario_id, nombre_comercial, ruc, razon_social, direccion, distrito, telefono, estado, motivo_rechazo)
+select u.id, b.nombre_comercial, b.ruc, b.razon_social, b.direccion, b.distrito, b.telefono, b.estado, b.motivo_rechazo
 from (values
-  ('rosa@boticasalud.pe',  'Botica Salud Total', '20601234565', 'Salud Total Farma S.A.C.', 'Av. Lima Sur 450',       'Lurigancho-Chosica', '014567890', 'APROBADO'),
-  ('jorge@farmavida.pe',   'FarmaVida',          '20549871233', 'FarmaVida Perú E.I.R.L.',  'Jr. Trujillo 210',       'Lurigancho-Chosica', '014561234', 'APROBADO'),
-  ('lucia@boticanueva.pe', 'Botica Nueva Era',   '20712345676', 'Nueva Era Salud S.A.C.',   'Av. Nicolás Ayllón 980', 'Ate',                '013459876', 'PENDIENTE')
-) as b(correo, nombre_comercial, ruc, razon_social, direccion, distrito, telefono, estado)
+  ('rosa@boticompara.nissidev.dev',  'Botica Salud Total', '20601234565', 'Salud Total Farma S.A.C.', 'Av. Lima Sur 450',       'Lurigancho-Chosica', '014567890', 'APROBADO',  null),
+  ('jorge@boticompara.nissidev.dev', 'FarmaVida',          '20549871233', 'FarmaVida Perú E.I.R.L.',  'Jr. Trujillo 210',       'Lurigancho-Chosica', '014561234', 'APROBADO',  null),
+  ('lucia@boticompara.nissidev.dev', 'Botica Nueva Era',   '20100047218', 'Nueva Era Salud S.A.C.',   'Av. Nicolás Ayllón 980', 'Ate',                '013459876', 'RECHAZADO',
+   'La dirección no coincide con la ficha RUC. Corrígela y vuelve a enviar.')
+) as b(correo, nombre_comercial, ruc, razon_social, direccion, distrito, telefono, estado, motivo_rechazo)
 join public.usuario u on u.correo = b.correo;
 
 -- Productos: mismos principios activos en ambas boticas para comparar precios

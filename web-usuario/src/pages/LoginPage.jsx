@@ -98,8 +98,8 @@ export default function LoginPage() {
               <div className="datos-prueba">
                 <Alerta tipo="info">
                   <p>
-                    <strong>Modo simulado.</strong> Prueba con <code>rosa@boticasalud.pe</code>{' '}
-                    (aprobada) o <code>lucia@boticanueva.pe</code> (pendiente), contraseña{' '}
+                    <strong>Modo simulado.</strong> Prueba con <code>rosa@boticompara.nissidev.dev</code>{' '}
+                    (aprobada) o <code>lucia@boticompara.nissidev.dev</code> (pendiente), contraseña{' '}
                     <code>Boti2026!</code>
                   </p>
                 </Alerta>

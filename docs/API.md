@@ -49,7 +49,7 @@ Crea un comprador o un dueño de botica.
 // Request
 {
   "nombre": "Carlos Ramírez",
-  "correo": "carlos@correo.com",
+  "correo": "carlos@boticompara.nissidev.dev",
   "password": "Boti2026!",
   "telefono": "954321098",
   "rol": "COMPRADOR"
@@ -57,7 +57,7 @@ Crea un comprador o un dueño de botica.
 ```
 ```json
 // 201 Created
-{ "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@correo.com", "rol": "COMPRADOR" }
+{ "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev", "rol": "COMPRADOR" }
 ```
 Validaciones: correo con formato válido, password de mínimo 8 caracteres, `rol` = `COMPRADOR` o `DUENO_BOTICA`. Nunca se piden datos de salud (H21).
 Tras el registro se envía un correo con un enlace de verificación (H20). El login **no** exige tener el correo verificado.
@@ -66,14 +66,14 @@ Errores: 400, 409 (correo ya registrado).
 ### `POST /auth/login` — H18
 ```json
 // Request
-{ "correo": "carlos@correo.com", "password": "Boti2026!" }
+{ "correo": "carlos@boticompara.nissidev.dev", "password": "Boti2026!" }
 ```
 ```json
 // 200 OK
 {
   "token": "eyJhbGciOiJIUzI1NiJ9...",
   "tipo": "Bearer",
-  "usuario": { "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@correo.com", "rol": "COMPRADOR" }
+  "usuario": { "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev", "rol": "COMPRADOR" }
 }
 ```
 El token dura 24 h. Errores: 401.
@@ -82,7 +82,7 @@ El token dura 24 h. Errores: 401.
 Inicia la recuperación de contraseña. **Siempre responde 200**, exista o no el correo, para no revelar qué correos están registrados.
 ```json
 // Request
-{ "correo": "carlos@correo.com" }
+{ "correo": "carlos@boticompara.nissidev.dev" }
 ```
 ```json
 // 200 OK
@@ -94,7 +94,7 @@ Errores: 400 (falta el campo `correo`).
 ### `POST /auth/restablecer` — H17
 ```json
 // Request
-{ "correo": "carlos@correo.com", "token": "483920", "password": "NuevaClave2026!" }
+{ "correo": "carlos@boticompara.nissidev.dev", "token": "483920", "password": "NuevaClave2026!" }
 ```
 ```json
 // 200 OK
@@ -117,7 +117,7 @@ El token vence a las 48 horas.
 ### `GET /usuarios/me` 🔒 — H16
 ```json
 // 200 OK
-{ "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@correo.com",
+{ "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev",
   "telefono": "954321098", "direccion": "Av. Lima 123, Chosica", "rol": "COMPRADOR" }
 ```
 
@@ -481,9 +481,9 @@ Contraseña de todos: `Boti2026!`
 
 | Correo | Rol | Situación |
 |---|---|---|
-| rosa@boticasalud.pe | DUENO_BOTICA | Botica Salud Total — APROBADO |
-| jorge@farmavida.pe | DUENO_BOTICA | FarmaVida — APROBADO |
-| lucia@boticanueva.pe | DUENO_BOTICA | Botica Nueva Era — PENDIENTE (para probar Django) |
-| carlos@correo.com | COMPRADOR | Para probar el móvil |
+| rosa@boticompara.nissidev.dev | DUENO_BOTICA | Botica Salud Total — APROBADO |
+| jorge@boticompara.nissidev.dev | DUENO_BOTICA | FarmaVida — APROBADO |
+| lucia@boticompara.nissidev.dev | DUENO_BOTICA | Botica Nueva Era — RECHAZADO (para probar la corrección, H7) |
+| carlos@boticompara.nissidev.dev | COMPRADOR | Para probar el móvil |
 
 Búsqueda de prueba: `q=paracetamol&tipo=principio` debe devolver 4 resultados, el primero a S/ 2.20.

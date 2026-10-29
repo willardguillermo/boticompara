@@ -40,6 +40,7 @@ create table if not exists usuario (
                     check (rol in ('COMPRADOR', 'DUENO_BOTICA')),
   correo_verificado boolean      not null default false,
   activo            boolean      not null default true,
+  notificaciones_precio boolean  not null default true,      -- H66
   creado_en         timestamptz  not null default now(),
   actualizado_en    timestamptz  not null default now()
 );
@@ -121,6 +122,9 @@ create table if not exists medicamento (
   registro_sanitario         varchar(50),
   fecha_vencimiento_registro date,
   oculto                     boolean      not null default false,
+  forma_farmaceutica         varchar(100),                 -- H46
+  titular                    varchar(200),                 -- H46
+  codigo_digemid             varchar(30),                  -- H46
   -- Destino de la FK compuesta de medicamento_grupo
   constraint uq_medicamento_id_principio unique (id, principio_activo_id)
 );
@@ -131,6 +135,10 @@ create index if not exists idx_medicamento_categoria on medicamento(categoria_id
 -- Registro sanitario único cuando existe (puede ser null)
 create unique index if not exists uq_medicamento_registro
   on medicamento(registro_sanitario) where registro_sanitario is not null;
+
+-- H46: código DIGEMID, no único (puede repetirse entre presentaciones)
+create index if not exists idx_medicamento_codigo_digemid
+  on medicamento(codigo_digemid) where codigo_digemid is not null;
 
 -- ---------------------------------------------------------------------
 -- GRUPO_EQUIVALENCIA y MEDICAMENTO_GRUPO
@@ -223,15 +231,74 @@ create index if not exists idx_consulta_comparacion_usuario  on consulta_compara
 
 -- ---------------------------------------------------------------------
 -- FAVORITO (H29-H32): productos guardados por el comprador
+-- precio_objetivo y ultimo_precio_avisado (H60, H61): alerta de bajada de
+-- precio; ultimo_precio_avisado evita repetir la alerta por el mismo precio.
 -- ---------------------------------------------------------------------
 create table if not exists favorito (
-  usuario_id  bigint      not null references usuario(id) on delete cascade,
-  producto_id bigint      not null references producto(id) on delete cascade,
-  fecha       timestamptz not null default now(),
-  primary key (usuario_id, producto_id)
+  usuario_id            bigint        not null references usuario(id) on delete cascade,
+  producto_id           bigint        not null references producto(id) on delete cascade,
+  fecha                 timestamptz   not null default now(),
+  precio_objetivo       numeric(10,2),
+  ultimo_precio_avisado numeric(10,2),
+  primary key (usuario_id, producto_id),
+  constraint chk_favorito_precio_objetivo
+    check (precio_objetivo is null or precio_objetivo > 0)
 );
 
 create index if not exists idx_favorito_producto on favorito(producto_id);
+
+-- ---------------------------------------------------------------------
+-- SPRINT 3. En la BD que ya existe se agregó con v4_sprint3.sql.
+-- ALERTA_PRECIO (H59, H61): avisos de bajada de precio de un favorito.
+-- ---------------------------------------------------------------------
+create table if not exists alerta_precio (
+  id              bigserial primary key,
+  usuario_id      bigint        not null references usuario(id) on delete cascade,
+  producto_id     bigint        not null references producto(id) on delete cascade,
+  precio_anterior numeric(10,2) not null,
+  precio_nuevo    numeric(10,2) not null,
+  leida           boolean       not null default false,
+  fecha           timestamptz   not null default now(),
+  constraint chk_alerta_precio_baja
+    check (precio_nuevo > 0 and precio_nuevo < precio_anterior)
+);
+
+create index if not exists idx_alerta_precio_usuario  on alerta_precio(usuario_id, leida, fecha desc);
+create index if not exists idx_alerta_precio_producto on alerta_precio(producto_id);
+
+-- ---------------------------------------------------------------------
+-- BUSQUEDA (H62): registro de búsquedas del comprador (null = anónima).
+-- El backend guarda texto = q.trim().toLowerCase().
+-- ---------------------------------------------------------------------
+create table if not exists busqueda (
+  id         bigserial primary key,
+  usuario_id bigint       references usuario(id) on delete set null,
+  texto      varchar(150) not null check (char_length(texto) >= 2),
+  tipo       varchar(20)  not null check (tipo in ('nombre', 'principio')),
+  resultados integer      not null check (resultados >= 0),
+  fecha      timestamptz  not null default now()
+);
+
+create index if not exists idx_busqueda_fecha on busqueda(fecha);
+create index if not exists idx_busqueda_texto on busqueda(texto);
+
+-- ---------------------------------------------------------------------
+-- BOTICA_REVISION (H47): historial de aprobaciones y rechazos hechos en
+-- Django. revisado_por es el username del admin; null = sin registro.
+-- ---------------------------------------------------------------------
+create table if not exists botica_revision (
+  id           bigserial primary key,
+  botica_id    bigint       not null references botica(id) on delete cascade,
+  estado       varchar(20)  not null check (estado in ('APROBADO', 'RECHAZADO')),
+  motivo       text,
+  revisado_por varchar(150),
+  fecha        timestamptz  not null default now(),
+  constraint chk_botica_revision_motivo
+    check (estado <> 'RECHAZADO' or motivo is not null)
+);
+
+create index if not exists idx_botica_revision_fecha  on botica_revision(fecha);
+create index if not exists idx_botica_revision_botica on botica_revision(botica_id, fecha);
 
 -- ---------------------------------------------------------------------
 -- VISTA para la búsqueda del comprador (H22, H23, H24):
@@ -352,6 +419,37 @@ begin
       public.medicamento_id_seq,
       public.grupo_equivalencia_id_seq,
       public.consulta_comparacion_id_seq
+    to boticompara_app;
+  end if;
+end
+$$;
+
+-- ---------------------------------------------------------------------
+-- SEGURIDAD DEL SPRINT 3 (H47, H59, H61, H62): mismo esquema que el
+-- catálogo maestro. RLS activado, sin acceso para la API automática de
+-- Supabase y política app_acceso_total solo para boticompara_app (si el rol
+-- ya existe). En la BD que ya existe se agregó con v4_sprint3.sql.
+-- ---------------------------------------------------------------------
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['alerta_precio', 'busqueda', 'botica_revision'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('revoke all on public.%I from anon, authenticated', t);
+  end loop;
+
+  if exists (select 1 from pg_roles where rolname = 'boticompara_app') then
+    foreach t in array array['alerta_precio', 'busqueda', 'botica_revision'] loop
+      execute format('grant select, insert, update, delete on public.%I to boticompara_app', t);
+      execute format('drop policy if exists app_acceso_total on public.%I', t);
+      execute format('create policy app_acceso_total on public.%I '
+                     'for all to boticompara_app using (true) with check (true)', t);
+    end loop;
+    grant usage, select on sequence
+      public.alerta_precio_id_seq,
+      public.busqueda_id_seq,
+      public.botica_revision_id_seq
     to boticompara_app;
   end if;
 end
