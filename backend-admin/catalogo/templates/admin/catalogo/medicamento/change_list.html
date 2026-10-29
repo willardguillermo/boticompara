@@ -1,0 +1,8 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  {% if puede_importar %}
+    <li><a href="{% url 'admin:catalogo_medicamento_importar_digemid' %}">Importar catálogo DIGEMID</a></li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

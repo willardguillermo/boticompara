@@ -1,5 +1,8 @@
+import os
+
 from django import forms
 
+from .digemid.lector import COLUMNAS, EXTENSIONES
 from .models import Categoria, GrupoEquivalencia, Medicamento, MedicamentoGrupo, PrincipioActivo
 
 
@@ -38,8 +41,9 @@ class MedicamentoForm(forms.ModelForm):
 
     class Meta:
         model = Medicamento
-        fields = ('nombre_comercial', 'presentacion', 'concentracion', 'principio_activo', 'categoria',
-                  'registro_sanitario', 'fecha_vencimiento_registro', 'oculto')
+        fields = ('nombre_comercial', 'presentacion', 'concentracion', 'forma_farmaceutica', 'principio_activo',
+                  'categoria', 'registro_sanitario', 'fecha_vencimiento_registro', 'titular', 'codigo_digemid',
+                  'oculto')
         help_texts = {
             'registro_sanitario': 'Opcional. Si se indica, no puede repetirse en otro medicamento.',
             'oculto': 'Al ocultarlo, sus productos dejan de aparecer en la búsqueda y en las alternativas (H39).',
@@ -120,3 +124,31 @@ class MiembroGrupoForm(forms.ModelForm):
                 'Un medicamento solo puede estar en un grupo: primero sácalo de ese.'
             )
         return medicamento
+
+
+class ImportarDigemidForm(forms.Form):
+    """H46: archivo del catálogo de DIGEMID a importar."""
+    MAXIMO_BYTES = 5 * 1024 * 1024
+
+    archivo = forms.FileField(
+        label='Archivo',
+        widget=forms.ClearableFileInput(attrs={'accept': ','.join(EXTENSIONES)}),
+        help_text=('Excel (.xlsx, primera hoja) o CSV separado por coma o punto y coma, de máximo 5 MB. '
+                   'La fila 1 debe tener las columnas: '
+                   + ', '.join(encabezado for encabezado, *_ in COLUMNAS.values())
+                   + '. Código y Titular son opcionales.'),
+    )
+    simulacion = forms.BooleanField(
+        label='Solo simular (no guardar)',
+        required=False,
+        help_text='Hace toda la carga y muestra el resultado, pero no guarda nada en la base de datos.',
+    )
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data['archivo']
+        if os.path.splitext(archivo.name)[1].lower() not in EXTENSIONES:
+            raise forms.ValidationError('El archivo debe ser .xlsx o .csv.')
+        if archivo.size > self.MAXIMO_BYTES:
+            raise forms.ValidationError(
+                f'El archivo pesa {archivo.size / 1024 / 1024:.1f} MB; el máximo es 5 MB.')
+        return archivo
