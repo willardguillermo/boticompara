@@ -65,7 +65,7 @@ class MedicamentoAdmin(admin.ModelAdmin):
     form = MedicamentoForm
     list_display = ('nombre_comercial', 'presentacion', 'concentracion', 'principio_activo', 'categoria',
                     'registro_sanitario', 'fecha_vencimiento_registro', 'estado_registro',
-                    'grupo_equivalencia', 'oculto')
+                    'titular', 'grupo_equivalencia', 'oculto')
     list_filter = (VigenciaRegistroFilter, 'categoria', 'oculto')
     search_fields = ('nombre_comercial', 'principio_activo__nombre', 'registro_sanitario')
     list_select_related = ('principio_activo', 'categoria', 'grupo_asignado__grupo')

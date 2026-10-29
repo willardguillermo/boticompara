@@ -38,8 +38,9 @@ class MedicamentoForm(forms.ModelForm):
 
     class Meta:
         model = Medicamento
-        fields = ('nombre_comercial', 'presentacion', 'concentracion', 'principio_activo', 'categoria',
-                  'registro_sanitario', 'fecha_vencimiento_registro', 'oculto')
+        fields = ('nombre_comercial', 'presentacion', 'concentracion', 'forma_farmaceutica', 'principio_activo',
+                  'categoria', 'registro_sanitario', 'fecha_vencimiento_registro', 'titular', 'codigo_digemid',
+                  'oculto')
         help_texts = {
             'registro_sanitario': 'Opcional. Si se indica, no puede repetirse en otro medicamento.',
             'oculto': 'Al ocultarlo, sus productos dejan de aparecer en la búsqueda y en las alternativas (H39).',

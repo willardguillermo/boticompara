@@ -70,6 +70,11 @@ class Medicamento(models.Model):
     registro_sanitario = models.CharField(max_length=50, null=True, blank=True)
     fecha_vencimiento_registro = models.DateField('vencimiento del registro', null=True, blank=True)
     oculto = models.BooleanField(default=False, help_text='Lo retira de la búsqueda sin borrarlo.')
+    # H46: datos del catálogo de DIGEMID (los llena la carga masiva)
+    forma_farmaceutica = models.CharField('forma farmacéutica', max_length=100, null=True, blank=True)
+    titular = models.CharField(max_length=200, null=True, blank=True)
+    # No es único: puede repetirse entre presentaciones (índice idx_medicamento_codigo_digemid)
+    codigo_digemid = models.CharField('código DIGEMID', max_length=30, null=True, blank=True)
 
     class Meta:
         managed = False
