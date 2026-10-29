@@ -3,7 +3,6 @@ package com.boticompara.usuario.service;
 import com.boticompara.usuario.dto.BusquedaResponse;
 import com.boticompara.usuario.dto.ProductoDetalleResponse;
 import com.boticompara.usuario.error.ApiException;
-import com.boticompara.usuario.service.BusquedaService.FilaBusqueda;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -43,6 +42,9 @@ class BusquedaServiceTest {
 
     @Captor
     ArgumentCaptor<RowMapper<ProductoDetalleResponse>> mapper;
+
+    @Captor
+    ArgumentCaptor<RowMapper<BusquedaResponse>> mapperBusqueda;
 
     private ProductoDetalleResponse ejemplo() {
         return new ProductoDetalleResponse(9L, "Paracetamol Genérico", "Paracetamol", "Tableta 500 mg x 10",
@@ -123,29 +125,29 @@ class BusquedaServiceTest {
     private static final double LNG = -76.699;
 
     /** Botica a ~1.09 km (0.01° de longitud). */
-    private static FilaBusqueda cerca(long id, String precio) {
+    private static BusquedaResponse cerca(long id, String precio) {
         return fila(id, precio, "-11.942500", "-76.689000");
     }
 
     /** Botica en la Plaza de Armas de Lima, a ~39.14 km. */
-    private static FilaBusqueda lejos(long id, String precio) {
+    private static BusquedaResponse lejos(long id, String precio) {
         return fila(id, precio, "-12.046374", "-77.042793");
     }
 
-    private static FilaBusqueda sinCoordenadas(long id, String precio) {
+    private static BusquedaResponse sinCoordenadas(long id, String precio) {
         return fila(id, precio, null, null);
     }
 
-    private static FilaBusqueda fila(long id, String precio, String lat, String lng) {
-        BusquedaResponse p = new BusquedaResponse(id, "Paracetamol " + id, "Paracetamol", "Tableta 500 mg x 10",
-                new BigDecimal(precio), 10, id, "Botica " + id, "Av. " + id, "Chosica", null);
-        return new FilaBusqueda(p, lat == null ? null : new BigDecimal(lat), lng == null ? null : new BigDecimal(lng));
+    private static BusquedaResponse fila(long id, String precio, String lat, String lng) {
+        return new BusquedaResponse(id, "Paracetamol " + id, "Paracetamol", "Tableta 500 mg x 10",
+                new BigDecimal(precio), 10, id, "Botica " + id, "Av. " + id, "Chosica",
+                lat == null ? null : new BigDecimal(lat), lng == null ? null : new BigDecimal(lng), null);
     }
 
     /** La base ya devuelve las filas ordenadas por precio ascendente. */
-    private void baseDevuelve(FilaBusqueda... filas) {
+    private void baseDevuelve(BusquedaResponse... filas) {
         when(jdbc.query(anyString(), any(SqlParameterSource.class),
-                ArgumentMatchers.<RowMapper<FilaBusqueda>>any()))
+                ArgumentMatchers.<RowMapper<BusquedaResponse>>any()))
                 .thenReturn(List.of(filas));
     }
 
@@ -163,8 +165,52 @@ class BusquedaServiceTest {
         assertTrue(r.stream().allMatch(x -> x.distanciaKm() == null));
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).query(sql.capture(), any(SqlParameterSource.class),
-                ArgumentMatchers.<RowMapper<FilaBusqueda>>any());
+                ArgumentMatchers.<RowMapper<BusquedaResponse>>any());
         assertTrue(sql.getValue().contains("order by precio asc"));
+    }
+
+    // ---------- H48: coordenadas de la botica en la búsqueda ----------
+
+    @Test
+    void buscar_devuelveLasCoordenadasDeLaBoticaONull() {
+        baseDevuelve(cerca(1, "2.20"), sinCoordenadas(2, "2.50"));
+
+        List<BusquedaResponse> r = service.buscar("para", "nombre", null, null, null, null);
+
+        assertEquals(new BigDecimal("-11.942500"), r.get(0).boticaLatitud());
+        assertEquals(new BigDecimal("-76.689000"), r.get(0).boticaLongitud());
+        assertNull(r.get(1).boticaLatitud());
+        assertNull(r.get(1).boticaLongitud());
+    }
+
+    @Test
+    void buscar_conUbicacion_conservaLasCoordenadasDeLaBotica() {
+        baseDevuelve(cerca(1, "2.20"));
+
+        List<BusquedaResponse> r = service.buscar("para", "nombre", null, LAT, LNG, null);
+
+        assertEquals(new BigDecimal("-11.942500"), r.get(0).boticaLatitud());
+        assertEquals(new BigDecimal("-76.689000"), r.get(0).boticaLongitud());
+        assertEquals(new BigDecimal("1.09"), r.get(0).distanciaKm());
+    }
+
+    @Test
+    void buscar_mapeaLasCoordenadasDeLaVista() throws Exception {
+        baseDevuelve();
+        service.buscar("para", "nombre", null, null, null, null);
+        verify(jdbc).query(anyString(), any(SqlParameterSource.class), mapperBusqueda.capture());
+
+        ResultSet rs = mock(ResultSet.class);
+        // Mockito estricto: todas las llamadas a getBigDecimal deben estar previstas
+        when(rs.getBigDecimal("precio")).thenReturn(new BigDecimal("2.20"));
+        when(rs.getBigDecimal("botica_latitud")).thenReturn(new BigDecimal("-11.937200"));
+        when(rs.getBigDecimal("botica_longitud")).thenReturn(new BigDecimal("-76.695800"));
+
+        BusquedaResponse fila = mapperBusqueda.getValue().mapRow(rs, 0);
+
+        assertEquals(new BigDecimal("-11.937200"), fila.boticaLatitud());
+        assertEquals(new BigDecimal("-76.695800"), fila.boticaLongitud());
+        assertNull(fila.distanciaKm());
     }
 
     @Test
@@ -221,7 +267,7 @@ class BusquedaServiceTest {
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
         assertEquals(mensaje, ex.getMessage());
         verify(jdbc, never()).query(anyString(), any(SqlParameterSource.class),
-                ArgumentMatchers.<RowMapper<FilaBusqueda>>any());
+                ArgumentMatchers.<RowMapper<BusquedaResponse>>any());
     }
 
     @Test
@@ -274,7 +320,7 @@ class BusquedaServiceTest {
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).query(sql.capture(), any(SqlParameterSource.class),
-                ArgumentMatchers.<RowMapper<FilaBusqueda>>any());
+                ArgumentMatchers.<RowMapper<BusquedaResponse>>any());
         assertTrue(sql.getValue().contains("and not oculto and registro_vigente is not false order by"));
     }
 
