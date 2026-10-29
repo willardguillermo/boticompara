@@ -17,10 +17,10 @@ const RUC_SUNAT = {
 
 const db = {
   usuarios: [
-    { id: 1, nombre: 'Rosa Quispe', correo: 'rosa@boticasalud.pe', password: PASSWORD_PRUEBA, telefono: '987654321', direccion: null, rol: 'DUENO_BOTICA' },
-    { id: 2, nombre: 'Jorge Mendoza', correo: 'jorge@farmavida.pe', password: PASSWORD_PRUEBA, telefono: '976543210', direccion: null, rol: 'DUENO_BOTICA' },
-    { id: 3, nombre: 'Lucía Torres', correo: 'lucia@boticanueva.pe', password: PASSWORD_PRUEBA, telefono: '965432109', direccion: null, rol: 'DUENO_BOTICA' },
-    { id: 4, nombre: 'Carlos Ramírez', correo: 'carlos@correo.com', password: PASSWORD_PRUEBA, telefono: '954321098', direccion: 'Av. Lima 123, Chosica', rol: 'COMPRADOR' },
+    { id: 1, nombre: 'Rosa Quispe', correo: 'rosa@boticompara.nissidev.dev', password: PASSWORD_PRUEBA, telefono: '987654321', direccion: null, rol: 'DUENO_BOTICA' },
+    { id: 2, nombre: 'Jorge Mendoza', correo: 'jorge@boticompara.nissidev.dev', password: PASSWORD_PRUEBA, telefono: '976543210', direccion: null, rol: 'DUENO_BOTICA' },
+    { id: 3, nombre: 'Lucía Torres', correo: 'lucia@boticompara.nissidev.dev', password: PASSWORD_PRUEBA, telefono: '965432109', direccion: null, rol: 'DUENO_BOTICA' },
+    { id: 4, nombre: 'Carlos Ramírez', correo: 'carlos@boticompara.nissidev.dev', password: PASSWORD_PRUEBA, telefono: '954321098', direccion: 'Av. Lima 123, Chosica', rol: 'COMPRADOR' },
   ],
   boticas: [
     { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', latitud: -11.942500, longitud: -76.699000, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },

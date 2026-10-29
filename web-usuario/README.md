@@ -51,10 +51,10 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
 
 | Correo | Qué permite probar |
 |---|---|
-| `rosa@boticasalud.pe` | Botica **aprobada**: catálogo completo (agregar, editar, eliminar, buscar) |
-| `jorge@farmavida.pe` | Botica **aprobada** con un producto agotado: etiqueta y filtro de **stock bajo** (H12) |
-| `lucia@boticanueva.pe` | Botica **pendiente**: catálogo bloqueado |
-| `carlos@correo.com` | Comprador: muestra que debe usar la app móvil |
+| `rosa@boticompara.nissidev.dev` | Botica **aprobada**: catálogo completo (agregar, editar, eliminar, buscar) |
+| `jorge@boticompara.nissidev.dev` | Botica **aprobada** con un producto agotado: etiqueta y filtro de **stock bajo** (H12) |
+| `lucia@boticompara.nissidev.dev` | Botica **pendiente**: catálogo bloqueado |
+| `carlos@boticompara.nissidev.dev` | Comprador: muestra que debe usar la app móvil |
 
 - Los datos viven en memoria: **al recargar la página vuelven a los de prueba**, y las cuentas creadas
   se pierden (la sesión guardada deja de valer y te envía al login).
@@ -67,7 +67,7 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
   boticomparaMock.pendiente(3)
   ```
 
-  Para probar la corrección (H7): rechaza Botica Nueva Era, entra con `lucia@boticanueva.pe`, pulsa
+  Para probar la corrección (H7): rechaza Botica Nueva Era, entra con `lucia@boticompara.nissidev.dev`, pulsa
   **"Actualizar estado"** y luego **"Corregir y reenviar"**.
 
 ## Pantallas e historias de usuario
