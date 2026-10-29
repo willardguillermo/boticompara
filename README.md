@@ -25,7 +25,9 @@ Monorepo con cuatro aplicaciones que comparten **una sola base PostgreSQL en Sup
 - La búsqueda del comprador lee de la vista `v_producto_busqueda`: solo productos activos, con stock
   y de boticas `APROBADO`.
 - Las licencias de funcionamiento se guardan en el bucket **privado** `licencias` de Supabase Storage.
-- Los correos (aprobación o rechazo de la botica, stock bajo) salen por SMTP; en desarrollo, el sandbox de Mailtrap.
+- Los correos (aprobación o rechazo de la botica, stock bajo) salen por SMTP de Resend desde
+  `notificaciones@boticompara.nissidev.dev`. Los usuarios de prueba reciben en buzones reales: sus correos
+  `@boticompara.nissidev.dev` se reenvían (Cloudflare) a la bandeja del equipo.
 
 ## Carpetas y responsables
 
@@ -96,13 +98,14 @@ está en `http://10.0.2.2:8080/api`.
 ## Usuarios de prueba
 
 Datos de [`database/seed.sql`](database/seed.sql). Contraseña de todos: **`Boti2026!`**
+Los correos son reales: lo que les envía la aplicación llega a la bandeja del equipo.
 
 | Correo | Rol | Situación |
 |---|---|---|
-| rosa@boticasalud.pe | DUENO_BOTICA | Botica Salud Total, APROBADO |
-| jorge@farmavida.pe | DUENO_BOTICA | FarmaVida, APROBADO (tiene un producto agotado: stock bajo) |
-| lucia@boticanueva.pe | DUENO_BOTICA | Botica Nueva Era, PENDIENTE (para probar Django) |
-| carlos@correo.com | COMPRADOR | Para probar el móvil |
+| rosa@boticompara.nissidev.dev | DUENO_BOTICA | Botica Salud Total, APROBADO |
+| jorge@boticompara.nissidev.dev | DUENO_BOTICA | FarmaVida, APROBADO (tiene un producto agotado: stock bajo) |
+| lucia@boticompara.nissidev.dev | DUENO_BOTICA | Botica Nueva Era, RECHAZADO (para probar la corrección y el reenvío) |
+| carlos@boticompara.nissidev.dev | COMPRADOR | Para probar el móvil |
 
 Los administradores de Django no están en el seed: se crean con `createsuperuser`.
 

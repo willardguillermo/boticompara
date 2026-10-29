@@ -23,8 +23,9 @@ Todas las aplicaciones comparten **una sola base PostgreSQL en Supabase**.
 - No se usa la API automática de Supabase: RLS activado; solo el rol `boticompara_app` tiene acceso.
 - La búsqueda del comprador lee de la vista `v_producto_busqueda` (productos activos, con stock,
   de boticas `APROBADO`).
-- Usuarios de prueba (contraseña `Boti2026!`): `rosa@boticasalud.pe` (aprobada),
-  `jorge@farmavida.pe` (aprobada), `lucia@boticanueva.pe` (pendiente), `carlos@correo.com` (comprador).
+- Usuarios de prueba (contraseña `Boti2026!`): `rosa@boticompara.nissidev.dev` (aprobada),
+  `jorge@boticompara.nissidev.dev` (aprobada), `lucia@boticompara.nissidev.dev` (rechazada),
+  `carlos@boticompara.nissidev.dev` (comprador).
 
 ## Reglas
 
