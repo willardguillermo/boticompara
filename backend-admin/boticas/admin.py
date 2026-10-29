@@ -3,7 +3,7 @@ from django.db import transaction
 from django.utils.html import format_html
 
 from .forms import BoticaRevisionForm
-from .models import Botica, Producto, Usuario
+from .models import Botica, BoticaRevision, Producto, Usuario
 from .notificaciones import notificar_revision
 from .storage import StorageError, url_firmada_licencia
 
@@ -126,14 +126,24 @@ class BoticaAdmin(admin.ModelAdmin):
     @admin.action(description='Aprobar boticas seleccionadas', permissions=['change'])
     def aprobar_boticas(self, request, queryset):
         # Solo las que realmente cambian de estado reciben el correo (H6)
-        por_aprobar = list(queryset.exclude(estado=Botica.Estado.APROBADO).select_related('usuario'))
-        actualizadas = (Botica.objects.filter(pk__in=[b.pk for b in por_aprobar])
-                        .exclude(estado=Botica.Estado.APROBADO)
-                        .update(estado=Botica.Estado.APROBADO, motivo_rechazo=None))
-        self.message_user(request, f'{actualizadas} botica(s) aprobada(s).', messages.SUCCESS)
-        for botica in por_aprobar:
-            botica.estado, botica.motivo_rechazo = Botica.Estado.APROBADO, None
-            transaction.on_commit(lambda b=botica: self._notificar(request, b))
+        # H47: el cambio de estado y su historial se guardan juntos o no se guarda nada
+        with transaction.atomic():
+            # select_for_update: si otro administrador la aprueba a la vez, no se registra dos veces
+            # (se vuelve a consultar por pk: el queryset del changelist puede traer DISTINCT)
+            por_aprobar = list(Botica.objects.filter(pk__in=queryset.values('pk'))
+                               .exclude(estado=Botica.Estado.APROBADO)
+                               .select_related('usuario').select_for_update(of=('self',)))
+            Botica.objects.filter(pk__in=[b.pk for b in por_aprobar]).update(
+                estado=Botica.Estado.APROBADO, motivo_rechazo=None)
+            BoticaRevision.objects.bulk_create([
+                BoticaRevision(botica=b, estado=BoticaRevision.Estado.APROBADO,
+                               revisado_por=request.user.get_username())
+                for b in por_aprobar
+            ])
+            for botica in por_aprobar:
+                botica.estado, botica.motivo_rechazo = Botica.Estado.APROBADO, None
+                transaction.on_commit(lambda b=botica: self._notificar(request, b))
+        self.message_user(request, f'{len(por_aprobar)} botica(s) aprobada(s).', messages.SUCCESS)
 
     def _notificar(self, request, botica):
         if not notificar_revision(botica):
@@ -151,11 +161,20 @@ class BoticaAdmin(admin.ModelAdmin):
         return False
 
     def save_model(self, request, obj, form, change):
-        # Estado guardado en la BD justo antes de escribir, para avisar solo si cambia (H6)
-        anterior = Botica.objects.filter(pk=obj.pk).values_list('estado', flat=True).first()
+        # Estado guardado en la BD justo antes de escribir, para avisar solo si cambia (H6).
+        # select_for_update: el changeform del admin ya corre en una transacción
+        anterior = (Botica.objects.select_for_update().filter(pk=obj.pk)
+                    .values_list('estado', flat=True).first())
         # Solo se escribe la revisión, para no pisar datos que el dueño
         # haya cambiado desde la web mientras el admin tenía el formulario abierto
         obj.save(update_fields=['estado', 'motivo_rechazo'])
         if obj.estado != anterior and obj.estado in (Botica.Estado.APROBADO, Botica.Estado.RECHAZADO):
+            # H47: en la misma transacción que el guardado; si falla, la botica no queda cambiada
+            BoticaRevision.objects.create(
+                botica=obj,
+                estado=obj.estado,
+                motivo=obj.motivo_rechazo if obj.estado == Botica.Estado.RECHAZADO else None,
+                revisado_por=request.user.get_username(),
+            )
             # Después del commit: si algo falla al guardar, no se avisa de un cambio que no ocurrió
             transaction.on_commit(lambda: self._notificar(request, obj))
