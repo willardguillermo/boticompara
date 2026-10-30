@@ -368,6 +368,8 @@ Sin resultados → `200` con `[]` (la app muestra "No encontramos ese medicament
 - `orden=distancia`: de la más cercana a la más lejana; a igual distancia, primero el más barato. Las boticas sin coordenadas van al final, con `distanciaKm: null`.
 - Con `radioKm`, solo quedan las boticas a esa distancia o menos; las que no tienen coordenadas quedan fuera.
 
+**Registro de la búsqueda (H62):** cada búsqueda que pasa las validaciones queda registrada para los reportes del administrador: el texto (`q` sin espacios al inicio ni al final y en minúsculas, hasta 150 caracteres), el `tipo`, la cantidad de resultados que se devuelven (ya con el filtro de radio) y el usuario de la sesión. No se guarda la ubicación del comprador. Las búsquedas que responden 400 no se registran. Si el registro falla, la respuesta no cambia.
+
 Errores: 400 (`q` de menos de 2 caracteres; `tipo` u `orden` inválidos; solo una de `lat` y `lng`; coordenadas fuera de rango; `radioKm` inválido; `orden=distancia` o `radioKm` sin `lat` y `lng`).
 
 ### `GET /productos/{id}` — H28
