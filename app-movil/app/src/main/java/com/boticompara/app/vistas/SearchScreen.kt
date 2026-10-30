@@ -34,7 +34,11 @@ import androidx.navigation.NavController
 import com.boticompara.app.data.remote.ProductoResponse
 import java.util.Locale
 
-// ===================== BÚSQUEDA (H22, H23, H24, H25, H26, H27, H40) =====================
+// Texto de cada opción del selector de radio (H58)
+private fun etiquetaRadio(radioKm: Double?): String =
+    if (radioKm == null) "Sin límite" else "${radioKm.toInt()} km"
+
+// ===================== BÚSQUEDA (H22, H23, H24, H25, H26, H27, H40, H58) =====================
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel = viewModel()) {
@@ -194,6 +198,36 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                             color = MaterialTheme.colorScheme.error
                         )
                     }
+
+                    // ---------- H58: selector de radio (solo se activa si hay ubicación) ----------
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Radio de búsqueda",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        SearchViewModel.OPCIONES_RADIO.forEach { opcion ->
+                            FilterChip(
+                                selected = vm.radioKm == opcion,
+                                onClick = { vm.onRadioChange(opcion) },
+                                enabled = vm.ordenCercanas,
+                                label = { Text(etiquetaRadio(opcion)) },
+                                shape = RoundedCornerShape(50)
+                            )
+                        }
+                    }
+                    if (!vm.ordenCercanas) {
+                        Text(
+                            "Activa Más cercanas para elegir el radio",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
 
                     // H26: indicador de carga (no se muestra si la carga viene de deslizar, ahí sale el círculo)
@@ -226,9 +260,15 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
             when {
                 // Hay resultados: se muestran aunque se esté actualizando (no "parpadea")
                 vm.productos.isNotEmpty() -> {
+                    val radio = vm.radioKm
                     Text(
                         "${vm.productos.size} resultados · " +
-                                if (vm.ordenCercanas) "de la más cercana a la más lejana" else "del más barato al más caro",
+                                when {
+                                    vm.ordenCercanas && radio != null ->
+                                        "a ${radio.toInt()} km o menos, de la más cercana a la más lejana"
+                                    vm.ordenCercanas -> "de la más cercana a la más lejana"
+                                    else -> "del más barato al más caro"
+                                },
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

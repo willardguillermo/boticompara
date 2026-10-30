@@ -270,6 +270,7 @@ Errores: 400 (`q` de menos de 2 caracteres).
 ```
 Respuesta: 201 con el producto creado. Validaciones: `precio > 0`, `stock >= 0`, textos obligatorios. `stockMinimo` es opcional y debe ser `>= 0`: al crear queda en 5 si no se envía, y al editar con `PUT` se conserva el valor actual.
 `medicamentoId` es opcional (H31): enlaza el producto con un medicamento del catálogo maestro, elegido con `GET /medicamentos`. Si el medicamento no existe o está oculto → 400.
+**Regla D2:** al enlazar (en `POST` o `PUT`), el backend copia el nombre del principio activo del medicamento a `principioActivo` del producto, y la respuesta devuelve ese valor actualizado. Al quitar el enlace con `DELETE /productos/{id}/medicamento`, el producto conserva ese texto.
 
 ### `PUT /productos/{id}` 🔒 — H9
 Mismo cuerpo que el POST. Si no se envía `medicamentoId`, se conserva el enlace actual (H31); para quitarlo se usa `DELETE /productos/{id}/medicamento` (enviar `null` no lo borra). Respuesta: 200 con el producto actualizado. 404 si no es de su botica.
@@ -278,7 +279,7 @@ Mismo cuerpo que el POST. Si no se envía `medicamentoId`, se conserva el enlace
 Baja lógica (`activo = false`): deja de aparecer en listados y búsquedas. Respuesta: 204 sin cuerpo.
 
 ### `DELETE /productos/{id}/medicamento` 🔒 — H31
-Quita el enlace del producto con el catálogo maestro (`medicamentoId` pasa a `null`). El producto sigue activo y conserva su nombre, precio, stock y principio activo. Respuesta: 204 sin cuerpo, también si el producto no estaba enlazado (se puede repetir sin error).
+Quita el enlace del producto con el catálogo maestro (`medicamentoId` pasa a `null`). El producto sigue activo y conserva su nombre, precio, stock y principio activo (el texto copiado al enlazar, regla D2). Respuesta: 204 sin cuerpo, también si el producto no estaba enlazado (se puede repetir sin error).
 Sin enlace, el producto deja de depender del medicamento: sus alternativas salen por el mismo principio activo (`PRINCIPIO_ACTIVO`) y no lo afecta que ese medicamento esté oculto o con el registro vencido (H39).
 Errores: 400 (`id` no numérico), 401 (sin token), 403 (sin botica o botica no aprobada), 404 (el producto no existe, está dado de baja o es de otra botica).
 
@@ -325,7 +326,7 @@ No es un endpoint. Todos los días a las 8:00 (hora de Lima) el backend envía a
 
 ## 5. Búsqueda del comprador
 
-### `GET /productos/buscar?q=paracetamol&tipo=nombre&orden=precio_asc` 🔒 — H22, H23, H24, H27
+### `GET /productos/buscar?q=paracetamol&tipo=nombre&orden=precio_asc` 🔒 — H22, H23, H24, H27, H48, H49
 
 | Parámetro | Valores | Por defecto |
 |---|---|---|
@@ -350,16 +351,24 @@ Solo devuelve productos activos, con stock > 0, de boticas `APROBADO` (vista `v_
     "boticaNombre": "FarmaVida",
     "boticaDireccion": "Jr. Trujillo 210",
     "boticaDistrito": "Lurigancho-Chosica",
+    "boticaLatitud": -11.937200,
+    "boticaLongitud": -76.695800,
     "distanciaKm": 1.25
   }
 ]
 ```
 Sin resultados → `200` con `[]` (la app muestra "No encontramos ese medicamento").
 
+**Ubicación de la botica (H48, H49):**
+- `boticaLatitud` y `boticaLongitud`: número con 6 decimales; `null` si la botica no registró ubicación. Van después de `boticaDistrito`.
+- El mapa del móvil (H48) solo pone marcador a los resultados con `boticaLatitud` y `boticaLongitud` no nulos.
+
 **Búsqueda por cercanía (H27):**
-- Con `lat` y `lng`, cada resultado trae `distanciaKm`: la distancia en línea recta hasta la botica, con 2 decimales. Sin ubicación, `distanciaKm` es `null` y la búsqueda funciona como antes.
+- Con `lat` y `lng`, cada resultado trae `distanciaKm`: la distancia en línea recta hasta la botica, con 2 decimales. Es `null` si no se envían `lat` y `lng` (la búsqueda funciona como antes) o si la botica no registró ubicación. El móvil la muestra con 1 decimal.
 - `orden=distancia`: de la más cercana a la más lejana; a igual distancia, primero el más barato. Las boticas sin coordenadas van al final, con `distanciaKm: null`.
 - Con `radioKm`, solo quedan las boticas a esa distancia o menos; las que no tienen coordenadas quedan fuera.
+
+**Registro de la búsqueda (H62):** cada búsqueda que pasa las validaciones queda registrada para los reportes del administrador: el texto (`q` sin espacios al inicio ni al final y en minúsculas, hasta 150 caracteres), el `tipo`, la cantidad de resultados que se devuelven (ya con el filtro de radio) y el usuario de la sesión. No se guarda la ubicación del comprador. Las búsquedas que responden 400 no se registran. Si el registro falla, la respuesta no cambia.
 
 Errores: 400 (`q` de menos de 2 caracteres; `tipo` u `orden` inválidos; solo una de `lat` y `lng`; coordenadas fuera de rango; `radioKm` inválido; `orden=distancia` o `radioKm` sin `lat` y `lng`).
 

@@ -124,3 +124,67 @@ python manage.py poblar_principios_activos --dry-run
 # 2. Crear de verdad: muestra el mismo resumen y pide confirmación [s/N]
 python manage.py poblar_principios_activos
 ```
+
+## Carga del catálogo DIGEMID (H46)
+
+Carga masiva del catálogo maestro desde un Excel (`.xlsx`, primera hoja) o CSV (separado por `,` o `;`,
+en UTF-8 o en la codificación de Excel en Windows) con las columnas del catálogo de DIGEMID en la fila 1:
+
+| Columna | Campo del medicamento | Obligatoria |
+|---|---|---|
+| Código | `codigo_digemid` (se lee como texto: `00101` conserva los ceros) | No |
+| Nombre Producto | `nombre_comercial` | Sí |
+| Principio Activo | `principio_activo` | Sí |
+| Concentración | `concentracion` | No |
+| Forma Farmacéutica | `forma_farmaceutica` | No |
+| Presentación | `presentacion` | Sí |
+| Reg Sanitario | `registro_sanitario` (clave de la carga) | Sí |
+| Fec Expiración | `fecha_vencimiento_registro` (fecha de Excel, `dd/mm/aaaa` o `aaaa-mm-dd`; vacía = sin fecha) | No |
+| Titular | `titular` | No |
+
+Los encabezados se reconocen sin distinguir mayúsculas, tildes, espacios dobles ni puntos
+(`Fec. Expiración` = `FEC EXPIRACION`). Las columnas Código y Titular pueden faltar; si falta
+cualquier otra, no se importa nada.
+
+Reglas:
+
+- **Clave = registro sanitario** (sin distinguir mayúsculas). Si ya existe, se **actualiza** el
+  medicamento (nombre, presentación, concentración, forma, titular, código, fecha y principio activo;
+  no se tocan la categoría ni `oculto`). Si no existe, se **crea sin categoría** (DIGEMID no la trae).
+  Un registro repetido dentro del archivo: vale la primera fila y las siguientes son error.
+- **Principio activo** sin distinguir mayúsculas **ni tildes**: `LOSARTAN` usa el `Losartán` que ya
+  existe. Si no existe se crea (si viene todo en mayúsculas, se guarda como `Losartan` con `str.title()`).
+- Un medicamento que está en un grupo de equivalencia no puede cambiar de principio activo: esa fila
+  es error ("sácalo del grupo primero").
+- **Las filas con error no detienen la carga**: se informan con número de fila de Excel y motivo.
+  Cada fila se guarda en su propia transacción.
+- Los de fecha pasada quedan como **Vencido** en el filtro de vigencia (H34).
+
+**Desde el admin:** Medicamentos → botón **"Importar catálogo DIGEMID"** (requiere permiso para añadir
+y cambiar medicamentos). Se sube el archivo (máximo 5 MB) y, si se marca **"Solo simular (no guardar)"**,
+se hace toda la carga y se deshace al final. Se muestran tarjetas con Creados, Actualizados y Filas con
+error, los principios activos nuevos y la tabla de errores (Fila, Reg Sanitario, Motivo).
+
+**Desde la consola** (en `backend-admin/`, con el entorno virtual activado):
+
+```bash
+# 1. Probar sin guardar nada
+python manage.py importar_digemid catalogo/muestras/catalogo-digemid-muestra.xlsx --simulacion
+
+# 2. Guardar de verdad
+python manage.py importar_digemid ruta/al/catalogo.xlsx
+```
+
+**Archivos de muestra** en [`catalogo/muestras/`](catalogo/muestras/):
+
+- `catalogo-digemid-muestra.xlsx`: 50 filas (44 válidas y 6 con error a propósito). Los registros
+  sanitarios y códigos son **FICTICIOS**; la hoja **Leeme** explica qué debe pasar en cada fila.
+  Con la BD del seed da: 41 creados, 3 actualizados (`TEST-001`, `TEST-005`, `TEST-010`), 6 filas con
+  error y 21 principios activos nuevos.
+- `catalogo-digemid-muestra.csv`: 10 filas, separado por `;`, en cp1252 (1 error: fecha 31/02/2029).
+
+Pruebas del lector (sin BD):
+
+```bash
+python manage.py test catalogo
+```

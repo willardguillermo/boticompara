@@ -34,10 +34,6 @@ public class BusquedaService {
 
     private final NamedParameterJdbcTemplate jdbc;
 
-    /** Fila leída de la vista con las coordenadas de la botica, que no salen en la respuesta. */
-    record FilaBusqueda(BusquedaResponse producto, BigDecimal boticaLatitud, BigDecimal boticaLongitud) {
-    }
-
     /**
      * H22 (nombre), H23 (principio activo), H24 (orden por precio), H27 (cercanía).
      * Lee de la vista v_producto_busqueda: solo productos activos, con stock y de boticas APROBADO.
@@ -76,8 +72,9 @@ public class BusquedaService {
                 + "order by precio " + direccion + ", botica_nombre asc";
 
         String patron = "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
-        List<FilaBusqueda> filas = jdbc.query(sql, new MapSqlParameterSource("patron", patron),
-                (rs, i) -> new FilaBusqueda(new BusquedaResponse(
+        // H48: las coordenadas de la botica salen en la respuesta (null si no registró ubicación)
+        List<BusquedaResponse> filas = jdbc.query(sql, new MapSqlParameterSource("patron", patron),
+                (rs, i) -> new BusquedaResponse(
                         rs.getLong("producto_id"),
                         rs.getString("nombre_comercial"),
                         rs.getString("principio_activo"),
@@ -88,14 +85,14 @@ public class BusquedaService {
                         rs.getString("botica_nombre"),
                         rs.getString("botica_direccion"),
                         rs.getString("botica_distrito"),
-                        null),
                         rs.getBigDecimal("botica_latitud"),
-                        rs.getBigDecimal("botica_longitud")));
+                        rs.getBigDecimal("botica_longitud"),
+                        null));
 
         if (!conUbicacion) {
-            return filas.stream().map(FilaBusqueda::producto).toList();
+            return filas;
         }
-        Stream<BusquedaResponse> resultado = filas.stream().map(f -> f.producto()
+        Stream<BusquedaResponse> resultado = filas.stream().map(f -> f
                 .conDistancia(distanciaKm(lat, lng, f.boticaLatitud(), f.boticaLongitud())));
         if (radio != null) {
             // Con radio, las boticas sin coordenadas quedan fuera
