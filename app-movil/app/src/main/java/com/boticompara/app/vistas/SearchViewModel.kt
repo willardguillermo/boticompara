@@ -19,6 +19,11 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private val repository = ProductoRepository(application)
     private val ubicacionProvider = UbicacionProvider(application)
 
+    companion object {
+        // H58: radios disponibles en kilómetros; null significa "Sin límite"
+        val OPCIONES_RADIO: List<Double?> = listOf(2.0, 5.0, 10.0, null)
+    }
+
     // H26: tiempo de espera desde la última tecla antes de buscar
     private val esperaDebounceMs = 500L
     private var busquedaJob: Job? = null
@@ -48,6 +53,10 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         private set
     private var ubicacion: UbicacionProvider.Coordenadas? = null
 
+    // H58: radio de búsqueda en km (null = sin límite). Solo se envía si hay ubicación
+    var radioKm by mutableStateOf<Double?>(null)
+        private set
+
     // H26: cada tecla reinicia la espera; solo se busca cuando el usuario deja de escribir
     fun onQueryChange(texto: String) {
         searchQuery = texto
@@ -59,6 +68,13 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         if (tipo == searchType) return
         searchType = tipo
         programarBusqueda(inmediata = true)
+    }
+
+    // H58: al cambiar el radio se vuelve a buscar sin esperar
+    fun onRadioChange(valor: Double?) {
+        if (valor == radioKm) return
+        radioKm = valor
+        if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
     }
 
     // Tecla "Buscar" del teclado: busca al instante
@@ -90,7 +106,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
     }
 
-    // Botón ✕ del campo
+    // Botón de borrar del campo de búsqueda
     fun limpiar() {
         busquedaJob?.cancel()
         searchQuery = ""
@@ -152,15 +168,24 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         isLoading = true
         mensaje = null
         val coordenadas = ubicacion
-        val resultado = if (ordenCercanas && coordenadas != null) {
-            repository.buscar(query, searchType, "distancia", coordenadas.lat, coordenadas.lng)   // H27
+        val conUbicacion = ordenCercanas && coordenadas != null
+        val resultado = if (conUbicacion && coordenadas != null) {
+            // H27 y H58: con ubicación se ordena por distancia y se aplica el radio elegido
+            repository.buscar(query, searchType, "distancia", coordenadas.lat, coordenadas.lng, radioKm)
         } else {
             repository.buscar(query, searchType, "precio_asc")   // H24
         }
         when (resultado) {
             is ResultadoBusqueda.Exito -> {
                 productos = resultado.productos
-                if (productos.isEmpty()) mensaje = "No encontramos ese medicamento"
+                if (productos.isEmpty()) {
+                    val radio = radioKm
+                    mensaje = if (conUbicacion && radio != null) {
+                        "No encontramos ese medicamento a ${radio.toInt()} km o menos de ti. Prueba con un radio mayor"
+                    } else {
+                        "No encontramos ese medicamento"
+                    }
+                }
             }
             ResultadoBusqueda.SesionVencida -> sesionVencida = true
             ResultadoBusqueda.SinConexion -> {
