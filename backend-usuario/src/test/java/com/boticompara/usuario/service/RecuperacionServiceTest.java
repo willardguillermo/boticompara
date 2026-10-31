@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
 class RecuperacionServiceTest {
 
     private static final String SECRETO = "secreto-de-prueba-con-mas-de-treinta-y-dos-caracteres";
-    private static final String CORREO = "carlos@correo.com";
+    private static final String CORREO = "carlos@boticompara.nissidev.dev";
     private static final String MENSAJE_INVALIDO = "El código no es válido o venció. Pide uno nuevo";
 
     @Mock

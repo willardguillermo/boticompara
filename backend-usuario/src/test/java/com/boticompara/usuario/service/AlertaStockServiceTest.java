@@ -74,19 +74,19 @@ class AlertaStockServiceTest {
     @Test
     void enviaUnCorreoConSoloLosProductosEnOBajoElMinimo() {
         when(boticas.findByEstado("APROBADO")).thenReturn(List.of(botica(1L, 10L, "FarmaVida")));
-        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario("jorge@farmavida.pe", true)));
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario("jorge@boticompara.nissidev.dev", true)));
         when(productos.findByBoticaIdAndActivoTrueOrderByNombreComercialAsc(1L)).thenReturn(List.of(
                 producto("Ibuprofeno Generico", 0, 5),
                 producto("Nexium", 5, 5),
                 producto("Panadol", 35, 5)));
-        when(correo.enviar(eq("jorge@farmavida.pe"), anyString(), anyString())).thenReturn(true);
+        when(correo.enviar(eq("jorge@boticompara.nissidev.dev"), anyString(), anyString())).thenReturn(true);
 
         int enviados = service.enviarAlertas();
 
         assertEquals(1, enviados);
         ArgumentCaptor<String> asunto = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> texto = ArgumentCaptor.forClass(String.class);
-        verify(correo).enviar(eq("jorge@farmavida.pe"), asunto.capture(), texto.capture());
+        verify(correo).enviar(eq("jorge@boticompara.nissidev.dev"), asunto.capture(), texto.capture());
         assertTrue(asunto.getValue().contains("2 productos con stock bajo"));
         assertTrue(asunto.getValue().contains("FarmaVida"));
         assertTrue(texto.getValue().contains("Hola Jorge Mendoza"));
@@ -98,7 +98,7 @@ class AlertaStockServiceTest {
     @Test
     void usaElSingularConUnSoloProducto() {
         when(boticas.findByEstado("APROBADO")).thenReturn(List.of(botica(1L, 10L, "FarmaVida")));
-        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario("jorge@farmavida.pe", true)));
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario("jorge@boticompara.nissidev.dev", true)));
         when(productos.findByBoticaIdAndActivoTrueOrderByNombreComercialAsc(1L))
                 .thenReturn(List.of(producto("Nexium", 1, 5)));
         when(correo.enviar(anyString(), anyString(), anyString())).thenReturn(true);
@@ -106,7 +106,7 @@ class AlertaStockServiceTest {
         service.enviarAlertas();
 
         ArgumentCaptor<String> asunto = ArgumentCaptor.forClass(String.class);
-        verify(correo).enviar(eq("jorge@farmavida.pe"), asunto.capture(), anyString());
+        verify(correo).enviar(eq("jorge@boticompara.nissidev.dev"), asunto.capture(), anyString());
         assertTrue(asunto.getValue().contains("1 producto con stock bajo"));
         assertFalse(asunto.getValue().contains("1 productos"));
     }
@@ -114,7 +114,7 @@ class AlertaStockServiceTest {
     @Test
     void noEnviaNadaSiNingunProductoEstaBajo() {
         when(boticas.findByEstado("APROBADO")).thenReturn(List.of(botica(1L, 10L, "Salud Total")));
-        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario("rosa@boticasalud.pe", true)));
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario("rosa@boticompara.nissidev.dev", true)));
         when(productos.findByBoticaIdAndActivoTrueOrderByNombreComercialAsc(1L))
                 .thenReturn(List.of(producto("Panadol", 40, 5), producto("Advil", 6, 5)));
 
@@ -139,7 +139,7 @@ class AlertaStockServiceTest {
     @Test
     void noCuentaLosCorreosQueFallan() {
         when(boticas.findByEstado("APROBADO")).thenReturn(List.of(botica(1L, 10L, "FarmaVida")));
-        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario("jorge@farmavida.pe", true)));
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario("jorge@boticompara.nissidev.dev", true)));
         when(productos.findByBoticaIdAndActivoTrueOrderByNombreComercialAsc(1L))
                 .thenReturn(List.of(producto("Nexium", 0, 5)));
         when(correo.enviar(anyString(), anyString(), anyString())).thenReturn(false);
