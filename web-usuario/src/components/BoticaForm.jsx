@@ -1,7 +1,8 @@
 // Formulario de datos de la botica de la corrección (H7). El registro (H1) va por pasos en RegistroBoticaPage.
 // H2 - Validación del RUC con SUNAT: en el hook useVerificacionRuc
 // H3 - Ubicación de la botica marcada en un mapa (latitud y longitud opcionales)
-import { useState } from 'react'
+// H7 - Sugiere la dirección fiscal de SUNAT sin reemplazar la que ya tiene la botica
+import { useRef, useState } from 'react'
 import { cuerpoBotica, esErrorDeRuc, useVerificacionRuc } from '../hooks/useVerificacionRuc.js'
 import { DISTRITOS } from '../utils/distritos.js'
 import { validarRuc } from '../utils/ruc.js'
@@ -42,8 +43,15 @@ export default function BoticaForm({
   const [errores, setErrores] = useState({})
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState('')
-  const ruc = useVerificacionRuc({ rucInicial: inicial.ruc, setDatos, setErrores })
+  const ruc = useVerificacionRuc({
+    rucInicial: inicial.ruc,
+    consultarAlIniciar: true,
+    cargados: inicial,
+    setDatos,
+    setErrores,
+  })
   const { razonDeSunat } = ruc
+  const campoDireccion = useRef(null)
 
   const cambiar = (campo) => (e) => {
     const valor = campo === 'ruc' ? e.target.value.replace(/\D/g, '').slice(0, 11) : e.target.value
@@ -52,8 +60,8 @@ export default function BoticaForm({
     if (campo === 'ruc') ruc.cambiarRuc(valor)
   }
 
-  // H3: completa dirección y distrito con lo que devuelve el mapa (solo los campos que vengan)
-  function usarDireccionDelMapa({ direccion, distrito }) {
+  // H3 y H7: completa dirección y distrito con lo que devuelve el mapa o SUNAT (solo los campos que vengan)
+  function usarDireccion({ direccion, distrito }) {
     setDatos((d) => ({ ...d, ...(direccion && { direccion }), ...(distrito && { distrito }) }))
     setErrores((er) => ({ ...er, direccion: undefined, distrito: undefined }))
   }
@@ -88,7 +96,26 @@ export default function BoticaForm({
   }
 
   const rucEnVivo = ruc.estadoRuc(datos.ruc, errores.ruc)
-  const ayudaDireccion = ruc.ayudaDireccion(datos.ruc, datos.direccion)
+  const fiscal = ruc.direccionFiscalDistinta(datos.ruc, datos.direccion)
+  const ayudaDireccion = fiscal ? (
+    <>
+      Dirección fiscal según SUNAT: {fiscal.direccion} ·{' '}
+      <button
+        type="button"
+        className="boton-texto"
+        aria-label="Usar esta dirección fiscal"
+        onClick={() => {
+          usarDireccion(fiscal)
+          // El botón desaparece al coincidir: el foco pasa al campo para no perderse
+          campoDireccion.current.focus()
+        }}
+      >
+        Usar esta
+      </button>
+    </>
+  ) : (
+    ruc.ayudaDireccion(datos.ruc, datos.direccion)
+  )
 
   return (
     <form className="tarjeta formulario" onSubmit={enviar} noValidate>
@@ -134,6 +161,7 @@ export default function BoticaForm({
       <Campo id="direccion" etiqueta="Dirección" error={errores.direccion} ayuda={ayudaDireccion}>
         <input
           {...propsError('direccion', errores.direccion)}
+          ref={campoDireccion}
           autoComplete="street-address"
           value={datos.direccion}
           onChange={cambiar('direccion')}
@@ -171,7 +199,7 @@ export default function BoticaForm({
         <span className="etiqueta-campo">
           Ubicación en el mapa <span className="opcional">(opcional)</span>
         </span>
-        <MapaUbicacion valor={ubicacion} onCambio={setUbicacion} onUsarDireccion={usarDireccionDelMapa} />
+        <MapaUbicacion valor={ubicacion} onCambio={setUbicacion} onUsarDireccion={usarDireccion} />
       </div>
 
       <div className="acciones-form">
