@@ -19,6 +19,38 @@ Los modelos `Usuario`, `Botica` y `Producto` usan `managed = False`: Django **no
 tablas, que se definen solo en [`database/schema.sql`](../database/schema.sql). Los administradores
 entran con el login propio de Django (`createsuperuser`), no con la tabla `usuario`.
 
+## Historial de revisiones (H47)
+
+**Boticas → Historial de revisiones** lista cada aprobación y rechazo, guardados en la tabla
+`botica_revision` (definida en [`database/schema.sql`](../database/schema.sql)): fecha y hora (de Lima),
+botica (enlace a su ficha), RUC, estado (verde aprobado, rojo rechazado), administrador que la hizo
+y motivo del rechazo (recortado a 80 caracteres; "—" si no hay).
+
+De dónde salen las filas:
+
+- **Formulario de la botica:** al guardar, si el estado cambió a `APROBADO` o `RECHAZADO` se crea una
+  revisión con el estado, el motivo (solo si es rechazo) y el usuario de Django que la hizo.
+- **Acción en lote "Aprobar boticas seleccionadas":** una revisión por cada botica que realmente cambió
+  (las que ya estaban aprobadas no).
+- En ambos casos el cambio de estado y su revisión se guardan en la **misma transacción**: si falla
+  el historial, la botica no queda cambiada. El correo al dueño (H6) sigue saliendo después del commit.
+- Las **4 revisiones iniciales** se cargaron con la BD y no tienen revisor: se muestran como
+  "Sin registro (carga inicial)".
+
+Filtros, combinables entre sí y con la búsqueda (nombre de la botica, RUC o administrador):
+
+- **Por estado**, en la barra lateral.
+- **Por rango de fechas**, con los campos **Desde** y **Hasta** arriba de la lista. Los días se toman en
+  hora de Lima e incluyen los dos extremos. Si "Desde" es posterior a "Hasta" o una fecha no es válida,
+  se muestra un error y no se filtra por fecha.
+
+El historial es de **solo lectura**: no se pueden crear, editar ni borrar revisiones. En la ficha de cada
+botica se ve también su **Historial de revisiones**.
+
+Al bajar esta versión, correr una vez `python manage.py migrate`: solo registra el modelo y sus
+permisos (para que un administrador que no es superusuario pueda ver el historial); **no crea la
+tabla**, que ya existe en Supabase.
+
 ## Puesta en marcha
 
 Requisito: el archivo `.env` en la **raíz del repo** (copia de [`.env.example`](../.env.example))

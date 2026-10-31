@@ -6,6 +6,7 @@ estructura se hace solo en database/schema.sql (por Pull Request).
 Las columnas actualizado_en las mantiene el trigger set_actualizado_en() de la BD.
 """
 from django.db import models
+from django.db.models.functions import Now
 
 
 class Usuario(models.Model):
@@ -113,3 +114,37 @@ class Producto(models.Model):
 
     def __str__(self):
         return f'{self.nombre_comercial} - {self.presentacion}'
+
+
+class BoticaRevision(models.Model):
+    """H47: historial de aprobaciones y rechazos. Lo escribe BoticaAdmin; aquí es de solo lectura."""
+
+    class Estado(models.TextChoices):
+        APROBADO = 'APROBADO', 'Aprobado'
+        RECHAZADO = 'RECHAZADO', 'Rechazado'
+
+    id = models.BigAutoField(primary_key=True)
+    # on_delete=DO_NOTHING: el "on delete cascade" lo resuelve la BD
+    botica = models.ForeignKey(
+        Botica,
+        on_delete=models.DO_NOTHING,
+        db_column='botica_id',
+        related_name='revisiones',
+    )
+    estado = models.CharField(max_length=20, choices=Estado.choices)
+    # Obligatorio si RECHAZADO: check chk_botica_revision_motivo
+    motivo = models.TextField(null=True, blank=True)
+    # null = revisiones de la carga inicial, anteriores a este historial
+    revisado_por = models.CharField('revisado por', max_length=150, null=True, blank=True)
+    # La BD pone now() por defecto; db_default hace que Django no la envíe en el insert
+    fecha = models.DateTimeField(db_default=Now())
+
+    class Meta:
+        managed = False
+        db_table = 'botica_revision'
+        ordering = ['-fecha']
+        verbose_name = 'revisión de botica'
+        verbose_name_plural = 'historial de revisiones'
+
+    def __str__(self):
+        return f'{self.botica} - {self.get_estado_display()} ({self.fecha:%d/%m/%Y %H:%M})'
