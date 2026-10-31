@@ -8,11 +8,18 @@ import { obtenerToken } from './sesion.js'
 
 const PASSWORD_PRUEBA = 'Boti2026!'
 const STOCK_MINIMO_DEFECTO = 5 // H12: igual que el default de la columna stock_minimo
-// H2: único RUC que el modo simulado "encuentra" en SUNAT
-const RUC_SUNAT = {
-  ruc: '20601030013', razonSocial: 'REXTIE S.A.C.', estado: 'ACTIVO', condicion: 'HABIDO',
-  // Como la manda SUNAT: en mayúsculas y con un espacio al final
-  direccion: 'CAL. LAS CAMELIAS NRO 256 INT. 701A URB. JARDIN ', distrito: 'SAN ISIDRO',
+// H2: únicos RUC que el modo simulado "encuentra" en SUNAT
+const RUCS_SUNAT = {
+  20601030013: {
+    ruc: '20601030013', razonSocial: 'REXTIE S.A.C.', estado: 'ACTIVO', condicion: 'HABIDO',
+    // Como la manda SUNAT: en mayúsculas y con un espacio al final
+    direccion: 'CAL. LAS CAMELIAS NRO 256 INT. 701A URB. JARDIN ', distrito: 'SAN ISIDRO',
+  },
+  // H7: Botica Nueva Era, con una dirección fiscal distinta a la de su local
+  20712345676: {
+    ruc: '20712345676', razonSocial: 'NUEVA ERA SALUD S.A.C.', estado: 'ACTIVO', condicion: 'HABIDO',
+    direccion: 'AV. JAVIER PRADO ESTE NRO 4200 ', distrito: 'LA MOLINA',
+  },
 }
 
 const db = {
@@ -350,11 +357,11 @@ export const apiMock = {
   },
 
   // ---------- 3. Botica ----------
-  // H2: simula la consulta a SUNAT solo para RUC_SUNAT; los demás RUC válidos salen como LOCAL
+  // H2: simula la consulta a SUNAT solo para RUCS_SUNAT; los demás RUC válidos salen como LOCAL
   async validarRuc(ruc) {
     await esperar()
     const { valido, mensaje } = validarRuc(ruc)
-    if (valido && ruc === RUC_SUNAT.ruc) return { ...RUC_SUNAT, valido, mensaje, fuente: 'SUNAT' }
+    if (valido && RUCS_SUNAT[ruc]) return { ...RUCS_SUNAT[ruc], valido, mensaje, fuente: 'SUNAT' }
     return {
       ruc, valido,
       mensaje: valido ? 'RUC válido (no se pudo consultar SUNAT)' : mensaje,

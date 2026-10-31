@@ -293,6 +293,22 @@ a {
   color: var(--color-texto-suave);
 }
 
+.boton-texto {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primario);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.boton-texto:focus-visible {
+  outline: 3px solid rgb(15 118 110 / 35%);
+  outline-offset: 1px;
+}
+
 .campo .error-campo {
   font-size: 0.85rem;
   color: var(--error);
@@ -1250,7 +1266,7 @@ a {
   padding-left: 2.4rem;
 }
 
-/* Pantallas angostas: una acción por fila (Agregar, Cargar CSV, Solo stock bajo) */
+/* Pantallas angostas: una acción por fila (Agregar, Cargar CSV o Excel, Solo stock bajo) */
 @media (max-width: 479px) {
   .barra-catalogo > * {
     flex-basis: 100%;
