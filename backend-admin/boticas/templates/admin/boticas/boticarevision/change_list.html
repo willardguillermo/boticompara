@@ -1,0 +1,31 @@
+{% extends "admin/change_list.html" %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <style>
+    #rango-fechas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px;
+                    margin-bottom: 10px; background: var(--darkened-bg); border: 1px solid var(--hairline-color);
+                    border-radius: 4px; }
+    #rango-fechas label { font-weight: bold; }
+  </style>
+{% endblock %}
+
+{% block search %}
+  {{ block.super }}
+  {# H47: rango de fechas; los campos ocultos conservan el filtro de estado y la búsqueda #}
+  <form id="rango-fechas" method="get">
+    <label for="rango-desde">Desde</label>
+    <input type="date" id="rango-desde" name="desde" value="{{ rango_desde }}">
+    <label for="rango-hasta">Hasta</label>
+    <input type="date" id="rango-hasta" name="hasta" value="{{ rango_hasta }}">
+    {% for nombre, valor in cl.params.items %}
+      {% if nombre != 'desde' and nombre != 'hasta' and nombre != 'p' %}
+        <input type="hidden" name="{{ nombre }}" value="{{ valor }}">
+      {% endif %}
+    {% endfor %}
+    <input type="submit" value="Filtrar por fecha">
+    {% if rango_desde or rango_hasta %}
+      <a href="?{% for nombre, valor in cl.params.items %}{% if nombre != 'desde' and nombre != 'hasta' and nombre != 'p' %}{{ nombre|urlencode }}={{ valor|urlencode }}&amp;{% endif %}{% endfor %}">Quitar fechas</a>
+    {% endif %}
+  </form>
+{% endblock %}
