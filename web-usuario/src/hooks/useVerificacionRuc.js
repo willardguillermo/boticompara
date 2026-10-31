@@ -1,8 +1,9 @@
 // H2 - Validación del RUC: en vivo con el dígito verificador y, cuando pasa, una sola consulta
 //      a GET /boticas/validar-ruc/{ruc} (SUNAT) que trae la razón social, el estado y la condición;
 //      la dirección fiscal y el distrito se sugieren en sus campos, que siguen siendo editables.
+// H7 - Al corregir la botica, el RUC cargado se consulta al entrar para sugerir la dirección fiscal.
 // Lo usan el formulario de la botica (BoticaForm) y el registro por pasos.
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../services/index.js'
 import { distritoDeLista } from '../utils/distritos.js'
 import { validarRuc } from '../utils/ruc.js'
@@ -30,11 +31,11 @@ function aplicarSugerencias(d, anteriores, sugerencias) {
   return cambios
 }
 
-/** Borra los campos que todavía tienen la sugerencia de SUNAT (lo escrito por el usuario se queda). */
-function quitarSugerencias(d, sugerencias) {
+/** Borra los campos que todavía tienen la sugerencia de SUNAT (lo escrito o cargado se queda). */
+function quitarSugerencias(d, sugerencias, cargados) {
   const cambios = {}
   for (const campo of ['direccion', 'distrito']) {
-    if (sugerencias[campo] && d[campo] === sugerencias[campo]) cambios[campo] = ''
+    if (sugerencias[campo] && d[campo] === sugerencias[campo] && d[campo] !== cargados[campo]) cambios[campo] = ''
   }
   return cambios
 }
@@ -81,10 +82,20 @@ export function esErrorDeRuc(err) {
 /**
  * Estado de la verificación del RUC de un formulario cuyos datos (ruc, razonSocial, direccion, distrito)
  * y errores guarda quien lo usa; el hook los actualiza con setDatos y setErrores.
+ * Con consultarAlIniciar (H7) consulta una vez el rucInicial; cargados es la dirección y el distrito
+ * que ya tenía la botica.
  */
-export function useVerificacionRuc({ rucInicial = '', setDatos, setErrores }) {
+export function useVerificacionRuc({
+  rucInicial = '',
+  consultarAlIniciar = false,
+  cargados = SIN_SUGERENCIAS,
+  setDatos,
+  setErrores,
+}) {
   // { ruc, cargando: true } mientras se consulta, luego { ruc, resultado }
-  const [consulta, setConsulta] = useState(null)
+  const [consulta, setConsulta] = useState(() =>
+    consultarAlIniciar && validarRuc(rucInicial).valido ? { ruc: rucInicial, cargando: true } : null,
+  )
   const [razonDeSunat, setRazonDeSunat] = useState(false)
   // SUNAT (Decolecta) tiene 100 consultas al mes: se guarda el último RUC consultado y la
   // consulta en curso para no repetir la llamada
@@ -147,7 +158,7 @@ export function useVerificacionRuc({ rucInicial = '', setDatos, setErrores }) {
     setDatos((d) => ({
       ...d,
       ...(razonDeSunat && { razonSocial: '' }),
-      ...quitarSugerencias(d, anteriores),
+      ...quitarSugerencias(d, anteriores, cargados),
     }))
     setRazonDeSunat(false)
     if (!validarRuc(ruc).valido) return
@@ -163,6 +174,18 @@ export function useVerificacionRuc({ rucInicial = '', setDatos, setErrores }) {
       () => rucActual.current === ruc && setConsulta(null),
     )
   }
+
+  // H7: si SUNAT no responde, el RUC cargado se queda solo con la validación local
+  useEffect(() => {
+    if (!consultarAlIniciar || !validarRuc(rucInicial).valido) return
+    const soloLocal = () => rucActual.current === rucInicial && setConsulta(null)
+    consultarRuc(rucInicial).then(
+      (resultado) => (resultado.fuente === 'SUNAT' ? aplicarConsulta(rucInicial, resultado) : soloLocal()),
+      soloLocal,
+    )
+    // Solo al montar: con cada render cambiaría aplicarConsulta y se repetiría el efecto
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /** Consulta el RUC (o reutiliza la consulta hecha al escribirlo), aplica la respuesta y la devuelve. */
   async function verificar(ruc) {
@@ -187,5 +210,11 @@ export function useVerificacionRuc({ rucInicial = '', setDatos, setErrores }) {
       : undefined
   }
 
-  return { razonDeSunat, cambiarRuc, verificar, estadoRuc, ayudaDireccion }
+  /** H7: dirección fiscal y distrito de SUNAT si la dirección difiere de la escrita; si no, null. */
+  function direccionFiscalDistinta(ruc, direccion) {
+    const sugerencias = consulta?.ruc === ruc ? sugerenciasDe(consulta.resultado) : SIN_SUGERENCIAS
+    return sugerencias.direccion && direccion !== sugerencias.direccion ? sugerencias : null
+  }
+
+  return { razonDeSunat, cambiarRuc, verificar, estadoRuc, ayudaDireccion, direccionFiscalDistinta }
 }

@@ -4,7 +4,7 @@
 // H8 / H9 - Agregar y editar productos (ver ProductoFormModal)
 // H10 - Eliminar producto con confirmación (ver ConfirmarEliminarModal)
 // H12 - Etiqueta "Stock bajo" y filtro "Solo stock bajo" (?stockBajo=true)
-// H11 - Acceso a la carga masiva por CSV (ver CargaMasivaPage)
+// H11 - Acceso a la carga masiva por CSV o Excel (ver CargaMasivaPage)
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
@@ -182,7 +182,7 @@ export default function CatalogoPage() {
           Solo stock bajo
         </label>
         <Link to="/panel/catalogo/carga-masiva" className="btn btn-secundario">
-          <Icono nombre="subir" /> Cargar CSV
+          <Icono nombre="subir" /> Cargar CSV o Excel
         </Link>
         <button type="button" className="btn btn-primario" onClick={() => setEditando({})}>
           <Icono nombre="mas" /> Agregar producto
