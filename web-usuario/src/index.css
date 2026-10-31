@@ -1250,7 +1250,7 @@ a {
   padding-left: 2.4rem;
 }
 
-/* Pantallas angostas: una acción por fila (Agregar, Cargar CSV, Solo stock bajo) */
+/* Pantallas angostas: una acción por fila (Agregar, Cargar CSV o Excel, Solo stock bajo) */
 @media (max-width: 479px) {
   .barra-catalogo > * {
     flex-basis: 100%;
