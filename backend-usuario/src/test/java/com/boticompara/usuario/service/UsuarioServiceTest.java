@@ -133,6 +133,22 @@ class UsuarioServiceTest {
     }
 
     @Test
+    void obtenerDevuelveSiElCorreoEstaVerificado() {
+        Usuario u = usuario(true);
+        u.setCorreoVerificado(true);
+        when(usuarios.findById(10L)).thenReturn(Optional.of(u));
+
+        assertTrue(service.obtener(10L).correoVerificado());
+    }
+
+    @Test
+    void obtenerConCorreoSinVerificarDevuelveFalse() {
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+
+        assertFalse(service.obtener(10L).correoVerificado());
+    }
+
+    @Test
     void unUsuarioInexistenteDa401SinTocarNada() {
         when(usuarios.findById(10L)).thenReturn(Optional.empty());
 
