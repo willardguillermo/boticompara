@@ -16,7 +16,6 @@ import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,9 +35,9 @@ class MedicamentoServiceTest {
     @InjectMocks
     MedicamentoService service;
 
-    private void ocultoEs(List<Boolean> filas) {
-        when(jdbc.query(anyString(), any(SqlParameterSource.class), ArgumentMatchers.<RowMapper<Boolean>>any()))
-                .thenReturn(filas);
+    private void enlazableEs(List<MedicamentoService.Enlazable> filas) {
+        when(jdbc.query(anyString(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<MedicamentoService.Enlazable>>any())).thenReturn(filas);
     }
 
     @Test
@@ -70,28 +69,40 @@ class MedicamentoServiceTest {
     }
 
     @Test
-    void validarEnlazable_medicamentoVisible_noLanza() {
-        ocultoEs(List.of(false));
+    void principioActivoEnlazable_medicamentoVisible_devuelveSuPrincipioActivo() {
+        enlazableEs(List.of(new MedicamentoService.Enlazable(false, "Paracetamol")));
 
-        assertDoesNotThrow(() -> service.validarEnlazable(12L));
+        assertEquals("Paracetamol", service.principioActivoEnlazable(12L));
     }
 
     @Test
-    void validarEnlazable_noExiste_responde400() {
-        ocultoEs(List.of());
+    void principioActivoEnlazable_noExiste_responde400() {
+        enlazableEs(List.of());
 
-        ApiException ex = assertThrows(ApiException.class, () -> service.validarEnlazable(99L));
+        ApiException ex = assertThrows(ApiException.class, () -> service.principioActivoEnlazable(99L));
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
         assertEquals("El medicamento no existe en el catálogo", ex.getMessage());
     }
 
     @Test
-    void validarEnlazable_oculto_responde400() {
-        ocultoEs(List.of(true));
+    void principioActivoEnlazable_oculto_responde400() {
+        enlazableEs(List.of(new MedicamentoService.Enlazable(true, "Paracetamol")));
 
-        ApiException ex = assertThrows(ApiException.class, () -> service.validarEnlazable(12L));
+        ApiException ex = assertThrows(ApiException.class, () -> service.principioActivoEnlazable(12L));
 
         assertEquals("El medicamento no está disponible en el catálogo", ex.getMessage());
+    }
+
+    @Test
+    void principioActivoEnlazable_leeElNombreDelPrincipioActivo() {
+        enlazableEs(List.of(new MedicamentoService.Enlazable(false, "Paracetamol")));
+
+        service.principioActivoEnlazable(12L);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<MedicamentoService.Enlazable>>any());
+        assertTrue(sql.getValue().contains("join principio_activo pa on pa.id = m.principio_activo_id"));
     }
 }

@@ -44,16 +44,26 @@ public class MedicamentoService {
                 rs.getString("concentracion")));
     }
 
-    /** Para enlazar un producto: 400 si el medicamento no existe o está oculto. */
+    /** Medicamento que se va a enlazar: si está oculto y el nombre de su principio activo. */
+    record Enlazable(boolean oculto, String principioActivo) {
+    }
+
+    /**
+     * Para enlazar un producto (H31): 400 si el medicamento no existe o está oculto.
+     * D2: devuelve el nombre de su principio activo, que se copia al producto.
+     */
     @Transactional(readOnly = true)
-    public void validarEnlazable(Long id) {
-        List<Boolean> oculto = jdbc.query("select oculto from medicamento where id = :id",
-                new MapSqlParameterSource("id", id), (rs, i) -> rs.getBoolean("oculto"));
-        if (oculto.isEmpty()) {
+    public String principioActivoEnlazable(Long id) {
+        List<Enlazable> filas = jdbc.query("select m.oculto, pa.nombre as principio_activo from medicamento m "
+                        + "join principio_activo pa on pa.id = m.principio_activo_id where m.id = :id",
+                new MapSqlParameterSource("id", id),
+                (rs, i) -> new Enlazable(rs.getBoolean("oculto"), rs.getString("principio_activo")));
+        if (filas.isEmpty()) {
             throw ApiException.badRequest("El medicamento no existe en el catálogo");
         }
-        if (oculto.get(0)) {
+        if (filas.get(0).oculto()) {
             throw ApiException.badRequest("El medicamento no está disponible en el catálogo");
         }
+        return filas.get(0).principioActivo();
     }
 }
