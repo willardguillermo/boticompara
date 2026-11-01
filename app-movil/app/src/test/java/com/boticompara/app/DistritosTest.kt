@@ -7,7 +7,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** H50: la lista de distritos para la ubicación manual. */
 class DistritosTest {
 
     @Test
@@ -18,9 +17,15 @@ class DistritosTest {
 
     @Test
     fun todasLasCoordenadasEstanEnLima() {
-        Distritos.LISTA.forEach {
-            assertTrue("${it.nombre}: latitud fuera de Lima", it.lat in -12.55..-11.70)
-            assertTrue("${it.nombre}: longitud fuera de Lima", it.lng in -77.20..-76.60)
+        Distritos.LISTA.forEach { distrito ->
+            assertTrue(
+                "Latitud fuera de Lima en ${distrito.nombre}",
+                distrito.lat in -12.55..-11.70
+            )
+            assertTrue(
+                "Longitud fuera de Lima en ${distrito.nombre}",
+                distrito.lng in -77.20..-76.60
+            )
         }
     }
 
@@ -31,5 +36,16 @@ class DistritosTest {
         assertEquals("Rímac", Distritos.buscar("    rimac ")?.nombre)
         assertNull(Distritos.buscar("Callao"))
         assertNull(Distritos.buscar(""))
+    }
+
+    @Test
+    fun filtraPorTextoParcial() {
+        assertEquals(
+            listOf("San Juan de Lurigancho", "San Juan de Miraflores"),
+            Distritos.filtrar("san juan").map { it.nombre }
+        )
+        assertEquals(listOf("Santiago de Surco"), Distritos.filtrar("SURCO").map { it.nombre })
+        assertEquals(35, Distritos.filtrar("   ").size)
+        assertTrue(Distritos.filtrar("zzz").isEmpty())
     }
 }

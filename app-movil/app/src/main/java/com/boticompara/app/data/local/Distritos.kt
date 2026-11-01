@@ -2,14 +2,11 @@ package com.boticompara.app.data.local
 
 import java.text.Normalizer
 
-/**
- * H50: distritos de Lima para la ubicación manual cuando el usuario no da permiso de GPS.
- * Son los mismos 35 distritos que ofrece la web (web-usuario/src/utils/distritos.js).
- *
- * Las coordenadas son APROXIMADAS: el centro o la zona más poblada de cada distrito
- * (plaza principal o municipalidad). Sirven para ordenar por cercanía, no para navegar.
- */
-data class Distrito(val nombre: String, val lat: Double, val lng: Double)
+data class Distrito(
+    val nombre: String,
+    val lat: Double,
+    val lng: Double
+)
 
 object Distritos {
 
@@ -48,18 +45,26 @@ object Distritos {
         Distrito("Santiago de Surco", -12.1460, -77.0060),
         Distrito("Surquillo", -12.1130, -77.0200),
         Distrito("Villa El Salvador", -12.2130, -76.9370),
-        Distrito("Villa María del Triunfo", -12.1610, -76.9400),
+        Distrito("Villa María del Triunfo", -12.1610, -76.9400)
     )
 
-    /** Busca por nombre sin distinguir mayúsculas ni tildes ("jesus maria" encuentra "Jesús María"). */
+    // Coincidencia exacta, sin distinguir mayúsculas ni tildes
     fun buscar(nombre: String): Distrito? {
         val buscado = normalizar(nombre)
         if (buscado.isEmpty()) return null
         return LISTA.firstOrNull { normalizar(it.nombre) == buscado }
     }
 
+    // Coincidencia parcial para el buscador de la lista; sin texto devuelve todos
+    fun filtrar(texto: String): List<Distrito> {
+        val buscado = normalizar(texto)
+        if (buscado.isEmpty()) return LISTA
+        return LISTA.filter { normalizar(it.nombre).contains(buscado) }
+    }
+
     private fun normalizar(texto: String): String =
-        Normalizer.normalize(texto.trim(), Normalizer.Form.NFD)
+        Normalizer.normalize(texto, Normalizer.Form.NFD)
             .replace(Regex("\\p{M}+"), "")
             .lowercase()
+            .trim()
 }
