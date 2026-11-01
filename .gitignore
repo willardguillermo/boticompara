@@ -1,5 +1,5 @@
 # ===== Variables de entorno (nunca subir credenciales) =====
-backend-usuario/.env
+.env
 .env.*
 !.env.example
 
