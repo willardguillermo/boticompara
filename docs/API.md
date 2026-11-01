@@ -118,21 +118,24 @@ El token vence a las 48 horas.
 ```json
 // 200 OK
 { "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev",
-  "telefono": "954321098", "direccion": "Av. Lima 123, Chosica", "rol": "COMPRADOR" }
+  "telefono": "954321098", "direccion": "Av. Lima 123, Chosica", "rol": "COMPRADOR",
+  "correoVerificado": true }
 ```
+`correoVerificado` (D5): `true` si el usuario ya abrió el enlace de verificación del correo (H20). El login no lo exige.
 
 ### `PUT /usuarios/me` 🔒 — H16
 ```json
 // Request (el correo y el rol NO se editan aquí)
 { "nombre": "Carlos Ramírez", "telefono": "999888777", "direccion": "Jr. Ayacucho 45" }
 ```
-Respuesta: 200 con el perfil actualizado.
+Respuesta: 200 con el perfil actualizado (mismo formato que `GET /usuarios/me`, incluido `correoVerificado`).
 
 ### `DELETE /usuarios/me` 🔒 — H19
 Elimina la cuenta del usuario logueado. Los datos se **anonimizan**, no se borra la fila:
 - `nombre` pasa a `"Usuario eliminado"` y `correo` a `eliminado-{id}@boticompara.local`.
 - `telefono` y `direccion` quedan en `null`, la contraseña deja de servir y `activo = false`.
 - Si es dueño de botica, todos sus productos pasan a `activo = false` (dejan de aparecer en las búsquedas).
+- Se borran todos sus favoritos (D1).
 
 Respuesta: 204 sin cuerpo. El token usado deja de ser válido (las siguientes llamadas responden 401).
 

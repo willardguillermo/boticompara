@@ -135,6 +135,15 @@ class FavoritoServiceTest {
     }
 
     @Test
+    void quitarTodos_borraTodosLosFavoritosDelUsuario() {
+        service.quitarTodos(42L);
+
+        ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbc).update(contains("delete from favorito where usuario_id = :usuario"), params.capture());
+        assertEquals(42L, params.getValue().getValue("usuario"));
+    }
+
+    @Test
     void quitar_siNoEstaba_noFalla() {
         assertDoesNotThrow(() -> service.quitar(42L, 999L));
     }

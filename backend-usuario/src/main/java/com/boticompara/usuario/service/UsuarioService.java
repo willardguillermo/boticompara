@@ -24,6 +24,7 @@ public class UsuarioService {
     private final BoticaRepository boticas;
     private final ProductoRepository productos;
     private final TokenUsuarioRepository tokens;
+    private final FavoritoService favoritos;
     private final PasswordEncoder encoder;
 
     private final SecureRandom azar = new SecureRandom();
@@ -46,6 +47,7 @@ public class UsuarioService {
     /**
      * H19: elimina la cuenta anonimizando los datos (la fila se conserva) y da de baja los productos de su
      * botica. Los códigos y tokens pendientes también quedan sin efecto.
+     * D1: también borra sus favoritos (como la fila del usuario no se borra, el on delete cascade no actúa).
      */
     @Transactional
     public void eliminar(Long id) {
@@ -64,6 +66,7 @@ public class UsuarioService {
 
         boticas.findByUsuarioId(id).ifPresent(b -> productos.desactivarPorBotica(b.getId()));
         tokens.invalidarPendientes(id);
+        favoritos.quitarTodos(id);
     }
 
     private Usuario buscar(Long id) {

@@ -62,6 +62,12 @@ public class FavoritoService {
                 parametros(usuarioId, productoId));
     }
 
+    /** D1: al eliminar la cuenta (H19) se borran todos sus favoritos. */
+    @Transactional
+    public void quitarTodos(Long usuarioId) {
+        jdbc.update("delete from favorito where usuario_id = :usuario", new MapSqlParameterSource("usuario", usuarioId));
+    }
+
     private static MapSqlParameterSource parametros(Long usuarioId, Long productoId) {
         return new MapSqlParameterSource("usuario", usuarioId).addValue("producto", productoId);
     }

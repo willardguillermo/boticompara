@@ -43,13 +43,13 @@ class CorreoServiceTest {
         when(proveedor.getIfAvailable()).thenReturn(sender);
         CorreoService service = new CorreoService(proveedor, "sandbox.smtp.mailtrap.io", "no-reply@boticompara.local");
 
-        assertTrue(service.enviar("jorge@farmavida.pe", "Stock bajo", "Hola"));
+        assertTrue(service.enviar("jorge@boticompara.nissidev.dev", "Stock bajo", "Hola"));
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(sender).send(captor.capture());
         SimpleMailMessage m = captor.getValue();
         assertEquals("no-reply@boticompara.local", m.getFrom());
-        assertArrayEquals(new String[]{"jorge@farmavida.pe"}, m.getTo());
+        assertArrayEquals(new String[]{"jorge@boticompara.nissidev.dev"}, m.getTo());
         assertEquals("Stock bajo", m.getSubject());
         assertEquals("Hola", m.getText());
     }

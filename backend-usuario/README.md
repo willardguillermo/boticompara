@@ -158,9 +158,15 @@ Durante el sprint cada historia se probó contra Supabase con scripts locales de
 doble filtro por nombre y botica. Resultados: alternativas 26 OK, favoritos 29 OK, desenlazar 17 OK. Esos scripts
 no se suben al repo; la evidencia de cada prueba está en la descripción del PR correspondiente.
 
-### Cuentas de prueba (`seed.sql`, contraseña `Boti2026!`)
-`rosa@boticasalud.pe` y `jorge@farmavida.pe` (dueños, boticas aprobadas), `lucia@boticanueva.pe` (botica pendiente),
-`carlos@correo.com` (comprador).
+### Cuentas de prueba (contraseña `Boti2026!`)
+Desde el Sprint 3 reciben correo real (Resend), que llega a la bandeja del equipo.
+
+| Correo | Rol | Botica |
+|---|---|---|
+| `rosa@boticompara.nissidev.dev` | Dueña | Botica Salud Total, aprobada |
+| `jorge@boticompara.nissidev.dev` | Dueño | FarmaVida, aprobada |
+| `lucia@boticompara.nissidev.dev` | Dueña | Botica Nueva Era, rechazada (sirve para probar la corrección y el reenvío, H7) |
+| `carlos@boticompara.nissidev.dev` | Comprador | — |
 
 ## Fuera de alcance (Sprint 3)
 

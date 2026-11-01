@@ -47,6 +47,9 @@ class UsuarioServiceTest {
     TokenUsuarioRepository tokens;
 
     @Mock
+    FavoritoService favoritos;
+
+    @Mock
     PasswordEncoder encoder;
 
     @InjectMocks
@@ -132,6 +135,32 @@ class UsuarioServiceTest {
         verify(tokens).invalidarPendientes(10L);
     }
 
+
+    @Test
+    void eliminarBorraSusFavoritos() {
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+
+        service.eliminar(10L);
+
+        verify(favoritos).quitarTodos(10L);
+    }
+
+    @Test
+    void obtenerDevuelveSiElCorreoEstaVerificado() {
+        Usuario u = usuario(true);
+        u.setCorreoVerificado(true);
+        when(usuarios.findById(10L)).thenReturn(Optional.of(u));
+
+        assertTrue(service.obtener(10L).correoVerificado());
+    }
+
+    @Test
+    void obtenerConCorreoSinVerificarDevuelveFalse() {
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+
+        assertFalse(service.obtener(10L).correoVerificado());
+    }
+
     @Test
     void unUsuarioInexistenteDa401SinTocarNada() {
         when(usuarios.findById(10L)).thenReturn(Optional.empty());
@@ -140,7 +169,7 @@ class UsuarioServiceTest {
 
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
         verify(usuarios, never()).save(any(Usuario.class));
-        verifyNoInteractions(boticas, productos, tokens, encoder);
+        verifyNoInteractions(boticas, productos, tokens, favoritos, encoder);
     }
 
     @Test
@@ -153,6 +182,6 @@ class UsuarioServiceTest {
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
         assertEquals("Ana Torres", u.getNombre());
         verify(usuarios, never()).save(any(Usuario.class));
-        verifyNoInteractions(boticas, productos, tokens, encoder);
+        verifyNoInteractions(boticas, productos, tokens, favoritos, encoder);
     }
 }
