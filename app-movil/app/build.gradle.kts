@@ -63,6 +63,7 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
