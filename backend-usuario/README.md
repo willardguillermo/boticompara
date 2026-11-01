@@ -95,6 +95,9 @@ búsqueda, el detalle, las alternativas y los favoritos. Un producto que deja de
   enlazado (idempotente). El producto sigue activo y conserva nombre, precio, stock y principio activo. Un producto
   de otra botica, inexistente o dado de baja responde `404`; un dueño sin botica aprobada, `403`.
 - Después de desenlazar, las alternativas del producto salen por `PRINCIPIO_ACTIVO`.
+- **D2:** al enlazar (en `POST` o `PUT` con `medicamentoId`), se guarda en el producto el principio activo del
+  medicamento, en lugar del texto enviado, y la respuesta lo devuelve. Al quitar el enlace, el producto conserva ese
+  texto. Así las alternativas por principio activo usan el mismo nombre que el catálogo maestro.
 
 ### Favoritos (H43, H44)
 - Cada usuario ve y modifica solo los suyos. Guardar dos veces el mismo producto no lo duplica (`201` la primera
@@ -164,8 +167,6 @@ no se suben al repo; la evidencia de cada prueba está en la descripción del PR
 
 ## Fuera de alcance (Sprint 3)
 
-- Validar que el principio activo del producto coincida con el del medicamento elegido (en `POST`, en `PUT` con
-  `medicamentoId` y en `PUT` sin él).
 - Que la web rellene el principio activo con el del medicamento elegido, y que muestre un botón "Quitar enlace" que
   llame a `DELETE /productos/{id}/medicamento`.
 - La carga masiva (CSV y `.xlsx`) no maneja `medicamentoId`: los productos que crea no quedan enlazados.
