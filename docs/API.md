@@ -506,11 +506,13 @@ Errores: 401 (sin token).
 { "precioObjetivo": null }
 ```
 Respuesta: 200 con el favorito (mismo formato que `GET /favoritos`).
+- El cuerpo debe traer el campo `precioObjetivo`: si falta (`{}` o sin cuerpo) responde 400. Para quitar el objetivo se envía `null` explícito.
 - `precioObjetivo` debe ser mayor que 0, con máximo 2 decimales y menor que 100000.
 - Puede ser mayor o igual al precio actual: la alerta llega en la siguiente baja que lo cumpla.
 - Cada vez que se pone, cambia o quita, se reinicia el registro del último precio avisado, para que la siguiente baja que cumpla la regla vuelva a avisar.
+- Si el producto está en sus favoritos pero ya no se ve (inactivo, sin stock, botica no aprobada, medicamento oculto o registro vencido), responde 404 con el mensaje "El producto no está disponible", igual que `POST /favoritos`.
 
-Errores: 400 (valor inválido), 401 (sin token), 404 (el producto no está en sus favoritos).
+Errores: 400 (falta `precioObjetivo` o valor inválido), 401 (sin token), 404 (no está en sus favoritos o ya no se ve).
 
 ### `DELETE /favoritos/{productoId}` 🔒 — H43, H44
 Quita el producto de los favoritos. Responde `204` sin cuerpo, también si el producto no estaba guardado.
@@ -555,7 +557,7 @@ Alertas del usuario, de la más reciente a la más antigua (máximo 100). `soloN
 ]
 ```
 `ahorro` = `precioAnterior - precioNuevo`. La alerta se conserva aunque después el producto deje de verse; para abrir su detalle se usa `GET /productos/{productoId}`, que responde 404 si ya no se ve. Sin alertas → `200` con `[]`.
-Errores: 401 (sin token).
+Errores: 400 (`soloNoLeidas` no es `true` ni `false`), 401 (sin token).
 
 ### `GET /alertas/resumen` 🔒 — H59
 Para el número sobre el ícono de Alertas.
