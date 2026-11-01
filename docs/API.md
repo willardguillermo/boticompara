@@ -510,7 +510,7 @@ Respuesta: 200 con el favorito (mismo formato que `GET /favoritos`).
 - `precioObjetivo` debe ser mayor que 0, con máximo 2 decimales y menor que 100000.
 - Puede ser mayor o igual al precio actual: la alerta llega en la siguiente baja que lo cumpla.
 - Cada vez que se pone, cambia o quita, se reinicia el registro del último precio avisado, para que la siguiente baja que cumpla la regla vuelva a avisar.
-- Si el producto está en sus favoritos pero ya no se ve (inactivo, sin stock, botica no aprobada, medicamento oculto o registro vencido), responde 404 con el mensaje "El producto no está disponible", igual que `POST /favoritos`.
+- Si el producto está en sus favoritos pero ya no se ve (inactivo, sin stock, botica no aprobada, medicamento oculto o registro vencido), responde 404 con el mensaje "El producto no está disponible", con el mismo criterio de visibilidad que `POST /favoritos`.
 
 Errores: 400 (falta `precioObjetivo` o valor inválido), 401 (sin token), 404 (no está en sus favoritos o ya no se ve).
 
