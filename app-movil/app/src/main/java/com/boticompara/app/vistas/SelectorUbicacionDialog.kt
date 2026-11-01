@@ -22,9 +22,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -194,7 +195,7 @@ private fun SelectorMapa(
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
-            controller.setZoom(if (inicial != null) 14.0 else 11.0)
+            controller.setZoom(if (inicial != null) 14.0 else 13.0)
             controller.setCenter(inicial?.let { GeoPoint(it.lat, it.lng) } ?: CENTRO_LIMA)
             overlays.add(
                 MapEventsOverlay(object : MapEventsReceiver {
@@ -218,12 +219,6 @@ private fun SelectorMapa(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            "Toca el mapa para marcar tu ubicación",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(16.dp)
-        )
         AndroidView(
             factory = { mapView },
             update = { vista ->
@@ -242,6 +237,7 @@ private fun SelectorMapa(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .clipToBounds()
         )
         Button(
             onClick = { punto?.let { onConfirmar(it.latitude, it.longitude) } },
@@ -250,7 +246,7 @@ private fun SelectorMapa(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Text("Usar este punto")
+            Text(if (punto == null) "Toca el mapa para marcar tu ubicación" else "Usar este punto")
         }
     }
 }

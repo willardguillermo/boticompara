@@ -38,17 +38,26 @@ import java.util.Locale
 private fun etiquetaRadio(radioKm: Double?): String =
     if (radioKm == null) "Sin límite" else "${radioKm.toInt()} km"
 
-// ===================== BÚSQUEDA (H22, H23, H24, H25, H26, H27, H40, H58) =====================
+// ===================== BÚSQUEDA (H22, H23, H24, H25, H26, H27, H40, H50, H58) =====================
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel = viewModel()) {
     val vm = searchViewModel
 
     // H27: pide el permiso de ubicación y, si lo dan, activa "Más cercanas"
+    // H50: si lo niegan, se abre la pantalla para elegir la ubicación a mano
     val permisoLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { resultado ->
         if (resultado.values.any { it }) vm.activarCercanas() else vm.permisoDenegado()
+    }
+    val pedirPermisoUbicacion = {
+        permisoLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
     }
 
     // Si el token venció, volver al login limpiando la navegación
@@ -64,6 +73,19 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
     LifecycleResumeEffect(Unit) {
         vm.recargarAlVolver()
         onPauseOrDispose { }
+    }
+
+    // H50: elegir o cambiar la ubicación manualmente
+    if (vm.mostrarSelector) {
+        SelectorUbicacionDialog(
+            ubicacionActual = vm.ubicacionManual,
+            onSeleccionar = { etiqueta, lat, lng -> vm.fijarUbicacionManual(etiqueta, lat, lng) },
+            onUsarGps = {
+                vm.quitarUbicacionManual()
+                if (vm.tienePermisoUbicacion()) vm.activarCercanas() else pedirPermisoUbicacion()
+            },
+            onCerrar = { vm.cerrarSelector() }
+        )
     }
 
     Scaffold(
@@ -168,13 +190,9 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                             onClick = {
                                 when {
                                     vm.ordenCercanas -> vm.desactivarCercanas()
-                                    vm.tienePermisoUbicacion() -> vm.activarCercanas()
-                                    else -> permisoLauncher.launch(
-                                        arrayOf(
-                                            Manifest.permission.ACCESS_FINE_LOCATION,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION
-                                        )
-                                    )
+                                    // H50: con ubicación manual guardada no hace falta el GPS
+                                    vm.ubicacionManual != null || vm.tienePermisoUbicacion() -> vm.activarCercanas()
+                                    else -> pedirPermisoUbicacion()
                                 }
                             },
                             label = {
@@ -190,8 +208,29 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                             shape = RoundedCornerShape(50)
                         )
                     }
+
+                    // ---------- H50: ubicación en uso y botón para cambiarla ----------
+                    Spacer(Modifier.height(8.dp))
+                    val etiquetaUbicacion = vm.ubicacionManual?.etiqueta
+                        ?: if (vm.ordenCercanas) "Tu ubicación (GPS)" else "Sin definir"
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Rounded.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Ubicación: $etiquetaUbicacion",
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = { vm.abrirSelector() }) { Text("Cambiar") }
+                    }
                     if (vm.mensajeUbicacion != null) {
-                        Spacer(Modifier.height(6.dp))
                         Text(
                             vm.mensajeUbicacion!!,
                             style = MaterialTheme.typography.labelMedium,
