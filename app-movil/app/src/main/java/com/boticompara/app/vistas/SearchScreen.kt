@@ -38,7 +38,7 @@ import java.util.Locale
 private fun etiquetaRadio(radioKm: Double?): String =
     if (radioKm == null) "Sin límite" else "${radioKm.toInt()} km"
 
-// ===================== BÚSQUEDA (H22, H23, H24, H25, H26, H27, H40, H50, H58) =====================
+// ===================== BÚSQUEDA (H22, H23, H24, H25, H26, H27, H40, H48, H50, H58) =====================
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel = viewModel()) {
@@ -239,33 +239,36 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                     }
 
                     // ---------- H58: selector de radio (solo se activa si hay ubicación) ----------
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Radio de búsqueda",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        SearchViewModel.OPCIONES_RADIO.forEach { opcion ->
-                            FilterChip(
-                                selected = vm.radioKm == opcion,
-                                onClick = { vm.onRadioChange(opcion) },
-                                enabled = vm.ordenCercanas,
-                                label = { Text(etiquetaRadio(opcion)) },
-                                shape = RoundedCornerShape(50)
+                    // En la vista de mapa se oculta para darle más espacio al mapa
+                    if (!vm.vistaMapa) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Radio de búsqueda",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            SearchViewModel.OPCIONES_RADIO.forEach { opcion ->
+                                FilterChip(
+                                    selected = vm.radioKm == opcion,
+                                    onClick = { vm.onRadioChange(opcion) },
+                                    enabled = vm.ordenCercanas,
+                                    label = { Text(etiquetaRadio(opcion)) },
+                                    shape = RoundedCornerShape(50)
+                                )
+                            }
+                        }
+                        if (!vm.ordenCercanas) {
+                            Text(
+                                "Activa Más cercanas para elegir el radio",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-                    if (!vm.ordenCercanas) {
-                        Text(
-                            "Activa Más cercanas para elegir el radio",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                     Spacer(Modifier.height(12.dp))
 
@@ -283,7 +286,7 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
-                    } else {
+                    } else if (!vm.vistaMapa) {
                         Text(
                             if (vm.productos.isNotEmpty()) "Desliza hacia abajo para actualizar los precios"
                             else "Los resultados aparecen mientras escribes",
@@ -313,26 +316,52 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                     )
                     Spacer(Modifier.height(8.dp))
 
-                    val precioMinimo = vm.productos.minOf { it.precio }
+                    // H48: alternar entre la lista y el mapa de boticas
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = !vm.vistaMapa,
+                            onClick = { vm.cambiarVista(false) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        ) { Text("Lista") }
+                        SegmentedButton(
+                            selected = vm.vistaMapa,
+                            onClick = { vm.cambiarVista(true) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        ) { Text("Mapa") }
+                    }
+                    Spacer(Modifier.height(8.dp))
 
-                    // H40: deslizar hacia abajo para actualizar
-                    PullToRefreshBox(
-                        isRefreshing = vm.isRefreshing,
-                        onRefresh = { vm.refrescar() },
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(bottom = 24.dp)
+                    if (vm.vistaMapa) {
+                        // H48: un marcador por botica; al tocarlo se abre el detalle (H28)
+                        MapaResultados(
+                            productos = vm.productos,
+                            onProductoClick = { productoId -> navController.navigate("detalle/$productoId") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        )
+                    } else {
+                        val precioMinimo = vm.productos.minOf { it.precio }
+
+                        // H40: deslizar hacia abajo para actualizar
+                        PullToRefreshBox(
+                            isRefreshing = vm.isRefreshing,
+                            onRefresh = { vm.refrescar() },
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            itemsIndexed(vm.productos, key = { _, p -> p.productoId }) { indice, producto ->
-                                ResultadoCard(
-                                    producto = producto,
-                                    // "Más barato" es el de menor precio, aunque se ordene por cercanía
-                                    esMasBarato = if (vm.ordenCercanas) producto.precio == precioMinimo else indice == 0,
-                                    onClick = { navController.navigate("detalle/${producto.productoId}") }
-                                )
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                contentPadding = PaddingValues(bottom = 24.dp)
+                            ) {
+                                itemsIndexed(vm.productos, key = { _, p -> p.productoId }) { indice, producto ->
+                                    ResultadoCard(
+                                        producto = producto,
+                                        // "Más barato" es el de menor precio, aunque se ordene por cercanía
+                                        esMasBarato = if (vm.ordenCercanas) producto.precio == precioMinimo else indice == 0,
+                                        onClick = { navController.navigate("detalle/${producto.productoId}") }
+                                    )
+                                }
                             }
                         }
                     }

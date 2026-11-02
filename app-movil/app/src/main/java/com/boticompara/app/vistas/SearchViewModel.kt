@@ -60,6 +60,14 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     var radioKm by mutableStateOf<Double?>(null)
         private set
 
+    // H48: alternar entre la lista de resultados y el mapa de boticas
+    var vistaMapa by mutableStateOf(false)
+        private set
+
+    fun cambiarVista(mapa: Boolean) {
+        vistaMapa = mapa
+    }
+
     // H50: ubicación elegida a mano (distrito o punto en el mapa); tiene prioridad sobre el GPS
     var ubicacionManual by mutableStateOf<UbicacionManual?>(null)
         private set
