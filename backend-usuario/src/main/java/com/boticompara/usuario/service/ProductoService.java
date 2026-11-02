@@ -23,10 +23,10 @@ public class ProductoService {
     @Transactional
     public ProductoResponse crear(Long usuarioId, ProductoRequest r) {
         Botica botica = boticaAprobada(usuarioId);
-        validarMedicamento(r);
+        String principioDelMedicamento = principioDelMedicamento(r);
         Producto p = new Producto();
         p.setBoticaId(botica.getId());
-        aplicar(p, r);
+        aplicar(p, r, principioDelMedicamento);
         return ProductoResponse.from(productos.save(p));
     }
 
@@ -35,8 +35,10 @@ public class ProductoService {
     public ProductoResponse actualizar(Long usuarioId, Long id, ProductoRequest r) {
         Botica botica = boticaAprobada(usuarioId);
         Producto p = propio(id, botica);
-        validarMedicamento(r);
-        aplicar(p, r);
+        String principioDelMedicamento = r.medicamentoId() != null
+                ? principioDelMedicamento(r)
+                : principioDelEnlaceActual(p);
+        aplicar(p, r, principioDelMedicamento);
         return ProductoResponse.from(productos.save(p));
     }
 
@@ -64,9 +66,10 @@ public class ProductoService {
                 .orElseThrow(() -> ApiException.notFound("Producto no encontrado"));
     }
 
-    private void aplicar(Producto p, ProductoRequest r) {
+    private void aplicar(Producto p, ProductoRequest r, String principioDelMedicamento) {
         p.setNombreComercial(r.nombreComercial().trim());
-        p.setPrincipioActivo(r.principioActivo().trim());
+        // D2: si el producto queda enlazado se guarda el principio activo del medicamento; si no, el que envía la web
+        p.setPrincipioActivo(principioDelMedicamento != null ? principioDelMedicamento : r.principioActivo().trim());
         p.setPresentacion(r.presentacion().trim());
         p.setPrecio(r.precio());
         p.setStock(r.stock());
@@ -80,11 +83,18 @@ public class ProductoService {
         }
     }
 
-    /** H31: 400 si el medicamento enviado no existe o está oculto. */
-    private void validarMedicamento(ProductoRequest r) {
-        if (r.medicamentoId() != null) {
-            medicamentos.validarEnlazable(r.medicamentoId());
-        }
+    /**
+     * H31: 400 si el medicamento enviado no existe o está oculto.
+     * D2: devuelve su principio activo; null si no se envía medicamentoId.
+     */
+    private String principioDelMedicamento(ProductoRequest r) {
+        return r.medicamentoId() == null ? null : medicamentos.principioActivoEnlazable(r.medicamentoId());
+    }
+
+
+    /** D2: sin medicamentoId se conserva el enlace, y con él el principio activo del medicamento enlazado. */
+    private String principioDelEnlaceActual(Producto p) {
+        return p.getMedicamentoId() == null ? null : medicamentos.principioActivoDe(p.getMedicamentoId());
     }
     /**
      * H31: quita el enlace del producto con el catálogo maestro. Es idempotente: si no estaba enlazado,
