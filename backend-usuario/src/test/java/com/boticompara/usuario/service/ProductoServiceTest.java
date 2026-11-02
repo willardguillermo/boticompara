@@ -220,6 +220,34 @@ class ProductoServiceTest {
     }
 
     @Test
+    void actualizarSinMedicamento_yaEnlazado_mantieneElPrincipioActivoDelMedicamento() {
+        conBoticaAprobada();
+        Producto existente = productoExistente(9);
+        existente.setMedicamentoId(12L);
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(existente));
+        when(medicamentos.principioActivoDe(12L)).thenReturn("Paracetamol");
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.actualizar(10L, 7L, requestConPrincipio("Otro texto", null));
+
+        assertEquals("Paracetamol", r.principioActivo());
+        assertEquals(12L, r.medicamentoId());
+        verify(medicamentos, never()).principioActivoEnlazable(any());
+    }
+
+    @Test
+    void actualizarSinMedicamento_sinEnlace_usaElPrincipioActivoEnviado() {
+        conBoticaAprobada();
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.actualizar(10L, 7L, requestConPrincipio("Amoxicilina", null));
+
+        assertEquals("Amoxicilina", r.principioActivo());
+        verify(medicamentos, never()).principioActivoDe(any());
+    }
+
+    @Test
     void desenlazarMedicamento_conservaElPrincipioActivoCopiado() {
         conBoticaAprobada();
         Producto existente = productoExistente(9);

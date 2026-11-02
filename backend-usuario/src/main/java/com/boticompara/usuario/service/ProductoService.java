@@ -35,7 +35,9 @@ public class ProductoService {
     public ProductoResponse actualizar(Long usuarioId, Long id, ProductoRequest r) {
         Botica botica = boticaAprobada(usuarioId);
         Producto p = propio(id, botica);
-        String principioDelMedicamento = principioDelMedicamento(r);
+        String principioDelMedicamento = r.medicamentoId() != null
+                ? principioDelMedicamento(r)
+                : principioDelEnlaceActual(p);
         aplicar(p, r, principioDelMedicamento);
         return ProductoResponse.from(productos.save(p));
     }
@@ -66,7 +68,7 @@ public class ProductoService {
 
     private void aplicar(Producto p, ProductoRequest r, String principioDelMedicamento) {
         p.setNombreComercial(r.nombreComercial().trim());
-        // D2: al enlazar se guarda el principio activo del medicamento; si no, el que envía la web
+        // D2: si el producto queda enlazado se guarda el principio activo del medicamento; si no, el que envía la web
         p.setPrincipioActivo(principioDelMedicamento != null ? principioDelMedicamento : r.principioActivo().trim());
         p.setPresentacion(r.presentacion().trim());
         p.setPrecio(r.precio());
@@ -87,6 +89,12 @@ public class ProductoService {
      */
     private String principioDelMedicamento(ProductoRequest r) {
         return r.medicamentoId() == null ? null : medicamentos.principioActivoEnlazable(r.medicamentoId());
+    }
+
+
+    /** D2: sin medicamentoId se conserva el enlace, y con él el principio activo del medicamento enlazado. */
+    private String principioDelEnlaceActual(Producto p) {
+        return p.getMedicamentoId() == null ? null : medicamentos.principioActivoDe(p.getMedicamentoId());
     }
     /**
      * H31: quita el enlace del producto con el catálogo maestro. Es idempotente: si no estaba enlazado,

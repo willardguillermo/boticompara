@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -15,7 +16,6 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
 import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -104,5 +104,19 @@ class MedicamentoServiceTest {
         verify(jdbc).query(sql.capture(), any(SqlParameterSource.class),
                 ArgumentMatchers.<RowMapper<MedicamentoService.Enlazable>>any());
         assertTrue(sql.getValue().contains("join principio_activo pa on pa.id = m.principio_activo_id"));
+    }
+
+    @Test
+    void principioActivoDe_medicamentoOculto_igualDevuelveSuPrincipioActivo() {
+        enlazableEs(List.of(new MedicamentoService.Enlazable(true, "Paracetamol")));
+
+        assertEquals("Paracetamol", service.principioActivoDe(12L));
+    }
+
+    @Test
+    void principioActivoDe_noExiste_devuelveNull() {
+        enlazableEs(List.of());
+
+        assertNull(service.principioActivoDe(99L));
     }
 }
