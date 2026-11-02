@@ -119,16 +119,28 @@ El token vence a las 48 horas.
 // 200 OK
 { "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev",
   "telefono": "954321098", "direccion": "Av. Lima 123, Chosica", "rol": "COMPRADOR",
-  "correoVerificado": true }
+  "correoVerificado": true, "notificacionesPrecio": true }
 ```
 `correoVerificado` (D5): `true` si el usuario ya abrió el enlace de verificación del correo (H20). El login no lo exige.
+`notificacionesPrecio` (H66): `true` si el usuario quiere recibir alertas de baja de precio. Por defecto `true`.
 
 ### `PUT /usuarios/me` 🔒 — H16
 ```json
 // Request (el correo y el rol NO se editan aquí)
 { "nombre": "Carlos Ramírez", "telefono": "999888777", "direccion": "Jr. Ayacucho 45" }
 ```
-Respuesta: 200 con el perfil actualizado (mismo formato que `GET /usuarios/me`, incluido `correoVerificado`).
+Respuesta: 200 con el perfil completo actualizado (mismo formato que `GET /usuarios/me`, incluidos `correoVerificado` y `notificacionesPrecio`).
+`notificacionesPrecio` **no** se cambia aquí, sino en `PUT /usuarios/me/notificaciones`.
+
+### `PUT /usuarios/me/notificaciones` 🔒 — H66
+```json
+// Request
+{ "notificacionesPrecio": false }
+```
+Respuesta: 200 con el perfil completo (mismo formato que `GET /usuarios/me`).
+Con `false` no se crean alertas de baja de precio ni se envían sus correos; las alertas que ya tiene se conservan.
+Con `true` vuelven a crearse desde la siguiente baja de precio (no se recuperan las de mientras estuvo apagado).
+Errores: 400 (falta `notificacionesPrecio` o no es booleano), 401 (sin token).
 
 ### `DELETE /usuarios/me` 🔒 — H19
 Elimina la cuenta del usuario logueado. Los datos se **anonimizan**, no se borra la fila:
@@ -136,6 +148,7 @@ Elimina la cuenta del usuario logueado. Los datos se **anonimizan**, no se borra
 - `telefono` y `direccion` quedan en `null`, la contraseña deja de servir y `activo = false`.
 - Si es dueño de botica, todos sus productos pasan a `activo = false` (dejan de aparecer en las búsquedas).
 - Se borran todos sus favoritos (D1).
+- Se borran todas sus alertas de precio (H59).
 
 Respuesta: 204 sin cuerpo. El token usado deja de ser válido (las siguientes llamadas responden 401).
 
@@ -441,7 +454,7 @@ Errores: 400 (`id` no numérico), 404 (el producto consultado no existe o no es 
 
 ## 6. Favoritos (cualquier usuario con sesión)
 
-Productos que el comprador guarda para volver a verlos. Los tres endpoints piden token (cualquier rol) y cada usuario solo ve y modifica sus propios favoritos.
+Productos que el comprador guarda para volver a verlos. Todos los endpoints piden token (cualquier rol) y cada usuario solo ve y modifica sus propios favoritos.
 
 ### `POST /favoritos` 🔒 — H43, H44
 ```json
@@ -461,9 +474,11 @@ Productos que el comprador guarda para volver a verlos. Los tres endpoints piden
   "boticaNombre": "FarmaVida",
   "boticaDireccion": "Jr. Trujillo 210",
   "boticaDistrito": "Lurigancho-Chosica",
-  "fecha": "2026-10-23T15:30:00.123456Z"
+  "fecha": "2026-10-23T15:30:00.123456Z",
+  "precioObjetivo": null
 }
 ```
+`precioObjetivo` (H60): precio en soles al que el usuario quiere que le avisen; `null` si no puso ninguno.
 Solo se pueden guardar productos que el comprador ve hoy: activos, con stock, de boticas `APROBADO` y sin medicamento oculto ni registro sanitario vencido. Guardar dos veces el mismo producto no lo duplica.
 Errores: 400 (falta `productoId`), 401 (sin token), 404 (el producto no existe o no se ve).
 
@@ -475,15 +490,90 @@ Devuelve los favoritos del usuario, del más reciente al más antiguo, con los m
   { "productoId": 9, "nombreComercial": "Paracetamol Genérico", "principioActivo": "Paracetamol",
     "presentacion": "Tableta 500 mg x 10", "precio": 2.20, "stock": 90, "boticaId": 2,
     "boticaNombre": "FarmaVida", "boticaDireccion": "Jr. Trujillo 210",
-    "boticaDistrito": "Lurigancho-Chosica", "fecha": "2026-10-23T15:30:00.123456Z" }
+    "boticaDistrito": "Lurigancho-Chosica", "fecha": "2026-10-23T15:30:00.123456Z",
+    "precioObjetivo": null }
 ]
 ```
+`precioObjetivo` (H60): precio en soles al que el usuario quiere que le avisen; `null` si no puso ninguno.
 Sin favoritos → `200` con `[]`.
 Errores: 401 (sin token).
+
+### `PUT /favoritos/{productoId}/precio-objetivo` 🔒 — H60
+```json
+// Request: poner o cambiar
+{ "precioObjetivo": 7.50 }
+// Request: quitar
+{ "precioObjetivo": null }
+```
+Respuesta: 200 con el favorito (mismo formato que `GET /favoritos`).
+- El cuerpo debe traer el campo `precioObjetivo`: si falta (`{}` o sin cuerpo) responde 400. Para quitar el objetivo se envía `null` explícito.
+- `precioObjetivo` debe ser mayor que 0, con máximo 2 decimales y menor que 100000.
+- Puede ser mayor o igual al precio actual: la alerta llega en la siguiente baja que lo cumpla.
+- Cada vez que se pone, cambia o quita, se reinicia el registro del último precio avisado, para que la siguiente baja que cumpla la regla vuelva a avisar.
+- Si el producto está en sus favoritos pero ya no se ve (inactivo, sin stock, botica no aprobada, medicamento oculto o registro vencido), responde 404 con el mensaje "El producto no está disponible", con el mismo criterio de visibilidad que `POST /favoritos`.
+
+Errores: 400 (falta `precioObjetivo` o valor inválido), 401 (sin token), 404 (no está en sus favoritos o ya no se ve).
 
 ### `DELETE /favoritos/{productoId}` 🔒 — H43, H44
 Quita el producto de los favoritos. Responde `204` sin cuerpo, también si el producto no estaba guardado.
 Errores: 400 (`productoId` no numérico), 401 (sin token).
+
+---
+
+## 7. Alertas de precio (cualquier usuario con sesión)
+
+Avisos de que bajó el precio de un producto que el usuario tiene en favoritos (H59, H61). Se ven en la pantalla "Alertas" de la app y llegan por correo. No hay notificaciones push en este sprint.
+
+### Cuándo se crea una alerta — H59, H60, H61, H66
+No es un endpoint. Se evalúa cada vez que cambia el precio de un producto, en `PUT /productos/{id}` y en `POST /productos/carga-masiva`:
+1. Solo si el precio **baja** (nuevo < anterior). Si sube o no cambia, no se crea nada.
+2. Solo si el producto se ve en la búsqueda: activo, con stock, de botica `APROBADO`, sin medicamento oculto ni registro vencido.
+3. Para cada usuario que lo tiene en favoritos, **activo** y con `notificacionesPrecio = true`:
+   - **Sin precio objetivo:** se crea una alerta en cada baja.
+   - **Con precio objetivo:** solo si el precio nuevo es **menor o igual** al objetivo y menor que el último precio que ya se le avisó (o si todavía no se le avisó nada).
+4. Al crear la alerta se guarda el precio nuevo como último precio avisado de ese favorito.
+
+**Correo (H61):** se envía después de guardar el cambio de precio y en segundo plano, así que no hace más lenta la respuesta. Uno por alerta en `PUT /productos/{id}`. En la carga masiva, **un solo correo por usuario** con todas sus bajas. Asunto de ejemplo: "Panadol bajó a S/ 7.50 en FarmaVida". Si el correo falla, la alerta igual queda guardada.
+
+Ejemplo: Carlos guarda Panadol de FarmaVida (S/ 7.90) con precio objetivo S/ 7.50. Si FarmaVida lo baja a S/ 7.70 no hay alerta (no llega al objetivo); si lo baja a S/ 7.50 se crea la alerta y le llega el correo; si luego vuelve a S/ 7.50 desde un precio mayor, no se repite el aviso (no es menor que el último avisado).
+
+### `GET /alertas?soloNoLeidas=true` 🔒 — H59
+Alertas del usuario, de la más reciente a la más antigua (máximo 100). `soloNoLeidas` es opcional (por defecto `false`).
+```json
+// 200 OK
+[
+  {
+    "id": 31,
+    "productoId": 14,
+    "nombreComercial": "Panadol",
+    "presentacion": "Tableta 500 mg x 10",
+    "boticaNombre": "FarmaVida",
+    "precioAnterior": 7.90,
+    "precioNuevo": 7.50,
+    "ahorro": 0.40,
+    "leida": false,
+    "fecha": "2026-11-05T14:20:00.123456Z"
+  }
+]
+```
+`ahorro` = `precioAnterior - precioNuevo`. La alerta se conserva aunque después el producto deje de verse; para abrir su detalle se usa `GET /productos/{productoId}`, que responde 404 si ya no se ve. Sin alertas → `200` con `[]`.
+Errores: 400 (`soloNoLeidas` no es `true` ni `false`), 401 (sin token).
+
+### `GET /alertas/resumen` 🔒 — H59
+Para el número sobre el ícono de Alertas.
+```json
+// 200 OK
+{ "noLeidas": 2 }
+```
+Errores: 401 (sin token).
+
+### `PUT /alertas/{id}/leida` 🔒 — H59
+Marca una alerta como leída. Responde `204` sin cuerpo, también si ya estaba leída.
+Errores: 400 (`id` no numérico), 401 (sin token), 404 (la alerta no existe o es de otro usuario).
+
+### `PUT /alertas/leidas` 🔒 — H59
+Marca como leídas todas las alertas del usuario. Responde `204` sin cuerpo.
+Errores: 401 (sin token).
 
 ---
 
