@@ -154,12 +154,12 @@ private fun ajustarVista(mapView: MapView, marcadores: List<MarcadorBotica>) {
         }
         else -> {
             val puntos = marcadores.map { GeoPoint(it.lat, it.lng) }
-            val caja = BoundingBox.fromGeoPoints(puntos)
-            if (caja.latitudeSpan == 0.0 && caja.longitudeSpan == 0.0) {
+            if (puntos.distinct().size == 1) {
+                // Una sola ubicación: no hay rango que ajustar, se acerca a ese punto
                 mapView.controller.setZoom(15.0)
                 mapView.controller.setCenter(puntos.first())
             } else {
-                mapView.zoomToBoundingBox(caja, false, (56 * densidad).toInt())
+                mapView.zoomToBoundingBox(BoundingBox.fromGeoPoints(puntos), false, (56 * densidad).toInt())
             }
         }
     }
