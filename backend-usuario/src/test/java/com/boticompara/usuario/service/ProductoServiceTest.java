@@ -126,7 +126,7 @@ class ProductoServiceTest {
         ProductoResponse r = service.crear(10L, request(null));
 
         assertNull(r.medicamentoId());
-        verify(medicamentos, never()).validarEnlazable(any());
+        verify(medicamentos, never()).principioActivoEnlazable(any());
     }
 
     @Test
@@ -137,14 +137,14 @@ class ProductoServiceTest {
         ProductoResponse r = service.crear(10L, request(null, 12L));
 
         assertEquals(12L, r.medicamentoId());
-        verify(medicamentos).validarEnlazable(12L);
+        verify(medicamentos).principioActivoEnlazable(12L);
     }
 
     @Test
     void crearConMedicamentoInvalido_noGuarda() {
         conBoticaAprobada();
         doThrow(ApiException.badRequest("El medicamento no existe en el catálogo"))
-                .when(medicamentos).validarEnlazable(99L);
+                .when(medicamentos).principioActivoEnlazable(99L);
 
         ApiException ex = assertThrows(ApiException.class, () -> service.crear(10L, request(null, 99L)));
 
@@ -176,7 +176,89 @@ class ProductoServiceTest {
         ProductoResponse r = service.actualizar(10L, 7L, request(null, 15L));
 
         assertEquals(15L, r.medicamentoId());
-        verify(medicamentos).validarEnlazable(15L);
+        verify(medicamentos).principioActivoEnlazable(15L);
+    }
+
+    // ---------- D2: al enlazar se copia el principio activo del medicamento ----------
+
+    private ProductoRequest requestConPrincipio(String principioActivo, Long medicamentoId) {
+        return new ProductoRequest("Panadol", principioActivo, "Tableta 500 mg x 10",
+                new BigDecimal("8.50"), 40, null, medicamentoId);
+    }
+
+    @Test
+    void crearConMedicamento_copiaElPrincipioActivoDelMedicamento() {
+        conBoticaAprobada();
+        when(medicamentos.principioActivoEnlazable(12L)).thenReturn("Paracetamol");
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.crear(10L, requestConPrincipio("paracetamol 500", 12L));
+
+        assertEquals("Paracetamol", r.principioActivo());
+    }
+
+    @Test
+    void actualizarConMedicamento_copiaElPrincipioActivoDelMedicamento() {
+        conBoticaAprobada();
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(medicamentos.principioActivoEnlazable(15L)).thenReturn("Ibuprofeno");
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.actualizar(10L, 7L, requestConPrincipio("Paracetamol", 15L));
+
+        assertEquals("Ibuprofeno", r.principioActivo());
+    }
+
+    @Test
+    void crearSinMedicamento_usaElPrincipioActivoEnviado() {
+        conBoticaAprobada();
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.crear(10L, requestConPrincipio("  Amoxicilina ", null));
+
+        assertEquals("Amoxicilina", r.principioActivo());
+    }
+
+    @Test
+    void actualizarSinMedicamento_yaEnlazado_mantieneElPrincipioActivoDelMedicamento() {
+        conBoticaAprobada();
+        Producto existente = productoExistente(9);
+        existente.setMedicamentoId(12L);
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(existente));
+        when(medicamentos.principioActivoDe(12L)).thenReturn("Paracetamol");
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.actualizar(10L, 7L, requestConPrincipio("Otro texto", null));
+
+        assertEquals("Paracetamol", r.principioActivo());
+        assertEquals(12L, r.medicamentoId());
+        verify(medicamentos, never()).principioActivoEnlazable(any());
+    }
+
+    @Test
+    void actualizarSinMedicamento_sinEnlace_usaElPrincipioActivoEnviado() {
+        conBoticaAprobada();
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProductoResponse r = service.actualizar(10L, 7L, requestConPrincipio("Amoxicilina", null));
+
+        assertEquals("Amoxicilina", r.principioActivo());
+        verify(medicamentos, never()).principioActivoDe(any());
+    }
+
+    @Test
+    void desenlazarMedicamento_conservaElPrincipioActivoCopiado() {
+        conBoticaAprobada();
+        Producto existente = productoExistente(9);
+        existente.setMedicamentoId(15L);
+        existente.setPrincipioActivo("Ibuprofeno");
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(existente));
+
+        service.desenlazarMedicamento(10L, 7L);
+
+        assertNull(existente.getMedicamentoId());
+        assertEquals("Ibuprofeno", existente.getPrincipioActivo());
     }
 
 

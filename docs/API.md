@@ -273,7 +273,7 @@ Errores: 400 (`q` de menos de 2 caracteres).
 ```
 Respuesta: 201 con el producto creado. Validaciones: `precio > 0`, `stock >= 0`, textos obligatorios. `stockMinimo` es opcional y debe ser `>= 0`: al crear queda en 5 si no se envía, y al editar con `PUT` se conserva el valor actual.
 `medicamentoId` es opcional (H31): enlaza el producto con un medicamento del catálogo maestro, elegido con `GET /medicamentos`. Si el medicamento no existe o está oculto → 400.
-**Regla D2:** al enlazar (en `POST` o `PUT`), el backend copia el nombre del principio activo del medicamento a `principioActivo` del producto, y la respuesta devuelve ese valor actualizado. Al quitar el enlace con `DELETE /productos/{id}/medicamento`, el producto conserva ese texto.
+**Regla D2:** mientras el producto esté enlazado, su `principioActivo` es el del medicamento. Al enlazar (en `POST` o `PUT` con `medicamentoId`) y también en un `PUT` sin `medicamentoId` sobre un producto ya enlazado, el backend guarda el nombre del principio activo del medicamento e ignora el texto enviado; la respuesta devuelve ese valor. Al quitar el enlace con `DELETE /productos/{id}/medicamento`, el producto conserva ese texto, y desde entonces se usa el que envía la web.
 
 ### `PUT /productos/{id}` 🔒 — H9
 Mismo cuerpo que el POST. Si no se envía `medicamentoId`, se conserva el enlace actual (H31); para quitarlo se usa `DELETE /productos/{id}/medicamento` (enviar `null` no lo borra). Respuesta: 200 con el producto actualizado. 404 si no es de su botica.
