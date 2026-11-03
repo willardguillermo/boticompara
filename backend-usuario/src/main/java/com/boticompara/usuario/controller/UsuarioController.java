@@ -5,6 +5,7 @@ import com.boticompara.usuario.dto.PerfilResponse;
 import com.boticompara.usuario.security.UsuarioAutenticado;
 import com.boticompara.usuario.service.UsuarioService;
 import jakarta.validation.Valid;
+import com.boticompara.usuario.dto.NotificacionesRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,6 +27,13 @@ public class UsuarioController {
     public PerfilResponse editar(@AuthenticationPrincipal UsuarioAutenticado yo,
                                  @Valid @RequestBody PerfilRequest request) {
         return usuarios.actualizar(yo.id(), request);
+    }
+
+    /** H66: el perfil completo con la preferencia actualizada. */
+    @PutMapping("/notificaciones")
+    public PerfilResponse notificaciones(@AuthenticationPrincipal UsuarioAutenticado yo,
+                                         @Valid @RequestBody NotificacionesRequest request) {
+        return usuarios.cambiarNotificaciones(yo.id(), request.notificacionesPrecio());
     }
 
     /** H19: anonimiza la cuenta. El token usado deja de ser válido. */

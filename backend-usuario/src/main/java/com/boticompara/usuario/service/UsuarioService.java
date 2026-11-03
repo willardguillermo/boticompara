@@ -44,6 +44,14 @@ public class UsuarioService {
         return PerfilResponse.from(usuarios.save(u));
     }
 
+    /** H66: activa o desactiva las alertas de baja de precio. Las alertas que ya tiene se conservan. */
+    @Transactional
+    public PerfilResponse cambiarNotificaciones(Long id, boolean notificacionesPrecio) {
+        Usuario u = buscar(id);
+        u.setNotificacionesPrecio(notificacionesPrecio);
+        return PerfilResponse.from(usuarios.save(u));
+    }
+
     /**
      * H19: elimina la cuenta anonimizando los datos (la fila se conserva) y da de baja los productos de su
      * botica. Los códigos y tokens pendientes también quedan sin efecto.
