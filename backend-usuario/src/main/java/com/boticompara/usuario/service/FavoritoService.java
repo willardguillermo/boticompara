@@ -8,14 +8,17 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.List;
 
 /**
  * H43 y H44: favoritos del comprador. Se leen de la misma vista y con los mismos filtros que la búsqueda,
  * así que un producto que deja de verse (sin stock, oculto, con registro vencido...) no sale en la lista,
  * pero su fila en favorito se conserva y reaparece si vuelve a estar disponible.
+ * H60: cada favorito trae su precio objetivo.
  */
 @Service
 @RequiredArgsConstructor
@@ -23,7 +26,7 @@ public class FavoritoService {
 
     private static final String SELECT = "select v.producto_id, v.nombre_comercial, v.principio_activo, "
             + "v.presentacion, v.precio, v.stock, v.botica_id, v.botica_nombre, v.botica_direccion, "
-            + "v.botica_distrito, f.fecha "
+            + "v.botica_distrito, f.fecha, f.precio_objetivo "
             + "from favorito f join v_producto_busqueda v on v.producto_id = f.producto_id "
             + "where f.usuario_id = :usuario and " + BusquedaService.FILTRO_VISIBLE;
 
@@ -68,6 +71,27 @@ public class FavoritoService {
         jdbc.update("delete from favorito where usuario_id = :usuario", new MapSqlParameterSource("usuario", usuarioId));
     }
 
+    /**
+     * H60: pone, cambia o quita (null) el precio objetivo de un favorito. Siempre reinicia ultimo_precio_avisado,
+     * para que la siguiente baja que cumpla la regla vuelva a avisar. 404 si no está en sus favoritos, o si el
+     * producto ya no se ve; en ese caso la transacción deshace el cambio.
+     */
+    @Transactional
+    public FavoritoResponse cambiarPrecioObjetivo(Long usuarioId, Long productoId, BigDecimal precioObjetivo) {
+        int cambiados = jdbc.update("update favorito set precio_objetivo = :objetivo, ultimo_precio_avisado = null "
+                        + "where usuario_id = :usuario and producto_id = :producto",
+                parametros(usuarioId, productoId).addValue("objetivo", precioObjetivo, Types.NUMERIC));
+        if (cambiados == 0) {
+            throw ApiException.notFound("El producto no está en tus favoritos");
+        }
+        List<FavoritoResponse> filas = jdbc.query(SELECT + " and f.producto_id = :producto",
+                parametros(usuarioId, productoId), (rs, i) -> favorito(rs));
+        if (filas.isEmpty()) {
+            throw ApiException.notFound("El producto no está disponible");
+        }
+        return filas.get(0);
+    }
+
     private static MapSqlParameterSource parametros(Long usuarioId, Long productoId) {
         return new MapSqlParameterSource("usuario", usuarioId).addValue("producto", productoId);
     }
@@ -84,6 +108,7 @@ public class FavoritoService {
                 rs.getString("botica_nombre"),
                 rs.getString("botica_direccion"),
                 rs.getString("botica_distrito"),
-                rs.getTimestamp("fecha").toInstant());
+                rs.getTimestamp("fecha").toInstant(),
+                rs.getBigDecimal("precio_objetivo"));
     }
 }

@@ -7,6 +7,9 @@ import com.boticompara.usuario.service.FavoritoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import com.boticompara.usuario.util.PrecioObjetivo;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -40,6 +43,13 @@ public class FavoritoController {
     @GetMapping
     public List<FavoritoResponse> listar(@AuthenticationPrincipal UsuarioAutenticado yo) {
         return favoritos.listar(yo.id());
+    }
+
+    /** H60: { "precioObjetivo": 7.50 } lo pone o cambia; { "precioObjetivo": null } lo quita. */
+    @PutMapping("/{productoId}/precio-objetivo")
+    public FavoritoResponse precioObjetivo(@AuthenticationPrincipal UsuarioAutenticado yo,
+                                           @PathVariable Long productoId, @RequestBody JsonNode cuerpo) {
+        return favoritos.cambiarPrecioObjetivo(yo.id(), productoId, PrecioObjetivo.leer(cuerpo));
     }
 
     @DeleteMapping("/{productoId}")
