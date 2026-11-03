@@ -39,6 +39,8 @@ data class ProductoResponse(
     val boticaNombre: String,
     val boticaDireccion: String,
     val boticaDistrito: String,
+    val boticaLatitud: Double? = null,    // H48: null si la botica no registró ubicación
+    val boticaLongitud: Double? = null,
     val distanciaKm: Double? = null   // H27: null si no se envió la ubicación
 )
 
