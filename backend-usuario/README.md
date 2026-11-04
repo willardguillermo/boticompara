@@ -37,7 +37,7 @@ Si el puerto 8080 ya está ocupado, hay una instancia vieja corriendo: cerrarla 
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE` | Conexión a Supabase | La API no arranca |
 | `JWT_SECRET` | Firma de los JWT (mínimo 32 caracteres, duran 24 h) | La API no arranca |
 | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET_LICENCIAS` | Licencias en Storage privado (H4) | La API arranca, pero subir la licencia responde 503 |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Correos de H12, H17 y H20 (en desarrollo, sandbox de Mailtrap) | La API arranca, pero no envía correos |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Correos de H12, H17 y H20 (Resend por SMTP, ver `../.env.example`) | La API arranca, pero no envía correos |
 | `RUC_API_URL`, `RUC_API_TOKEN` | Consulta del RUC en SUNAT con Decolecta (H2) | El RUC solo se valida localmente |
 | `ALERTA_STOCK_CRON`, `APP_BASE_URL` | Opcionales: horario de la alerta y URL pública de los enlaces de correo | Valores por defecto (8:00 hora de Lima; `http://localhost:8080/api`) |
 
@@ -53,6 +53,7 @@ Detalle completo, con ejemplos de petición y respuesta, en [`../docs/API.md`](.
 | | `POST /auth/recuperar`, `POST /auth/restablecer` | H17 | Público |
 | | `GET /auth/verificar?token=` | H20 | Público |
 | Perfil | `GET`, `PUT`, `DELETE /usuarios/me` | H16, H19 | 🔒 cualquier rol |
+| | `PUT /usuarios/me/notificaciones` | H66 | 🔒 cualquier rol |
 | Botica | `GET /boticas/validar-ruc/{ruc}` | H2 | Público (con token consulta SUNAT) |
 | | `POST /boticas`, `GET /boticas/mia`, `PUT /boticas/mia` | H1, H2, H3, H5, H7 | 🔒 dueño |
 | | `POST /boticas/mia/licencia` | H4 | 🔒 dueño |
@@ -65,6 +66,7 @@ Detalle completo, con ejemplos de petición y respuesta, en [`../docs/API.md`](.
 | | `GET /productos/{id}` | H28 | Público |
 | | `GET /productos/{id}/alternativas` | H36, H37, H38, H41, H42 | Público |
 | Favoritos | `POST /favoritos`, `GET /favoritos`, `DELETE /favoritos/{productoId}` | H43, H44 | 🔒 cualquier rol |
+| | `PUT /favoritos/{productoId}/precio-objetivo` | H60 | 🔒 cualquier rol |
 
 Todos los errores usan el mismo formato, descrito al inicio de `API.md`.
 
@@ -100,12 +102,21 @@ búsqueda, el detalle, las alternativas y los favoritos. Un producto que deja de
   quitar el enlace, el producto conserva ese texto y desde entonces se usa el que envía la web. Así las alternativas
   por principio activo usan el mismo nombre que el catálogo maestro.
 
-### Favoritos (H43, H44)
+### Favoritos (H43, H44, H60)
 - Cada usuario ve y modifica solo los suyos. Guardar dos veces el mismo producto no lo duplica (`201` la primera
   vez, `200` después). Quitar uno que no estaba también responde `204`.
 - Solo se pueden guardar productos que el comprador ve hoy. Si un favorito deja de verse (por ejemplo, se queda sin
   stock), sale de la lista pero la fila se conserva y vuelve a aparecer cuando el producto se ve otra vez.
 - La lista va del más reciente al más antiguo. Si se borra el producto, sus favoritos se borran solos (`on delete cascade`).
+- **H60:** cada favorito trae `precioObjetivo` (`null` si no hay). `PUT /favoritos/{productoId}/precio-objetivo` lo
+  pone, cambia o quita (con `null`); el cuerpo se lee como `JsonNode` para distinguir el campo ausente (`400`) de
+  `null`. Cada cambio reinicia `ultimo_precio_avisado`. Si el producto ya no se ve responde `404` y la transacción
+  deshace el cambio.
+
+### Preferencia de alertas de precio (H66)
+- `notificacionesPrecio` viene en el perfil y por defecto es `true`. Solo cambia con `PUT /usuarios/me/notificaciones`;
+  `PUT /usuarios/me` no lo toca. Falta o `null` responde `400`.
+- Con `false` no se crean alertas de baja de precio ni se envían sus correos (H59, H61).
 
 ### Otras reglas
 - `ddl-auto=validate`: la API no crea ni modifica tablas.
