@@ -527,7 +527,7 @@ Avisos de que bajó el precio de un producto que el usuario tiene en favoritos (
 ### Cuándo se crea una alerta — H59, H60, H61, H66
 No es un endpoint. Se evalúa cada vez que cambia el precio de un producto, en `PUT /productos/{id}` y en `POST /productos/carga-masiva`:
 1. Solo si el precio **baja** (nuevo < anterior). Si sube o no cambia, no se crea nada.
-2. Solo si el producto se ve en la búsqueda: activo, con stock, de botica `APROBADO`, sin medicamento oculto ni registro vencido.
+2. Solo si el producto se ve en la búsqueda **después del cambio**: activo, con stock, de botica `APROBADO`, sin medicamento oculto ni registro vencido. Si el mismo `PUT` baja el precio y deja el stock en 0, no hay alerta.
 3. Para cada usuario que lo tiene en favoritos, **activo** y con `notificacionesPrecio = true`:
    - **Sin precio objetivo:** se crea una alerta en cada baja.
    - **Con precio objetivo:** solo si el precio nuevo es **menor o igual** al objetivo y menor que el último precio que ya se le avisó (o si todavía no se le avisó nada).
