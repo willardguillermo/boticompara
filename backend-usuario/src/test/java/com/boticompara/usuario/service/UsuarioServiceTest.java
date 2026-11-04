@@ -50,6 +50,9 @@ class UsuarioServiceTest {
     FavoritoService favoritos;
 
     @Mock
+    AlertaService alertas;
+
+    @Mock
     PasswordEncoder encoder;
 
     @InjectMocks
@@ -146,6 +149,15 @@ class UsuarioServiceTest {
     }
 
     @Test
+    void eliminarBorraSusAlertasDePrecio() {
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+
+        service.eliminar(10L);
+
+        verify(alertas).borrarTodas(10L);
+    }
+
+    @Test
     void obtenerDevuelveSiElCorreoEstaVerificado() {
         Usuario u = usuario(true);
         u.setCorreoVerificado(true);
@@ -169,7 +181,7 @@ class UsuarioServiceTest {
 
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
         verify(usuarios, never()).save(any(Usuario.class));
-        verifyNoInteractions(boticas, productos, tokens, favoritos, encoder);
+        verifyNoInteractions(boticas, productos, tokens, favoritos, alertas, encoder);
     }
 
     @Test
@@ -182,6 +194,6 @@ class UsuarioServiceTest {
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
         assertEquals("Ana Torres", u.getNombre());
         verify(usuarios, never()).save(any(Usuario.class));
-        verifyNoInteractions(boticas, productos, tokens, favoritos, encoder);
+        verifyNoInteractions(boticas, productos, tokens, favoritos, alertas, encoder);
     }
 }

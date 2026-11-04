@@ -25,6 +25,7 @@ public class UsuarioService {
     private final ProductoRepository productos;
     private final TokenUsuarioRepository tokens;
     private final FavoritoService favoritos;
+    private final AlertaService alertas;
     private final PasswordEncoder encoder;
 
     private final SecureRandom azar = new SecureRandom();
@@ -67,6 +68,7 @@ public class UsuarioService {
         boticas.findByUsuarioId(id).ifPresent(b -> productos.desactivarPorBotica(b.getId()));
         tokens.invalidarPendientes(id);
         favoritos.quitarTodos(id);
+        alertas.borrarTodas(id);   // H59: también sus alertas de precio
     }
 
     private Usuario buscar(Long id) {

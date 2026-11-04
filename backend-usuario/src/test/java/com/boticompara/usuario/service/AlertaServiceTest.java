@@ -235,4 +235,13 @@ class AlertaServiceTest {
         assertEquals(4L, update.getValue().getValue("usuario"));
         assertEquals(14L, update.getValue().getValue("producto"));
     }
+
+    @Test
+    void borrarTodas_soloLasDelUsuario() {
+        service.borrarTodas(42L);
+
+        ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbc).update(eq("delete from alerta_precio where usuario_id = :usuario"), params.capture());
+        assertEquals(42L, params.getValue().getValue("usuario"));
+    }
 }

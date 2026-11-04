@@ -86,6 +86,13 @@ public class AlertaService {
             default -> throw ApiException.badRequest("soloNoLeidas debe ser true o false");
         };
     }
+
+    /** H59 y D1: al eliminar la cuenta (H19) se borran todas sus alertas. */
+    @Transactional
+    public void borrarTodas(Long usuarioId) {
+        jdbc.update("delete from alerta_precio where usuario_id = :usuario",
+                new MapSqlParameterSource("usuario", usuarioId));
+    }
     /** Favorito al que podría avisarse de una baja de precio. */
     record Interesado(Long usuarioId, BigDecimal precioObjetivo, BigDecimal ultimoPrecioAvisado) {
     }
