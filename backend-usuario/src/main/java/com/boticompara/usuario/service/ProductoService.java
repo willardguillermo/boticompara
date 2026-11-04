@@ -5,6 +5,7 @@ import com.boticompara.usuario.dto.ProductoResponse;
 import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
+import java.math.BigDecimal;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class ProductoService {
     private final BoticaRepository boticas;
     private final ProductoRepository productos;
     private final MedicamentoService medicamentos;
+    private final AlertaService alertas;
 
     /** H8 */
     @Transactional
@@ -35,11 +37,19 @@ public class ProductoService {
     public ProductoResponse actualizar(Long usuarioId, Long id, ProductoRequest r) {
         Botica botica = boticaAprobada(usuarioId);
         Producto p = propio(id, botica);
+        BigDecimal precioAnterior = p.getPrecio();
         String principioDelMedicamento = r.medicamentoId() != null
                 ? principioDelMedicamento(r)
                 : principioDelEnlaceActual(p);
         aplicar(p, r, principioDelMedicamento);
-        return ProductoResponse.from(productos.save(p));
+        Producto guardado = productos.save(p);
+        // H59: si bajó el precio, las alertas se crean en la misma transacción. El flush deja el cambio en la BD
+        // para que la vista de búsqueda (JDBC) vea el producto ya actualizado (stock, activo...).
+        if (guardado.getPrecio().compareTo(precioAnterior) < 0) {
+            productos.flush();
+            alertas.registrarBaja(guardado.getId(), precioAnterior, guardado.getPrecio());
+        }
+        return ProductoResponse.from(guardado);
     }
 
     /** H10: baja lógica, el registro se conserva con activo = false. */

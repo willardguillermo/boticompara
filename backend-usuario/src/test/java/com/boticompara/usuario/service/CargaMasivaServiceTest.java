@@ -7,6 +7,9 @@ import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
+import org.mockito.InOrder;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -40,6 +43,9 @@ class CargaMasivaServiceTest {
 
     @Mock
     ProductoRepository productos;
+
+    @Mock
+    AlertaService alertas;
 
     @Captor
     ArgumentCaptor<List<Producto>> guardados;
@@ -190,5 +196,37 @@ class CargaMasivaServiceTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
         verifyNoInteractions(productos);
+    }
+
+    // ---------- H59: alertas cuando baja el precio ----------
+
+    @Test
+    void registraLaBajaSoloDeLosExistentesQueBajanDePrecio() {
+        conBotica("APROBADO");
+        Producto panadol = producto(7L, "Panadol", "Tableta 500 mg x 10", "8.50", 40, 5);
+        Producto ibuprofeno = producto(8L, "Ibuprofeno", "Tableta 400 mg x 10", "3.00", 40, 5);
+        conCatalogo(panadol, ibuprofeno);
+
+        service.cargar(10L, csv(CAB,
+                "Panadol,Paracetamol,Tableta 500 mg x 10,7.90,40,",
+                "Ibuprofeno,Ibuprofeno,Tableta 400 mg x 10,3.50,40,",
+                "Nuevo,Principio,Caja,1.00,5,"));
+
+        InOrder orden = inOrder(productos, alertas);
+        orden.verify(productos).saveAll(any());
+        orden.verify(productos).flush();
+        orden.verify(alertas).registrarBaja(7L, new BigDecimal("8.50"), new BigDecimal("7.90"));
+        verifyNoMoreInteractions(alertas);
+    }
+
+    @Test
+    void sinBajasDePrecio_noRegistraAlertas() {
+        conBotica("APROBADO");
+        conCatalogo(producto(7L, "Panadol", "Tableta 500 mg x 10", "8.50", 40, 5));
+
+        service.cargar(10L, csv(CAB, "Panadol,Paracetamol,Tableta 500 mg x 10,8.50,10,"));
+
+        verifyNoInteractions(alertas);
+        verify(productos, never()).flush();
     }
 }

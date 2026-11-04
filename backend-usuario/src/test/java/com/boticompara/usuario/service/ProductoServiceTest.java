@@ -6,6 +6,9 @@ import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
 import org.springframework.http.HttpStatus;
+import org.mockito.InOrder;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
@@ -38,6 +41,9 @@ class ProductoServiceTest {
 
     @Mock
     MedicamentoService medicamentos;
+
+    @Mock
+    AlertaService alertas;
 
     @InjectMocks
     ProductoService service;
@@ -313,5 +319,40 @@ class ProductoServiceTest {
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
         verify(productos, never()).findByIdAndBoticaIdAndActivoTrue(any(), any());
         verify(productos, never()).save(any(Producto.class));
+    }
+
+
+    // ---------- H59: alertas cuando baja el precio ----------
+
+    private ProductoRequest requestConPrecio(String precio) {
+        return new ProductoRequest("Panadol", "Paracetamol", "Tableta 500 mg x 10",
+                new BigDecimal(precio), 40, null, null);
+    }
+
+    @Test
+    void actualizarBajandoElPrecio_registraLaBajaDespuesDeGuardar() {
+        conBoticaAprobada();
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        service.actualizar(10L, 7L, requestConPrecio("7.50"));
+
+        InOrder orden = inOrder(productos, alertas);
+        orden.verify(productos).save(any(Producto.class));
+        orden.verify(productos).flush();
+        orden.verify(alertas).registrarBaja(7L, new BigDecimal("8.50"), new BigDecimal("7.50"));
+    }
+
+    @Test
+    void actualizarSinBajarElPrecio_noRegistraAlertas() {
+        conBoticaAprobada();
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        service.actualizar(10L, 7L, requestConPrecio("8.50"));
+        service.actualizar(10L, 7L, requestConPrecio("9.90"));
+
+        verifyNoInteractions(alertas);
+        verify(productos, never()).flush();
     }
 }
