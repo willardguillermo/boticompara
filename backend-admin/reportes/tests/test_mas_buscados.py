@@ -4,7 +4,7 @@ H62: pruebas del reporte "Medicamentos más buscados".
 La tabla busqueda es managed = False, así que Django no la crea en la base de pruebas: se crea
 aquí antes de abrir la transacción de TestCase y se borra al terminar.
 """
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.contrib import admin
 from django.contrib.auth.models import User
@@ -142,3 +142,104 @@ class AccesoTests(ConTablaBusqueda):
         self.assertFalse(modelo_admin.has_change_permission(peticion))
         self.assertFalse(modelo_admin.has_delete_permission(peticion))
 
+
+
+def en_lima(*partes):
+    """Fecha y hora de Lima (zona del proyecto), como las ve el administrador."""
+    return timezone.make_aware(datetime(*partes))
+
+
+def buscar_el(fecha, texto='paracetamol'):
+    return Busqueda.objects.create(texto=texto, tipo='nombre', resultados=1, fecha=fecha)
+
+
+class FiltroFechasTests(ConTablaBusqueda):
+    """H63: formulario Desde/Hasta del reporte."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = User.objects.create_user('revisora', password='clave-de-prueba', is_staff=True)
+
+    def setUp(self):
+        self.client.force_login(self.staff)
+
+    def textos(self, respuesta):
+        return [f['texto_normalizado'] for f in respuesta.context['filas']]
+
+    def test_rango_con_fechas_incluye_el_ultimo_dia_completo(self):
+        buscar_el(en_lima(2026, 9, 30, 23, 59), 'antes')
+        buscar_el(en_lima(2026, 10, 1, 0, 0), 'primer minuto')
+        # 23:59 en Lima ya es el 11/10 en UTC: igual cuenta como 10/10
+        buscar_el(en_lima(2026, 10, 10, 23, 59, 59), 'ultimo minuto')
+        buscar_el(en_lima(2026, 10, 11, 0, 0), 'despues')
+
+        respuesta = self.client.get(URL, {'desde': '2026-10-01', 'hasta': '2026-10-10'})
+
+        self.assertEqual(sorted(self.textos(respuesta)), ['primer minuto', 'ultimo minuto'])
+        self.assertContains(respuesta, '<caption>Del 01/10/2026 al 10/10/2026</caption>', html=True)
+        self.assertContains(respuesta, 'value="2026-10-01"')
+        self.assertContains(respuesta, 'value="2026-10-10"')
+        self.assertContains(respuesta, 'id="rango-limpiar"')
+
+    def test_solo_desde_no_tiene_limite_superior(self):
+        buscar_el(en_lima(2026, 10, 4, 23, 59), 'antes')
+        buscar_el(en_lima(2026, 10, 5, 0, 0), 'ese dia')
+        buscar_el(timezone.now() - timedelta(hours=1), 'hoy')
+
+        respuesta = self.client.get(URL, {'desde': '2026-10-05'})
+
+        self.assertEqual(sorted(self.textos(respuesta)), ['ese dia', 'hoy'])
+        self.assertContains(respuesta, '<caption>Desde el 05/10/2026</caption>', html=True)
+
+    def test_solo_hasta_no_tiene_limite_inferior(self):
+        # Más de 30 días antes: con "Hasta" sola ya no se aplica el rango por defecto
+        buscar_el(en_lima(2026, 1, 15, 12, 0), 'enero')
+        buscar_el(en_lima(2026, 10, 5, 23, 59), 'ese dia')
+        buscar_el(en_lima(2026, 10, 6, 0, 0), 'despues')
+
+        respuesta = self.client.get(URL, {'hasta': '2026-10-05'})
+
+        self.assertEqual(sorted(self.textos(respuesta)), ['enero', 'ese dia'])
+        self.assertContains(respuesta, '<caption>Hasta el 05/10/2026</caption>', html=True)
+
+    def test_desde_posterior_a_hasta_muestra_error_y_no_filtra(self):
+        buscar('reciente')
+        buscar('antigua', hace=timedelta(days=60))
+
+        respuesta = self.client.get(URL, {'desde': '2026-10-28', 'hasta': '2026-10-01'})
+
+        self.assertContains(respuesta, 'La fecha «Desde» (28/10/2026) es posterior a «Hasta» (01/10/2026)')
+        self.assertEqual(self.textos(respuesta), ['reciente'])  # últimos 30 días
+        self.assertContains(respuesta, 'Últimos 30 días')
+        self.assertContains(respuesta, 'id="rango-limpiar"')
+
+    def test_fecha_invalida_muestra_error_y_no_filtra(self):
+        buscar('reciente')
+        buscar('antigua', hace=timedelta(days=60))
+
+        respuesta = self.client.get(URL, {'desde': '2026-02-31'})
+
+        self.assertContains(respuesta, 'La fecha «Desde» (2026-02-31) no es válida')
+        self.assertEqual(self.textos(respuesta), ['reciente'])
+        self.assertContains(respuesta, 'Últimos 30 días')
+
+    def test_rango_sin_datos_muestra_mensaje_en_lugar_de_la_tabla(self):
+        buscar('reciente')
+
+        respuesta = self.client.get(URL, {'desde': '2025-01-01', 'hasta': '2025-01-31'})
+
+        self.assertEqual(self.textos(respuesta), [])
+        self.assertNotContains(respuesta, 'id="result_list"')
+        self.assertContains(respuesta, 'id="reporte-vacio"')
+        self.assertContains(respuesta, 'Del 01/01/2025 al 31/01/2025')
+        self.assertContains(respuesta, 'no hubo búsquedas en este rango')
+
+    def test_sin_fechas_usa_los_ultimos_30_dias_y_no_muestra_limpiar(self):
+        buscar('reciente')
+        buscar('antigua', hace=timedelta(days=31))
+
+        respuesta = self.client.get(URL)
+
+        self.assertEqual(self.textos(respuesta), ['reciente'])
+        self.assertContains(respuesta, 'Últimos 30 días')
+        self.assertNotContains(respuesta, 'id="rango-limpiar"')

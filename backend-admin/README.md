@@ -59,6 +59,12 @@ Spring Boot con cada búsqueda del comprador. Agrupa por texto buscado (sin dist
 cuántas veces no hubo resultados, de mayor a menor. Toma los **últimos 30 días** y muestra como máximo
 **20 filas**. Es de solo lectura y lo ve cualquier usuario staff, sin asignarle permisos.
 
+**Filtro por fechas (H63):** los campos **Desde** y **Hasta** arriba de la tabla (mismo estilo y mismas reglas
+que el historial de revisiones de H47). Los días se toman en hora de Lima y "Hasta" incluye todo ese día;
+un lado vacío no limita y sin fechas se vuelve a los últimos 30 días. Si "Desde" es posterior a "Hasta" o
+una fecha no es válida, se muestra un error y se mantienen los últimos 30 días. **Limpiar** quita las
+fechas. El título de la tabla dice el rango aplicado; si no hubo búsquedas, se muestra un mensaje.
+
 Al bajar esta versión, correr `python manage.py migrate`: la migración de `reportes` no crea la tabla.
 
 **Pruebas:** `python manage.py test` usa SQLite en memoria, porque el rol `boticompara_app` no puede crear
