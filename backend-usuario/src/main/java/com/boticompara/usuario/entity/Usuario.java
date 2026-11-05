@@ -37,4 +37,9 @@ public class Usuario {
 
     @Column(nullable = false)
     private boolean activo = true;
+
+
+    /** H66: si quiere recibir alertas de baja de precio. Por defecto true (igual que en la BD). */
+    @Column(name = "notificaciones_precio", nullable = false)
+    private boolean notificacionesPrecio = true;
 }

@@ -6,6 +6,7 @@ import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
 import com.boticompara.usuario.repository.TokenUsuarioRepository;
+import com.boticompara.usuario.dto.PerfilResponse;
 import com.boticompara.usuario.repository.UsuarioRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -159,6 +160,39 @@ class UsuarioServiceTest {
         when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
 
         assertFalse(service.obtener(10L).correoVerificado());
+    }
+
+
+    // ---------- H66: alertas de baja de precio ----------
+
+    @Test
+    void obtenerDevuelveLasNotificacionesDePrecioActivasPorDefecto() {
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+
+        assertTrue(service.obtener(10L).notificacionesPrecio());
+    }
+
+    @Test
+    void cambiarNotificacionesLasDesactivaYDevuelveElPerfil() {
+        Usuario u = usuario(true);
+        when(usuarios.findById(10L)).thenReturn(Optional.of(u));
+        when(usuarios.save(u)).thenReturn(u);
+
+        PerfilResponse r = service.cambiarNotificaciones(10L, false);
+
+        assertFalse(u.isNotificacionesPrecio());
+        assertFalse(r.notificacionesPrecio());
+        verify(usuarios).save(u);
+    }
+
+    @Test
+    void cambiarNotificacionesConCuentaEliminadaDa401SinGuardar() {
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(false)));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.cambiarNotificaciones(10L, false));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
+        verify(usuarios, never()).save(any(Usuario.class));
     }
 
     @Test

@@ -6,6 +6,9 @@ import com.boticompara.usuario.service.FavoritoService.Agregado;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -54,7 +57,7 @@ class FavoritoServiceTest {
 
     private static FavoritoResponse fav(long id) {
         return new FavoritoResponse(id, "Producto " + id, "Paracetamol", "Tableta 500 mg x 10",
-                new BigDecimal("2.20"), 90, 2L, "FarmaVida", "Jr. Trujillo 210", "Lurigancho-Chosica", FECHA);
+                new BigDecimal("2.20"), 90, 2L, "FarmaVida", "Jr. Trujillo 210", "Lurigancho-Chosica", FECHA, null);
     }
 
     private void insertaFilas(int filas) {
@@ -181,9 +184,73 @@ class FavoritoServiceTest {
         when(rs.getString("botica_direccion")).thenReturn("Jr. Trujillo 210");
         when(rs.getString("botica_distrito")).thenReturn("Lurigancho-Chosica");
         when(rs.getTimestamp("fecha")).thenReturn(Timestamp.from(FECHA));
+        when(rs.getBigDecimal("precio_objetivo")).thenReturn(new BigDecimal("7.50"));
 
         assertEquals(new FavoritoResponse(13L, "Paracetamol Genérico", "Paracetamol", "Tableta 500 mg x 10",
-                        new BigDecimal("2.20"), 90, 2L, "FarmaVida", "Jr. Trujillo 210", "Lurigancho-Chosica", FECHA),
+                        new BigDecimal("2.20"), 90, 2L, "FarmaVida", "Jr. Trujillo 210", "Lurigancho-Chosica", FECHA,
+                        new BigDecimal("7.50")),
                 mapper.getValue().mapRow(rs, 0));
+    }
+
+
+    // ---------- H60: precio objetivo ----------
+
+    private static final String UPDATE_OBJETIVO =
+            "update favorito set precio_objetivo = :objetivo, ultimo_precio_avisado = null";
+
+    private void favoritoActualizado(int filas) {
+        when(jdbc.update(contains(UPDATE_OBJETIVO), any(SqlParameterSource.class))).thenReturn(filas);
+    }
+
+    @Test
+    void precioObjetivo_loGuardaYReiniciaElUltimoPrecioAvisado() {
+        favoritoActualizado(1);
+        productoGuardadoEs(List.of(fav(9)));
+
+        FavoritoResponse r = service.cambiarPrecioObjetivo(42L, 9L, new BigDecimal("7.50"));
+
+        assertEquals(fav(9), r);
+        ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbc).update(contains(UPDATE_OBJETIVO), params.capture());
+        assertEquals(new BigDecimal("7.50"), params.getValue().getValue("objetivo"));
+        assertEquals(42L, params.getValue().getValue("usuario"));
+        assertEquals(9L, params.getValue().getValue("producto"));
+    }
+
+    @Test
+    void precioObjetivo_null_loQuita() {
+        favoritoActualizado(1);
+        productoGuardadoEs(List.of(fav(9)));
+
+        service.cambiarPrecioObjetivo(42L, 9L, null);
+
+        ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbc).update(contains(UPDATE_OBJETIVO), params.capture());
+        assertNull(params.getValue().getValue("objetivo"));
+    }
+
+    @Test
+    void precioObjetivo_noEstaEnFavoritos_responde404SinConsultarLaVista() {
+        favoritoActualizado(0);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.cambiarPrecioObjetivo(42L, 9L, BigDecimal.ONE));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+        assertEquals("El producto no está en tus favoritos", ex.getMessage());
+        verify(jdbc, never()).query(anyString(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<FavoritoResponse>>any());
+    }
+
+    @Test
+    void precioObjetivo_productoQueYaNoSeVe_responde404() {
+        favoritoActualizado(1);
+        productoGuardadoEs(List.of());
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.cambiarPrecioObjetivo(42L, 9L, BigDecimal.ONE));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+        assertEquals("El producto no está disponible", ex.getMessage());
     }
 }
