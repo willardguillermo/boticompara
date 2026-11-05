@@ -12,8 +12,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +25,7 @@ public class CargaMasivaService {
 
     private final BoticaRepository boticas;
     private final ProductoRepository productos;
+    private final AlertaService alertas;
 
     /**
      * H11: crea los productos nuevos y actualiza precio y stock de los que ya existen (mismo nombre y
@@ -39,11 +42,14 @@ public class CargaMasivaService {
         }
 
         List<Producto> aGuardar = new ArrayList<>();
+        // H59: precio de cada producto existente antes de la carga (el primero, si aparece en varias filas)
+        Map<Producto, BigDecimal> preciosAntes = new LinkedHashMap<>();
         int creados = 0;
         int actualizados = 0;
         for (FilaProducto f : csv.filas()) {
             Producto p = existentes.get(f.clave());
             if (p != null) {
+                preciosAntes.putIfAbsent(p, p.getPrecio());
                 p.setPrecio(f.precio());
                 p.setStock(f.stock());
                 if (f.stockMinimo() != null) {
@@ -68,7 +74,23 @@ public class CargaMasivaService {
         if (!aGuardar.isEmpty()) {
             productos.saveAll(aGuardar);
         }
+        registrarBajas(preciosAntes);
         return new ResultadoCarga(creados, actualizados, csv.errores());
+    }
+
+    /** H59: alertas de los productos que bajaron de precio, en la misma transacción que la carga. */
+    private void registrarBajas(Map<Producto, BigDecimal> preciosAntes) {
+        List<Map.Entry<Producto, BigDecimal>> bajas = preciosAntes.entrySet().stream()
+                .filter(e -> e.getKey().getPrecio().compareTo(e.getValue()) < 0)
+                .toList();
+        if (bajas.isEmpty()) {
+            return;
+        }
+        // Deja los cambios en la BD para que la vista de búsqueda (JDBC) vea los productos ya actualizados
+        productos.flush();
+        for (Map.Entry<Producto, BigDecimal> e : bajas) {
+            alertas.registrarBaja(e.getKey().getId(), e.getValue(), e.getKey().getPrecio());
+        }
     }
 
     private Botica boticaAprobada(Long usuarioId) {

@@ -65,6 +65,7 @@ Detalle completo, con ejemplos de petición y respuesta, en [`../docs/API.md`](.
 | Búsqueda | `GET /productos/buscar?q=&tipo=&orden=` | H22, H23, H24, H27 | 🔒 cualquier rol |
 | | `GET /productos/{id}` | H28 | Público |
 | | `GET /productos/{id}/alternativas` | H36, H37, H38, H41, H42 | Público |
+| Alertas | `GET /alertas`, `GET /alertas/resumen`, `PUT /alertas/{id}/leida`, `PUT /alertas/leidas` | H59 | 🔒 cualquier rol |
 | Favoritos | `POST /favoritos`, `GET /favoritos`, `DELETE /favoritos/{productoId}` | H43, H44 | 🔒 cualquier rol |
 | | `PUT /favoritos/{productoId}/precio-objetivo` | H60 | 🔒 cualquier rol |
 
@@ -88,6 +89,17 @@ búsqueda, el detalle, las alternativas y los favoritos. Un producto que deja de
 - `sinEquivalentes` es `true` cuando la lista viene vacía (H41).
 - Cada consulta de un producto visible queda registrada en `consulta_comparacion`, con el usuario si llegó un token
   válido (H42). Si el registro falla, la respuesta no se ve afectada; las consultas con 404 no se registran.
+
+### Alertas de baja de precio (H59)
+- Se evalúan en `PUT /productos/{id}` y en la carga masiva, en la misma transacción que el cambio de precio
+  (`AlertaService.registrarBaja`). Antes, `productos.flush()` deja el cambio en la BD para que la vista de búsqueda
+  vea el producto ya actualizado.
+- Solo si el precio baja y el producto se ve después del cambio. Para cada favorito de un usuario activo con
+  `notificacionesPrecio`: sin precio objetivo, alerta en cada baja; con objetivo, solo si el precio nuevo es menor o
+  igual al objetivo y menor que el último avisado. El precio nuevo queda como `ultimo_precio_avisado`.
+- `GET /alertas` devuelve hasta 100, de la más reciente a la más antigua (`soloNoLeidas` solo acepta `true` o
+  `false`). Marcar una alerta de otro usuario responde `404`. La alerta se conserva aunque el producto deje de verse.
+- Al eliminar la cuenta (H19) se borran sus alertas.
 
 ### Enlace con el catálogo maestro (H31)
 - Un producto puede enlazarse a un medicamento con `medicamentoId` en `POST /productos` o `PUT /productos/{id}`;
