@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'boticas',
     'catalogo',
+    'reportes',
 ]
 
 MIDDLEWARE = [
@@ -97,6 +99,12 @@ DATABASES = {
         },
     }
 }
+
+# Pruebas con TestCase: el rol boticompara_app no puede crear la base de pruebas en Supabase,
+# así que "manage.py test" usa SQLite en memoria. Las tablas managed = False que una prueba
+# necesite las crea la propia prueba.
+if sys.argv[1:2] == ['test']:
+    DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}}
 
 
 # Password validation

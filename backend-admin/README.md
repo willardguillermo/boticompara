@@ -51,6 +51,19 @@ Al bajar esta versión, correr una vez `python manage.py migrate`: solo registra
 permisos (para que un administrador que no es superusuario pueda ver el historial); **no crea la
 tabla**, que ya existe en Supabase.
 
+## Medicamentos más buscados (H62)
+
+**Reportes → Medicamentos más buscados** (`/admin/reportes/busqueda/`) lee la tabla `busqueda`, que llena
+Spring Boot con cada búsqueda del comprador. Agrupa por texto buscado (sin distinguir mayúsculas) y tipo
+(nombre comercial o principio activo) y muestra el número de búsquedas, el promedio de resultados y
+cuántas veces no hubo resultados, de mayor a menor. Toma los **últimos 30 días** y muestra como máximo
+**20 filas**. Es de solo lectura y lo ve cualquier usuario staff, sin asignarle permisos.
+
+Al bajar esta versión, correr `python manage.py migrate`: la migración de `reportes` no crea la tabla.
+
+**Pruebas:** `python manage.py test` usa SQLite en memoria, porque el rol `boticompara_app` no puede crear
+la base de pruebas en Supabase; las pruebas de `reportes` crean su tabla `busqueda` temporal.
+
 ## Puesta en marcha
 
 Requisito: el archivo `.env` en la **raíz del repo** (copia de [`.env.example`](../.env.example))
