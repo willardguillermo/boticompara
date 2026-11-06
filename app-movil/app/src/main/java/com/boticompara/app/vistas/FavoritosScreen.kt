@@ -1,24 +1,34 @@
 package com.boticompara.app.vistas
 
 import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.LocalPharmacy
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Medication
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.NotificationsNone
+import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -27,7 +37,7 @@ import androidx.navigation.NavController
 import com.boticompara.app.data.remote.FavoritoResponse
 import java.util.Locale
 
-// ===================== MIS FAVORITOS (H44, H45) =====================
+// ===================== MIS FAVORITOS (H44, H45, H60) =====================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritosScreen(
@@ -36,6 +46,7 @@ fun FavoritosScreen(
 ) {
     val vm = favoritosViewModel
     val snackbarHostState = remember { SnackbarHostState() }
+    var favoritoEditando by remember { mutableStateOf<FavoritoResponse?>(null) }
 
     // Si el token venció, volver al login limpiando la navegación
     LaunchedEffect(vm.sesionVencida) {
@@ -52,7 +63,7 @@ fun FavoritosScreen(
         onPauseOrDispose { }
     }
 
-    // Aviso al quitar un favorito
+    // Aviso al quitar un favorito o cambiar su precio objetivo
     LaunchedEffect(vm.mensajeAccion) {
         vm.mensajeAccion?.let {
             snackbarHostState.showSnackbar(it)
@@ -147,7 +158,8 @@ fun FavoritosScreen(
                                 FavoritoCard(
                                     favorito = favorito,
                                     onClick = { navController.navigate("detalle/${favorito.productoId}") },
-                                    onQuitar = { vm.quitar(favorito.productoId) }
+                                    onQuitar = { vm.quitar(favorito.productoId) },
+                                    onEditarObjetivo = { favoritoEditando = favorito }
                                 )
                             }
                         }
@@ -156,14 +168,27 @@ fun FavoritosScreen(
             }
         }
     }
+
+    // H60: diálogo para poner, cambiar o quitar el precio objetivo
+    favoritoEditando?.let { favorito ->
+        DialogPrecioObjetivo(
+            favorito = favorito,
+            onGuardar = { precio ->
+                vm.fijarPrecioObjetivo(favorito.productoId, precio)
+                favoritoEditando = null
+            },
+            onDismiss = { favoritoEditando = null }
+        )
+    }
 }
 
-// ===================== TARJETA DE FAVORITO (H44, H45) =====================
+// ===================== TARJETA DE FAVORITO (H44, H45, H60) =====================
 @Composable
 private fun FavoritoCard(
     favorito: FavoritoResponse,
     onClick: () -> Unit,
-    onQuitar: () -> Unit
+    onQuitar: () -> Unit,
+    onEditarObjetivo: () -> Unit
 ) {
     Card(
         onClick = onClick,
@@ -214,6 +239,10 @@ private fun FavoritoCard(
                 EtiquetaStock(favorito.stock)
             }
             Spacer(Modifier.height(12.dp))
+
+            // Precio objetivo (H60)
+            BloquePrecioObjetivo(favorito = favorito, onEditar = onEditarObjetivo)
+            Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(12.dp))
 
@@ -240,6 +269,168 @@ private fun FavoritoCard(
             }
         }
     }
+}
+
+// ===================== BLOQUE DE PRECIO OBJETIVO (H60) =====================
+@Composable
+private fun BloquePrecioObjetivo(
+    favorito: FavoritoResponse,
+    onEditar: () -> Unit
+) {
+    val objetivo = favorito.precioObjetivo
+
+    if (objetivo == null) {
+        OutlinedButton(
+            onClick = onEditar,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(
+                Icons.Rounded.NotificationsNone,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("Definir precio objetivo")
+        }
+        return
+    }
+
+    // Si el precio actual ya está en el objetivo, el bloque cambia de color
+    val alcanzado = favorito.precio <= objetivo
+    val fondo = if (alcanzado) MaterialTheme.colorScheme.tertiaryContainer
+    else MaterialTheme.colorScheme.primaryContainer
+    val contenido = if (alcanzado) MaterialTheme.colorScheme.onTertiaryContainer
+    else MaterialTheme.colorScheme.onPrimaryContainer
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(fondo)
+            .clickable(onClick = onEditar)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            if (alcanzado) Icons.Rounded.CheckCircle else Icons.Rounded.NotificationsActive,
+            contentDescription = null,
+            tint = contenido,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                if (alcanzado) "Objetivo alcanzado" else "Precio objetivo",
+                style = MaterialTheme.typography.labelMedium,
+                color = contenido
+            )
+            Text(
+                "S/ ${String.format(Locale.US, "%.2f", objetivo)} o menos",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = contenido
+            )
+        }
+        Icon(
+            Icons.Rounded.Edit,
+            contentDescription = "Cambiar precio objetivo",
+            tint = contenido,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+// ===================== DIÁLOGO DE PRECIO OBJETIVO (H60) =====================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DialogPrecioObjetivo(
+    favorito: FavoritoResponse,
+    onGuardar: (Double?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var texto by remember {
+        mutableStateOf(
+            favorito.precioObjetivo?.let { String.format(Locale.US, "%.2f", it) } ?: ""
+        )
+    }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Rounded.NotificationsActive, contentDescription = null) },
+        title = { Text("Precio objetivo") },
+        text = {
+            Column {
+                Text(
+                    "${favorito.nombreComercial} cuesta hoy S/ ${String.format(Locale.US, "%.2f", favorito.precio)}. " +
+                            "Te avisaremos cuando baje a este precio o menos.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = texto,
+                    onValueChange = {
+                        texto = it
+                        error = null
+                    },
+                    label = { Text("Precio en soles") },
+                    prefix = { Text("S/ ") },
+                    singleLine = true,
+                    isError = error != null,
+                    supportingText = { error?.let { Text(it) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(4.dp))
+
+                // Sugerencias rápidas: un porcentaje menos que el precio de hoy
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(5, 10, 20).forEach { porcentaje ->
+                        SuggestionChip(
+                            onClick = {
+                                val sugerido = Math.round(favorito.precio * (100 - porcentaje)) / 100.0
+                                texto = String.format(Locale.US, "%.2f", sugerido)
+                                error = null
+                            },
+                            label = { Text("$porcentaje% menos") }
+                        )
+                    }
+                }
+
+                if (favorito.precioObjetivo != null) {
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(
+                        onClick = { onGuardar(null) },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            Icons.Rounded.NotificationsOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Quitar precio objetivo")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                when (val resultado = ValidadorPrecioObjetivo.validar(texto)) {
+                    is ResultadoPrecioObjetivo.Valido -> onGuardar(resultado.valor)
+                    is ResultadoPrecioObjetivo.Invalido -> error = resultado.mensaje
+                }
+            }) { Text("Guardar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
 }
 
 // Convierte la fecha ISO del backend (UTC) a dd/MM/yyyy en la zona horaria del celular
