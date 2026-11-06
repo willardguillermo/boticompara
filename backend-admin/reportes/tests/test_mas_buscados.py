@@ -1,20 +1,14 @@
-"""
-H62: pruebas del reporte "Medicamentos más buscados".
-
-La tabla busqueda es managed = False, así que Django no la crea en la base de pruebas: se crea
-aquí antes de abrir la transacción de TestCase y se borra al terminar.
-"""
+"""H62: pruebas del reporte "Medicamentos más buscados"."""
 from datetime import datetime, timedelta
 
 from django.contrib import admin
 from django.contrib.auth.models import User
-from django.db import connection
-from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from reportes.consultas import MAXIMO_FILAS, mas_buscados, rango_por_defecto
 from reportes.models import Busqueda
+from reportes.tests.base import TABLAS_DEL_PANEL, ConTablas
 
 URL = reverse('admin:reportes_busqueda_changelist')
 
@@ -23,18 +17,8 @@ def buscar(texto, tipo='nombre', resultados=1, hace=timedelta(days=1)):
     return Busqueda.objects.create(texto=texto, tipo=tipo, resultados=resultados, fecha=timezone.now() - hace)
 
 
-class ConTablaBusqueda(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        with connection.schema_editor() as editor:
-            editor.create_model(Busqueda)
-        super().setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        with connection.schema_editor() as editor:
-            editor.delete_model(Busqueda)
+class ConTablaBusqueda(ConTablas):
+    tablas = (Busqueda,)
 
 
 class ConsultaAgregadaTests(ConTablaBusqueda):
@@ -98,6 +82,9 @@ class RangoPorDefectoTests(ConTablaBusqueda):
 
 
 class AccesoTests(ConTablaBusqueda):
+    # H64: la portada del admin muestra el panel, que lee todas estas tablas
+    tablas = TABLAS_DEL_PANEL
+
     @classmethod
     def setUpTestData(cls):
         cls.staff = User.objects.create_user('revisora', password='clave-de-prueba', is_staff=True)

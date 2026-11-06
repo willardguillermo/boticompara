@@ -1,0 +1,75 @@
+{% extends "admin/index.html" %}
+{% load static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static "reportes/reportes.css" %}">
+{% endblock %}
+
+{% block content %}
+{# H64: panel principal; solo existe en el contexto para usuarios staff (reportes/sitio.py) #}
+{% if panel %}
+{% with ind=panel.indicadores %}
+<div id="panel-principal">
+  <div class="module">
+    <h2>Resumen general</h2>
+    <div class="panel-cuerpo">
+      <ul class="panel-tarjetas">
+        <li class="panel-tarjeta" id="ind-compradores">
+          <span class="panel-valor">{{ ind.compradores_activos }}</span>
+          <span class="panel-etiqueta">Compradores activos</span>
+        </li>
+        <li class="panel-tarjeta" id="ind-duenos">
+          <span class="panel-valor">{{ ind.duenos_activos }}</span>
+          <span class="panel-etiqueta">Dueños de botica activos</span>
+        </li>
+        <li class="panel-tarjeta{% if ind.boticas_pendientes %} atencion{% endif %}" id="ind-pendientes">
+          <span class="panel-valor">{{ ind.boticas_pendientes }}</span>
+          <span class="panel-etiqueta">Boticas pendientes</span>
+          <a href="{{ panel.url_pendientes }}">Revisar pendientes</a>
+        </li>
+        <li class="panel-tarjeta" id="ind-aprobadas">
+          <span class="panel-valor">{{ ind.boticas_aprobadas }}</span>
+          <span class="panel-etiqueta">Boticas aprobadas</span>
+        </li>
+        <li class="panel-tarjeta" id="ind-rechazadas">
+          <span class="panel-valor">{{ ind.boticas_rechazadas }}</span>
+          <span class="panel-etiqueta">Boticas rechazadas</span>
+        </li>
+        <li class="panel-tarjeta" id="ind-productos">
+          <span class="panel-valor">{{ ind.productos_activos }}</span>
+          <span class="panel-etiqueta">Productos activos</span>
+        </li>
+        <li class="panel-tarjeta" id="ind-medicamentos">
+          <span class="panel-valor">{{ ind.medicamentos }}</span>
+          <span class="panel-etiqueta">Medicamentos del catálogo{% if ind.medicamentos_ocultos %} ({{ ind.medicamentos_ocultos }} ocultos){% endif %}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="module">
+    <h2>Actividad del periodo</h2>
+    <div class="panel-cuerpo">
+      {% include "admin/reportes/rango_fechas.html" with rango_desde=panel.rango_desde rango_hasta=panel.rango_hasta %}
+      <p class="reporte-nota">
+        <strong id="panel-rango">{{ panel.rango }}</strong>.
+        Días en hora de Lima; «Hasta» incluye todo ese día. Sin fechas, los últimos {{ panel.dias }} días.
+      </p>
+      <ul class="panel-tarjetas">
+        <li class="panel-tarjeta" id="ind-busquedas">
+          <span class="panel-valor">{{ ind.busquedas }}</span>
+          <span class="panel-etiqueta">Búsquedas</span>
+        </li>
+        <li class="panel-tarjeta" id="ind-comparaciones">
+          <span class="panel-valor">{{ ind.comparaciones }}</span>
+          <span class="panel-etiqueta">Comparaciones de precio</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endwith %}
+{% endif %}
+{{ block.super }}
+{% endblock %}

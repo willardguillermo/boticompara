@@ -1,0 +1,14 @@
+{% comment %}
+H63/H64: formulario Desde/Hasta compartido por el reporte de más buscados y el panel principal.
+Espera rango_desde y rango_hasta (lo que escribió el administrador). Estilos en reportes/reportes.css.
+{% endcomment %}
+<form id="rango-fechas" method="get">
+  <label for="rango-desde">Desde</label>
+  <input type="date" id="rango-desde" name="desde" value="{{ rango_desde }}">
+  <label for="rango-hasta">Hasta</label>
+  <input type="date" id="rango-hasta" name="hasta" value="{{ rango_hasta }}">
+  <input type="submit" value="Filtrar por fecha">
+  {% if rango_desde or rango_hasta %}
+    <a href="?" id="rango-limpiar">Limpiar</a>
+  {% endif %}
+</form>
