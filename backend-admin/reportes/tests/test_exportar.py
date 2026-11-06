@@ -102,6 +102,42 @@ class LibroPanelTests(ConTablas):
         self.assertTrue(all(celda.font.bold for celda in hoja[2]))
 
 
+class InyeccionDeFormulasTests(ConTablas):
+    """Los textos que empiezan con "=" se guardan como texto, no como fórmula que Excel evalúe."""
+
+    def test_busqueda_con_igual_queda_como_texto(self):
+        buscar_con('=1+1')
+        desde, hasta, rango = rango_de_fechas(None, None)
+
+        hoja = abrir(_guardar(libro_mas_buscados(mas_buscados(desde, hasta, limite=None), rango))).active
+
+        self.assertEqual(hoja['B3'].value, '=1+1')
+        self.assertEqual(hoja['B3'].data_type, 's')
+
+    def test_nombre_comercial_con_formula_queda_como_texto(self):
+        formula = '=HYPERLINK("http://sitio.test","clic")'
+        comparar(crear_producto(crear_botica(), formula))
+        desde, hasta, rango = rango_de_fechas(None, None)
+
+        libro = abrir(_guardar(libro_panel(indicadores(desde, hasta), mas_comparados(desde, hasta, limite=None), rango)))
+
+        celda = libro['Más comparados']['B3']
+        self.assertEqual(celda.value, formula)
+        self.assertEqual(celda.data_type, 's')
+
+    def test_textos_normales_y_numeros_no_cambian_de_tipo(self):
+        buscar_con('paracetamol', resultados=4)
+        desde, hasta, rango = rango_de_fechas(None, None)
+
+        hoja = abrir(_guardar(libro_mas_buscados(mas_buscados(desde, hasta, limite=None), rango))).active
+
+        self.assertEqual((hoja['B3'].value, hoja['B3'].data_type), ('paracetamol', 's'))
+        for coordenada, valor in (('A3', 1), ('D3', 1), ('E3', 4.0), ('F3', 0)):
+            with self.subTest(celda=coordenada):
+                self.assertEqual(hoja[coordenada].value, valor)
+                self.assertEqual(hoja[coordenada].data_type, 'n')
+
+
 class NombreDeArchivoTests(SimpleTestCase):
     def test_formato_con_la_fecha(self):
         self.assertEqual(nombre_de_archivo('panel', date(2026, 11, 5)), 'boticompara-panel-2026-11-05.xlsx')

@@ -30,6 +30,11 @@ def _llenar_hoja(hoja, titulo, rango, encabezados, filas):
         celda.font = Font(bold=True)
     for fila in filas:
         hoja.append(fila)
+        # Los textos vienen de compradores y dueños: openpyxl guarda como fórmula todo texto que empieza
+        # con "=" y Excel la evaluaría al abrir (p. ej. =HYPERLINK(...)). Se fuerzan a texto.
+        for celda in hoja[hoja.max_row]:
+            if isinstance(celda.value, str) and celda.value.startswith('='):
+                celda.data_type = 's'
     # Ancho según el texto más largo de cada columna (sin contar el título, que puede desbordar)
     for indice, columna in enumerate(hoja.iter_cols(min_row=FILA_ENCABEZADOS), start=1):
         largo = max(len(str(celda.value)) for celda in columna if celda.value is not None)
