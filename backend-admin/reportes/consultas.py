@@ -50,21 +50,25 @@ def rango_de_fechas(fecha_desde, fecha_hasta, ahora=None):
     return desde, hasta, titulo
 
 
+def en_rango(consulta, desde, hasta):
+    """Filtra desde <= fecha < hasta; desde o hasta en None: sin límite por ese lado."""
+    if desde:
+        consulta = consulta.filter(fecha__gte=desde)
+    if hasta:
+        consulta = consulta.filter(fecha__lt=hasta)
+    return consulta
+
+
 def mas_buscados(desde, hasta, limite=MAXIMO_FILAS):
     """
     Agrupa las búsquedas con desde <= fecha < hasta por texto (sin distinguir mayúsculas) y tipo.
-    desde o hasta en None: sin límite por ese lado.
+    desde o hasta en None: sin límite por ese lado; limite en None: todas las filas (Excel, H65).
 
     Cada fila trae: texto, tipo, busquedas, promedio_resultados y sin_resultados. Orden: más
     búsquedas primero; si empatan, más búsquedas sin resultados primero y luego por texto.
     """
-    busquedas = Busqueda.objects.all()
-    if desde:
-        busquedas = busquedas.filter(fecha__gte=desde)
-    if hasta:
-        busquedas = busquedas.filter(fecha__lt=hasta)
     return list(
-        busquedas
+        en_rango(Busqueda.objects.all(), desde, hasta)
         .annotate(texto_normalizado=Lower('texto'))
         .values('texto_normalizado', 'tipo')
         .annotate(

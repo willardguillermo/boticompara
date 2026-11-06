@@ -1,10 +1,11 @@
-from django.contrib import admin, messages
+from django.contrib import admin
 from django.template.response import TemplateResponse
 from django.urls import path
-from boticas.historial import validar_rango
 
-from .consultas import DIAS_POR_DEFECTO, MAXIMO_FILAS, mas_buscados, rango_de_fechas
+from .consultas import MAXIMO_FILAS, mas_buscados
+from .exportar import libro_mas_buscados, respuesta_excel
 from .models import Busqueda
+from .periodo import periodo_de_la_peticion
 
 
 @admin.register(Busqueda)
@@ -31,28 +32,30 @@ class MasBuscadosAdmin(admin.ModelAdmin):
         return False
 
     def get_urls(self):
-        # Solo la página del reporte: sin ficha individual por búsqueda
+        # Solo la página del reporte y su exportación (H65): sin ficha individual por búsqueda.
+        # admin_view exige usuario staff activo; si no, manda al login.
         info = self.opts.app_label, self.opts.model_name
-        return [path('', self.admin_site.admin_view(self.changelist_view), name='%s_%s_changelist' % info)]
+        return [
+            path('', self.admin_site.admin_view(self.changelist_view), name='%s_%s_changelist' % info),
+            path('exportar/', self.admin_site.admin_view(self.exportar_view), name='%s_%s_exportar' % info),
+        ]
+
+    def exportar_view(self, request):
+        """H65: todas las filas del periodo que se está viendo (no solo 20), en Excel."""
+        # Sin aviso: el error de fechas ya se mostró en la página; aquí se exporta el rango por defecto
+        periodo = periodo_de_la_peticion(request, avisar=False)
+        filas = mas_buscados(periodo['desde'], periodo['hasta'], limite=None)
+        return respuesta_excel(libro_mas_buscados(filas, periodo['rango']), 'mas-buscados')
 
     def changelist_view(self, request, extra_context=None):
-        # H63: mismas reglas que el filtro Desde/Hasta del historial de revisiones (H47).
-        # Con error no se filtra: se muestra el rango por defecto (últimos 30 días).
-        texto_desde = request.GET.get('desde', '')
-        texto_hasta = request.GET.get('hasta', '')
-        fecha_desde, fecha_hasta, error = validar_rango(texto_desde, texto_hasta)
-        if error:
-            messages.error(request, error)
-        desde, hasta, rango = rango_de_fechas(fecha_desde, fecha_hasta)
+        # H63: periodo del formulario Desde/Hasta; con error, los últimos 30 días
+        periodo = periodo_de_la_peticion(request)
         context = {
             **self.admin_site.each_context(request),
+            **periodo,
             'opts': self.opts,
             'title': 'Medicamentos más buscados',
-            'filas': mas_buscados(desde, hasta),
-            'rango': rango,
-            'rango_desde': texto_desde,
-            'rango_hasta': texto_hasta,
-            'dias': DIAS_POR_DEFECTO,
+            'filas': mas_buscados(periodo['desde'], periodo['hasta']),
             'maximo_filas': MAXIMO_FILAS,
             **(extra_context or {}),
         }
