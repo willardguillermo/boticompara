@@ -5,6 +5,7 @@ import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import com.boticompara.usuario.repository.ProductoRepository;
 import com.boticompara.usuario.util.CsvProductoParser;
 import com.boticompara.usuario.util.CsvProductoParser.FilaProducto;
@@ -26,6 +27,7 @@ public class CargaMasivaService {
     private final BoticaRepository boticas;
     private final ProductoRepository productos;
     private final AlertaService alertas;
+    private final ApplicationEventPublisher eventos;
 
     /**
      * H11: crea los productos nuevos y actualiza precio y stock de los que ya existen (mismo nombre y
@@ -88,8 +90,12 @@ public class CargaMasivaService {
         }
         // Deja los cambios en la BD para que la vista de búsqueda (JDBC) vea los productos ya actualizados
         productos.flush();
+        List<AlertaService.AlertaCreada> creadas = new ArrayList<>();
         for (Map.Entry<Producto, BigDecimal> e : bajas) {
-            alertas.registrarBaja(e.getKey().getId(), e.getValue(), e.getKey().getPrecio());
+            creadas.addAll(alertas.registrarBaja(e.getKey().getId(), e.getValue(), e.getKey().getPrecio()));
+        }
+        if (!creadas.isEmpty()) {
+            eventos.publishEvent(new AlertasCreadas(creadas));
         }
     }
 
