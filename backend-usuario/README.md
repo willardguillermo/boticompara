@@ -37,7 +37,7 @@ Si el puerto 8080 ya está ocupado, hay una instancia vieja corriendo: cerrarla 
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE` | Conexión a Supabase | La API no arranca |
 | `JWT_SECRET` | Firma de los JWT (mínimo 32 caracteres, duran 24 h) | La API no arranca |
 | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET_LICENCIAS` | Licencias en Storage privado (H4) | La API arranca, pero subir la licencia responde 503 |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Correos de H12, H17 y H20 (Resend por SMTP, ver `../.env.example`) | La API arranca, pero no envía correos |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Correos de H12, H17, H20 y H61 (Resend por SMTP, ver `../.env.example`) | La API arranca, pero no envía correos |
 | `RUC_API_URL`, `RUC_API_TOKEN` | Consulta del RUC en SUNAT con Decolecta (H2) | El RUC solo se valida localmente |
 | `ALERTA_STOCK_CRON`, `APP_BASE_URL` | Opcionales: horario de la alerta y URL pública de los enlaces de correo | Valores por defecto (8:00 hora de Lima; `http://localhost:8080/api`) |
 
