@@ -24,7 +24,8 @@ data class MensajeResponse(val mensaje: String)
 data class PerfilResponse(
     val id: Long, val nombre: String, val correo: String,
     val telefono: String?, val direccion: String?, val rol: String,
-    val notificacionesPrecio: Boolean = true   // H66: alertas de baja de precio
+    val notificacionesPrecio: Boolean? = null  // H66: alertas de baja de precio
+
 )
 data class PerfilRequest(val nombre: String, val telefono: String?, val direccion: String?)
 

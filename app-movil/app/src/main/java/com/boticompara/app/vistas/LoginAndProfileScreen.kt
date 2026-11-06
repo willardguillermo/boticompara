@@ -213,7 +213,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     correo = p.correo
                     telefono = p.telefono ?: ""
                     direccion = p.direccion ?: ""
-                    notificacionesPrecio = p.notificacionesPrecio
+                    notificacionesPrecio = p.notificacionesPrecio ?: true
                 } else if (resp.code() == 401) {
                     tokenManager.clearSession(); sesionVencida = true
                 }
@@ -257,7 +257,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 )
                 val perfil = resp.body()
                 when {
-                    resp.isSuccessful && perfil != null -> notificacionesPrecio = perfil.notificacionesPrecio
+                    resp.isSuccessful && perfil != null -> notificacionesPrecio = perfil.notificacionesPrecio ?: activar
                     resp.code() == 401 -> { tokenManager.clearSession(); sesionVencida = true }
                     else -> mensajeNotificaciones = "No se pudo cambiar la preferencia de alertas"
                 }
