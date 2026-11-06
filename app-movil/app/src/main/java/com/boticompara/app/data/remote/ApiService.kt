@@ -23,9 +23,13 @@ data class MensajeResponse(val mensaje: String)
 // ---- Perfil (H16) ----
 data class PerfilResponse(
     val id: Long, val nombre: String, val correo: String,
-    val telefono: String?, val direccion: String?, val rol: String
+    val telefono: String?, val direccion: String?, val rol: String,
+    val notificacionesPrecio: Boolean = true   // H66: alertas de baja de precio
 )
 data class PerfilRequest(val nombre: String, val telefono: String?, val direccion: String?)
+
+// ---- Alertas de precio: preferencia del perfil (H66) ----
+data class NotificacionesRequest(val notificacionesPrecio: Boolean)
 
 // ---- Búsqueda (H22–H27) ----
 data class ProductoResponse(
@@ -120,6 +124,12 @@ interface ApiService {
     suspend fun actualizarPerfil(
         @Header("Authorization") auth: String,
         @Body request: PerfilRequest
+    ): Response<PerfilResponse>
+
+    @PUT("usuarios/me/notificaciones")   // H66: activa o desactiva las alertas de baja de precio
+    suspend fun actualizarNotificaciones(
+        @Header("Authorization") auth: String,
+        @Body request: NotificacionesRequest
     ): Response<PerfilResponse>
 
     @DELETE("usuarios/me")   // H19: 204 sin cuerpo, la cuenta queda anonimizada

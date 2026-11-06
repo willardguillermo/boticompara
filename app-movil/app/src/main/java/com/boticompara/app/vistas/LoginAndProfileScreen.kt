@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +25,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.local.TokenManager
+import com.boticompara.app.data.remote.NotificacionesRequest
 import com.boticompara.app.data.remote.PerfilRequest
 import com.boticompara.app.data.remote.RetrofitClient
 import kotlinx.coroutines.launch
@@ -188,6 +192,14 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     var sesionVencida by mutableStateOf(false)
         private set
 
+    // H66: preferencia de alertas de baja de precio
+    var notificacionesPrecio by mutableStateOf(true)
+        private set
+    var guardandoNotificaciones by mutableStateOf(false)
+        private set
+    var mensajeNotificaciones by mutableStateOf<String?>(null)
+        private set
+
     init { cargarPerfil() }
 
     fun cargarPerfil() {
@@ -201,6 +213,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     correo = p.correo
                     telefono = p.telefono ?: ""
                     direccion = p.direccion ?: ""
+                    notificacionesPrecio = p.notificacionesPrecio
                 } else if (resp.code() == 401) {
                     tokenManager.clearSession(); sesionVencida = true
                 }
@@ -227,6 +240,32 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             } catch (e: Exception) {
                 mensaje = "No se pudo conectar con el servidor"
             } finally { isLoading = false }
+        }
+    }
+
+    // H66: PUT /usuarios/me/notificaciones. El interruptor solo cambia cuando el servidor confirma;
+    // si falla, queda como estaba y se muestra el aviso.
+    fun cambiarNotificaciones(activar: Boolean) {
+        if (guardandoNotificaciones) return
+        viewModelScope.launch {
+            guardandoNotificaciones = true
+            mensajeNotificaciones = null
+            try {
+                val resp = api.actualizarNotificaciones(
+                    tokenManager.getBearer(),
+                    NotificacionesRequest(activar)
+                )
+                val perfil = resp.body()
+                when {
+                    resp.isSuccessful && perfil != null -> notificacionesPrecio = perfil.notificacionesPrecio
+                    resp.code() == 401 -> { tokenManager.clearSession(); sesionVencida = true }
+                    else -> mensajeNotificaciones = "No se pudo cambiar la preferencia de alertas"
+                }
+            } catch (e: Exception) {
+                mensajeNotificaciones = "No se pudo conectar con el servidor"
+            } finally {
+                guardandoNotificaciones = false
+            }
         }
     }
 
@@ -374,6 +413,60 @@ fun ProfileScreen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(14.dp)
                 )
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+
+        // ---------- Alertas de precio (H66) ----------
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconoCircular(
+                        icono = if (vm.notificacionesPrecio) Icons.Rounded.NotificationsActive
+                        else Icons.Rounded.NotificationsOff
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Alertas de baja de precio",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Te avisamos cuando baje el precio de un producto de tus favoritos.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = vm.notificacionesPrecio,
+                        onCheckedChange = { vm.cambiarNotificaciones(it) },
+                        enabled = !vm.guardandoNotificaciones
+                    )
+                }
+                if (!vm.notificacionesPrecio) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Con las alertas apagadas no se crean avisos nuevos ni llegan correos. " +
+                                "Las alertas que ya tienes se conservan.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                vm.mensajeNotificaciones?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
         Spacer(Modifier.height(16.dp))
