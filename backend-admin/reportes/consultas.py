@@ -62,7 +62,7 @@ def en_rango(consulta, desde, hasta):
 def mas_buscados(desde, hasta, limite=MAXIMO_FILAS):
     """
     Agrupa las búsquedas con desde <= fecha < hasta por texto (sin distinguir mayúsculas) y tipo.
-    desde o hasta en None: sin límite por ese lado.
+    desde o hasta en None: sin límite por ese lado; limite en None: todas las filas (Excel, H65).
 
     Cada fila trae: texto, tipo, busquedas, promedio_resultados y sin_resultados. Orden: más
     búsquedas primero; si empatan, más búsquedas sin resultados primero y luego por texto.

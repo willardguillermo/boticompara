@@ -42,6 +42,7 @@ def indicadores(desde, hasta):
 def mas_comparados(desde, hasta, limite=TOP_DEL_PANEL):
     """
     Agrupa las consultas de comparación con desde <= fecha < hasta por producto.
+    limite en None: todas las filas (Excel, H65).
 
     Cada fila trae: producto_id, nombre_comercial, presentacion, botica y comparaciones. Orden:
     más comparaciones primero; si empatan, por nombre comercial y luego por id del producto.

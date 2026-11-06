@@ -19,7 +19,10 @@
   {% include "admin/reportes/rango_fechas.html" %}
   <p class="reporte-nota">
     Días en hora de Lima; «Hasta» incluye todo ese día. Sin fechas se muestran los últimos {{ dias }} días.
-    Como máximo {{ maximo_filas }} textos.
+    Como máximo {{ maximo_filas }} textos; el Excel trae todos los del periodo.
+  </p>
+  <p class="reporte-exportar">
+    <a href="{% url 'admin:reportes_busqueda_exportar' %}{{ sufijo_url }}" class="button" id="exportar-buscados">Exportar a Excel</a>
   </p>
 
   {% if filas %}

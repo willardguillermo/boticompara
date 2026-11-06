@@ -39,3 +39,7 @@
 .panel-detalle { display: block; color: var(--body-quiet-color); font-size: 0.75rem; }
 .panel-vacio { margin: 0; padding: 12px; color: var(--body-quiet-color); }
 .panel-pie { margin: 0; padding: 8px 12px; border-top: 1px solid var(--hairline-color); }
+
+/* H65: botón "Exportar a Excel" */
+.reporte-exportar { margin: 0 0 16px; }
+.panel-pie .button + .panel-detalle { margin-top: 6px; }
