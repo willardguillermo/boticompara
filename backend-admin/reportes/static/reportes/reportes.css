@@ -16,7 +16,7 @@
 #panel-principal { margin-bottom: 30px; }
 #panel-principal .module { margin-bottom: 20px; }
 #panel-principal .panel-cuerpo { padding: 12px; }
-.panel-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px;
+.panel-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr)); gap: 12px;
                   margin: 0; padding: 0; list-style: none; }
 .panel-tarjetas li { list-style: none; }
 .panel-tarjeta { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; margin: 0;
@@ -26,3 +26,16 @@
                font-variant-numeric: tabular-nums; }
 .panel-etiqueta { color: var(--body-quiet-color); }
 .panel-tarjeta a { font-weight: 600; }
+
+/* H64: tablas del top, lado a lado; en pantallas angostas una debajo de la otra */
+.panel-tops { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 0 20px; }
+.panel-tabla { overflow-x: auto; }
+#panel-principal table { width: 100%; }
+/* dashboard.css estira la primera columna y no deja partir las celdas: aquí no aplica */
+#panel-principal table th { width: auto; }
+#panel-principal table td { white-space: normal; }
+#panel-principal table td a { display: inline; padding-right: 0; }
+#panel-principal .numero { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.panel-detalle { display: block; color: var(--body-quiet-color); font-size: 0.75rem; }
+.panel-vacio { margin: 0; padding: 12px; color: var(--body-quiet-color); }
+.panel-pie { margin: 0; padding: 8px 12px; border-top: 1px solid var(--hairline-color); }

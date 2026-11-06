@@ -68,6 +68,72 @@
       </ul>
     </div>
   </div>
+
+  <div class="panel-tops">
+    <div class="module" id="top-buscados">
+      <h2>Top {{ panel.top }} más buscados</h2>
+      {% if panel.mas_buscados %}
+      <div class="panel-tabla">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Texto buscado</th>
+              <th scope="col">Tipo</th>
+              <th scope="col" class="numero">Búsquedas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fila in panel.mas_buscados %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>{{ fila.texto_normalizado }}</td>
+              <td>{% if fila.tipo == "principio" %}Principio activo{% else %}Nombre comercial{% endif %}</td>
+              <td class="numero">{{ fila.busquedas }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="panel-vacio">No hubo búsquedas en este periodo.</p>
+      {% endif %}
+      <p class="panel-pie"><a href="{{ panel.url_reporte_buscados }}" id="enlace-reporte-buscados">Ver el reporte completo</a></p>
+    </div>
+
+    <div class="module" id="top-comparados">
+      <h2>Top {{ panel.top }} más comparados</h2>
+      {% if panel.mas_comparados %}
+      <div class="panel-tabla">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Producto</th>
+              <th scope="col">Botica</th>
+              <th scope="col" class="numero">Comparaciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fila in panel.mas_comparados %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>
+                <a href="{% url 'admin:boticas_producto_change' fila.producto_id %}">{{ fila.nombre_comercial }}</a>
+                <span class="panel-detalle">{{ fila.presentacion }}</span>
+              </td>
+              <td>{{ fila.botica }}</td>
+              <td class="numero">{{ fila.comparaciones }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="panel-vacio">No hubo comparaciones en este periodo.</p>
+      {% endif %}
+    </div>
+  </div>
 </div>
 {% endwith %}
 {% endif %}

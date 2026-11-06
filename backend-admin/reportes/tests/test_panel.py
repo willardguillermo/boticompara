@@ -12,7 +12,7 @@ from boticas.models import Botica, Producto, Usuario
 from catalogo.models import ConsultaComparacion, Medicamento, PrincipioActivo
 from reportes.consultas import rango_por_defecto
 from reportes.models import Busqueda
-from reportes.panel import indicadores
+from reportes.panel import TOP_DEL_PANEL, indicadores, mas_comparados
 from reportes.sitio import SitioAdmin
 from reportes.tests.base import ConTablas
 
@@ -129,6 +129,60 @@ class IndicadoresTests(ConTablas):
                           datos['duenos_activos']), (1, 1, 1, 1))
 
 
+class MasComparadosTests(ConTablas):
+    def test_agrupa_por_producto_con_nombre_presentacion_y_botica(self):
+        botica = crear_botica(nombre='Botica Rosa')
+        panadol = crear_producto(botica, 'Panadol', 'Caja x 100')
+        for _ in range(3):
+            comparar(panadol)
+
+        filas = mas_comparados(*rango_por_defecto())
+
+        self.assertEqual(filas, [{'producto_id': panadol.id, 'nombre_comercial': 'Panadol',
+                                  'presentacion': 'Caja x 100', 'botica': 'Botica Rosa', 'comparaciones': 3}])
+
+    def test_mismo_nombre_en_dos_boticas_son_filas_distintas(self):
+        de_rosa = crear_producto(crear_botica(nombre='Botica Rosa'), 'Panadol')
+        de_jorge = crear_producto(crear_botica(nombre='Botica Jorge'), 'Panadol')
+        comparar(de_rosa)
+        comparar(de_jorge)
+        comparar(de_jorge)
+
+        filas = mas_comparados(*rango_por_defecto())
+
+        self.assertEqual([(f['botica'], f['comparaciones']) for f in filas], [('Botica Jorge', 2), ('Botica Rosa', 1)])
+
+    def test_ordena_de_mayor_a_menor_y_empates_por_nombre(self):
+        botica = crear_botica()
+        for nombre, veces in (('Nexium', 1), ('Aspirina', 2), ('Panadol', 4), ('Bismutol', 2)):
+            producto = crear_producto(botica, nombre)
+            for _ in range(veces):
+                comparar(producto)
+
+        filas = mas_comparados(*rango_por_defecto())
+
+        self.assertEqual([(f['nombre_comercial'], f['comparaciones']) for f in filas],
+                         [('Panadol', 4), ('Aspirina', 2), ('Bismutol', 2), ('Nexium', 1)])
+
+    def test_maximo_5_filas(self):
+        botica = crear_botica()
+        for i in range(TOP_DEL_PANEL + 3):
+            comparar(crear_producto(botica, f'Producto {i}'))
+
+        self.assertEqual(TOP_DEL_PANEL, 5)
+        self.assertEqual(len(mas_comparados(*rango_por_defecto())), 5)
+
+    def test_solo_cuenta_las_del_periodo(self):
+        producto = crear_producto(crear_botica())
+        antiguo = crear_producto(crear_botica(), 'Antiguo')
+        comparar(producto, hace=timedelta(days=29))
+        comparar(antiguo, hace=timedelta(days=31))
+
+        filas = mas_comparados(*rango_por_defecto())
+
+        self.assertEqual([f['nombre_comercial'] for f in filas], ['Panadol'])
+
+
 class PanelEnLaPortadaTests(ConTablas):
     @classmethod
     def setUpTestData(cls):
@@ -223,3 +277,40 @@ class PanelEnLaPortadaTests(ConTablas):
 
         self.assertEqual(respuesta.status_code, 302)
         self.assertIn(reverse('admin:login'), respuesta['Location'])
+
+    def test_staff_ve_los_dos_tops(self):
+        producto = crear_producto(crear_botica(nombre='Botica Rosa'), 'Panadol', 'Caja x 100')
+        comparar(producto)
+        comparar(producto)
+        for i in range(7):
+            buscar(f'texto {i}')
+        self.client.force_login(self.staff)
+
+        respuesta = self.client.get(URL)
+
+        panel = respuesta.context['panel']
+        self.assertEqual(len(panel['mas_buscados']), 5)
+        self.assertEqual(panel['mas_comparados'][0]['comparaciones'], 2)
+        self.assertContains(respuesta, 'Top 5 más buscados')
+        self.assertContains(respuesta, 'Top 5 más comparados')
+        self.assertContains(respuesta, 'Botica Rosa')
+        self.assertContains(respuesta, 'Caja x 100')
+        self.assertContains(respuesta, reverse('admin:boticas_producto_change', args=[producto.id]))
+
+    def test_enlace_al_reporte_completo_conserva_las_fechas(self):
+        self.client.force_login(self.staff)
+        reporte = reverse('admin:reportes_busqueda_changelist')
+
+        sin_fechas = self.client.get(URL)
+        con_fechas = self.client.get(URL, {'desde': '2026-10-01', 'hasta': '2026-10-10'})
+
+        self.assertContains(sin_fechas, f'href="{reporte}" id="enlace-reporte-buscados"')
+        self.assertContains(con_fechas, f'href="{reporte}?desde=2026-10-01&amp;hasta=2026-10-10"')
+
+    def test_periodo_sin_datos_muestra_mensajes_en_vez_de_tablas(self):
+        self.client.force_login(self.staff)
+
+        respuesta = self.client.get(URL)
+
+        self.assertContains(respuesta, 'No hubo búsquedas en este periodo.')
+        self.assertContains(respuesta, 'No hubo comparaciones en este periodo.')
