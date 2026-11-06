@@ -6,9 +6,12 @@ import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
 import java.math.BigDecimal;
+import java.util.List;
+
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +23,7 @@ public class ProductoService {
     private final ProductoRepository productos;
     private final MedicamentoService medicamentos;
     private final AlertaService alertas;
+    private final ApplicationEventPublisher eventos;
 
     /** H8 */
     @Transactional
@@ -47,7 +51,11 @@ public class ProductoService {
         // para que la vista de búsqueda (JDBC) vea el producto ya actualizado (stock, activo...).
         if (guardado.getPrecio().compareTo(precioAnterior) < 0) {
             productos.flush();
-            alertas.registrarBaja(guardado.getId(), precioAnterior, guardado.getPrecio());
+            List<AlertaService.AlertaCreada> creadas = alertas.registrarBaja(guardado.getId(), precioAnterior,
+                    guardado.getPrecio());
+            if (!creadas.isEmpty()) {
+                eventos.publishEvent(new AlertasCreadas(creadas));
+            }
         }
         return ProductoResponse.from(guardado);
     }

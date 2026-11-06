@@ -5,6 +5,7 @@ import com.boticompara.usuario.dto.ProductoResponse;
 import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.mockito.InOrder;
 import static org.mockito.Mockito.inOrder;
@@ -19,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,6 +46,9 @@ class ProductoServiceTest {
 
     @Mock
     AlertaService alertas;
+
+    @Mock
+    ApplicationEventPublisher eventos;
 
     @InjectMocks
     ProductoService service;
@@ -354,5 +359,29 @@ class ProductoServiceTest {
 
         verifyNoInteractions(alertas);
         verify(productos, never()).flush();
+    }
+    @Test
+    void actualizarBajandoElPrecio_publicaElEventoConLasAlertasCreadas() {
+        conBoticaAprobada();
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+        AlertaService.AlertaCreada creada = new AlertaService.AlertaCreada(1L, 42L, 7L,
+                new BigDecimal("8.50"), new BigDecimal("7.50"));
+        when(alertas.registrarBaja(7L, new BigDecimal("8.50"), new BigDecimal("7.50"))).thenReturn(List.of(creada));
+
+        service.actualizar(10L, 7L, requestConPrecio("7.50"));
+
+        verify(eventos).publishEvent(new AlertasCreadas(List.of(creada)));
+    }
+
+    @Test
+    void actualizarBajandoElPrecio_sinAlertasCreadas_noPublicaEvento() {
+        conBoticaAprobada();
+        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
+
+        service.actualizar(10L, 7L, requestConPrecio("7.50"));
+
+        verifyNoInteractions(eventos);
     }
 }

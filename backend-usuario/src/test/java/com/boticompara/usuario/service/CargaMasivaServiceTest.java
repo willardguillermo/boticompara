@@ -8,8 +8,6 @@ import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
 import org.mockito.InOrder;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -17,6 +15,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
@@ -28,10 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CargaMasivaServiceTest {
@@ -46,6 +42,9 @@ class CargaMasivaServiceTest {
 
     @Mock
     AlertaService alertas;
+
+    @Mock
+    ApplicationEventPublisher eventos;
 
     @Captor
     ArgumentCaptor<List<Producto>> guardados;
@@ -228,5 +227,27 @@ class CargaMasivaServiceTest {
 
         verifyNoInteractions(alertas);
         verify(productos, never()).flush();
+    }
+
+    @Test
+    void variasBajas_publicanUnSoloEventoConTodasLasAlertas() {
+        conBotica("APROBADO");
+        conCatalogo(producto(7L, "Panadol", "Tableta 500 mg x 10", "8.50", 40, 5),
+                producto(8L, "Ibuprofeno", "Tableta 400 mg x 10", "3.00", 40, 5));
+        AlertaService.AlertaCreada a1 = new AlertaService.AlertaCreada(1L, 42L, 7L,
+                new BigDecimal("8.50"), new BigDecimal("7.90"));
+        AlertaService.AlertaCreada a2 = new AlertaService.AlertaCreada(2L, 42L, 8L,
+                new BigDecimal("3.00"), new BigDecimal("2.50"));
+        when(alertas.registrarBaja(7L, new BigDecimal("8.50"), new BigDecimal("7.90"))).thenReturn(List.of(a1));
+        when(alertas.registrarBaja(8L, new BigDecimal("3.00"), new BigDecimal("2.50"))).thenReturn(List.of(a2));
+
+        service.cargar(10L, csv(CAB,
+                "Panadol,Paracetamol,Tableta 500 mg x 10,7.90,40,",
+                "Ibuprofeno,Ibuprofeno,Tableta 400 mg x 10,2.50,40,"));
+
+        ArgumentCaptor<AlertasCreadas> evento = ArgumentCaptor.forClass(AlertasCreadas.class);
+        verify(eventos, times(1)).publishEvent(evento.capture());
+        assertEquals(2, evento.getValue().alertas().size());
+        assertTrue(evento.getValue().alertas().containsAll(List.of(a1, a2)));
     }
 }
