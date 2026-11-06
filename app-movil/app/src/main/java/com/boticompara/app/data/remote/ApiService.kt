@@ -1,5 +1,9 @@
 package com.boticompara.app.data.remote
 
+import com.google.gson.TypeAdapter
+import com.google.gson.annotations.JsonAdapter
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonWriter
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -24,8 +28,7 @@ data class MensajeResponse(val mensaje: String)
 data class PerfilResponse(
     val id: Long, val nombre: String, val correo: String,
     val telefono: String?, val direccion: String?, val rol: String,
-    val notificacionesPrecio: Boolean? = null  // H66: alertas de baja de precio
-
+    val notificacionesPrecio: Boolean? = null   // H66: alertas de baja de precio
 )
 data class PerfilRequest(val nombre: String, val telefono: String?, val direccion: String?)
 
@@ -88,7 +91,7 @@ data class AlternativasResponse(
     val alternativas: List<AlternativaResponse> = emptyList()
 )
 
-// ---- Favoritos (H43, H44, H45) ----
+// ---- Favoritos (H43, H44, H45, H60) ----
 data class FavoritoRequest(val productoId: Long)
 
 data class FavoritoResponse(
@@ -102,8 +105,30 @@ data class FavoritoResponse(
     val boticaNombre: String,
     val boticaDireccion: String,
     val boticaDistrito: String,
-    val fecha: String                      // fecha en que se guardó (ISO 8601)
+    val fecha: String,                     // fecha en que se guardó (ISO 8601)
+    val precioObjetivo: Double? = null     // H60: precio al que quiere el aviso, null si no puso
 )
+
+// H60: el campo se envía siempre, incluso null (null = quitar el precio objetivo)
+@JsonAdapter(PrecioObjetivoRequestAdapter::class)
+data class PrecioObjetivoRequest(val precioObjetivo: Double?)
+
+class PrecioObjetivoRequestAdapter : TypeAdapter<PrecioObjetivoRequest>() {
+    override fun write(out: JsonWriter, value: PrecioObjetivoRequest?) {
+        if (value == null) {
+            out.nullValue()
+            return
+        }
+        out.beginObject()
+        out.serializeNulls = true
+        out.name("precioObjetivo")
+        if (value.precioObjetivo == null) out.nullValue() else out.value(value.precioObjetivo)
+        out.endObject()
+    }
+
+    override fun read(reader: JsonReader): PrecioObjetivoRequest =
+        throw UnsupportedOperationException("Solo se usa para enviar")
+}
 
 interface ApiService {
     @POST("auth/login")
@@ -180,4 +205,12 @@ interface ApiService {
         @Header("Authorization") auth: String,
         @Path("productoId") productoId: Long
     ): Response<Unit>
+
+    // H60: poner, cambiar o quitar (null) el precio objetivo de un favorito
+    @PUT("favoritos/{productoId}/precio-objetivo")
+    suspend fun actualizarPrecioObjetivo(
+        @Header("Authorization") auth: String,
+        @Path("productoId") productoId: Long,
+        @Body request: PrecioObjetivoRequest
+    ): Response<FavoritoResponse>
 }
