@@ -1,20 +1,23 @@
 package com.boticompara.usuario.service;
 
+import com.boticompara.usuario.dto.ErrorFila;
 import com.boticompara.usuario.dto.ResultadoCarga;
 import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
-import org.springframework.context.ApplicationEventPublisher;
 import com.boticompara.usuario.repository.ProductoRepository;
+import com.boticompara.usuario.service.MedicamentoService.EnlaceMedicamento;
 import com.boticompara.usuario.util.CsvProductoParser;
 import com.boticompara.usuario.util.CsvProductoParser.FilaProducto;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,17 +29,21 @@ public class CargaMasivaService {
 
     private final BoticaRepository boticas;
     private final ProductoRepository productos;
+    private final MedicamentoService medicamentos;
     private final AlertaService alertas;
     private final ApplicationEventPublisher eventos;
 
     /**
      * H11: crea los productos nuevos y actualiza precio y stock de los que ya existen (mismo nombre y
      * presentación). Las filas válidas se guardan aunque otras tengan errores; los errores van en el reporte.
+     * D4: si la fila trae medicamentoId, enlaza el producto y copia el principio activo del medicamento (regla D2);
+     * un medicamento inexistente u oculto deja esa fila como error. Sin medicamentoId se conserva el enlace actual.
      */
     @Transactional
     public ResultadoCarga cargar(Long usuarioId, byte[] datos) {
         Botica botica = boticaAprobada(usuarioId);
         CsvProductoParser.Resultado csv = CsvProductoParser.parsearArchivo(datos);
+        List<ErrorFila> errores = new ArrayList<>(csv.errores());
 
         Map<String, Producto> existentes = new HashMap<>();
         for (Producto p : productos.findByBoticaIdAndActivoTrueOrderByNombreComercialAsc(botica.getId())) {
@@ -46,9 +53,19 @@ public class CargaMasivaService {
         List<Producto> aGuardar = new ArrayList<>();
         // H59: precio de cada producto existente antes de la carga (el primero, si aparece en varias filas)
         Map<Producto, BigDecimal> preciosAntes = new LinkedHashMap<>();
+        // D4: una consulta por medicamento, aunque aparezca en varias filas
+        Map<Long, EnlaceMedicamento> enlaces = new HashMap<>();
         int creados = 0;
         int actualizados = 0;
         for (FilaProducto f : csv.filas()) {
+            EnlaceMedicamento enlace = null;
+            if (f.medicamentoId() != null) {
+                enlace = enlaces.computeIfAbsent(f.medicamentoId(), medicamentos::enlace);
+                if (enlace.error() != null) {
+                    errores.add(new ErrorFila(f.fila(), enlace.error()));
+                    continue;
+                }
+            }
             Producto p = existentes.get(f.clave());
             if (p != null) {
                 preciosAntes.putIfAbsent(p, p.getPrecio());
@@ -71,13 +88,19 @@ public class CargaMasivaService {
                 }
                 creados++;
             }
+            if (enlace != null) {
+                // D2: enlazado, el principio activo es el del medicamento y se ignora el texto de la fila
+                p.setMedicamentoId(f.medicamentoId());
+                p.setPrincipioActivo(enlace.principioActivo());
+            }
             aGuardar.add(p);
         }
         if (!aGuardar.isEmpty()) {
             productos.saveAll(aGuardar);
         }
         registrarBajas(preciosAntes);
-        return new ResultadoCarga(creados, actualizados, csv.errores());
+        errores.sort(Comparator.comparingInt(ErrorFila::fila));
+        return new ResultadoCarga(creados, actualizados, errores);
     }
 
     /** H59: alertas de los productos que bajaron de precio, en la misma transacción que la carga. */

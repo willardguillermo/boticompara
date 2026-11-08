@@ -29,6 +29,9 @@ class XlsxProductoLectorTest {
     private static final Object[] CAB =
             {"nombreComercial", "principioActivo", "presentacion", "precio", "stock", "stockMinimo"};
 
+    private static final Object[] CAB_MED =
+            {"nombreComercial", "principioActivo", "presentacion", "precio", "stock", "stockMinimo", "medicamentoId"};
+
     /**
      * Crea un .xlsx en memoria. Cada fila es un arreglo de valores: Number = celda numérica,
      * String que empieza con "=" = fórmula, otro String = texto, null = celda vacía.
@@ -203,5 +206,16 @@ class XlsxProductoLectorTest {
 
         assertEquals(1, r.filas().size());
         assertTrue(r.errores().isEmpty());
+    }
+
+    @Test
+    void xlsx_leeMedicamentoIdNumericoOVacio() throws IOException {
+        Resultado r = CsvProductoParser.parsearArchivo(xlsx(CAB_MED,
+                new Object[]{"Panadol", "Paracetamol", "Tableta 500 mg x 10", 8.5, 40, 5, 12},
+                new Object[]{"Ibuprofeno Genérico", "Ibuprofeno", "Tableta 400 mg x 10", 3.2, 100, 10, null}));
+
+        assertTrue(r.errores().isEmpty());
+        assertEquals(12L, r.filas().get(0).medicamentoId());
+        assertNull(r.filas().get(1).medicamentoId());
     }
 }

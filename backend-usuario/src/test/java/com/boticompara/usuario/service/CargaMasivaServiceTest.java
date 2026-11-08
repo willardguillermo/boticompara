@@ -43,6 +43,11 @@ class CargaMasivaServiceTest {
     @Mock
     AlertaService alertas;
 
+    private static final String CAB_MED = CAB + ",medicamentoId";
+
+    @Mock
+    MedicamentoService medicamentos;
+
     @Mock
     ApplicationEventPublisher eventos;
 
@@ -249,5 +254,81 @@ class CargaMasivaServiceTest {
         verify(eventos, times(1)).publishEvent(evento.capture());
         assertEquals(2, evento.getValue().alertas().size());
         assertTrue(evento.getValue().alertas().containsAll(List.of(a1, a2)));
+    }
+
+    @Test
+    void conMedicamentoId_enlazaElProductoNuevoYCopiaElPrincipioActivo() {
+        conBotica("APROBADO");
+        conCatalogo();
+        when(medicamentos.enlace(12L)).thenReturn(new MedicamentoService.EnlaceMedicamento("Paracetamol", null));
+
+        ResultadoCarga r = service.cargar(10L, csv(CAB_MED,
+                "Panadol,Texto que se ignora,Tableta 500 mg x 10,8.50,40,5,12"));
+
+        assertEquals(1, r.creados());
+        verify(productos).saveAll(guardados.capture());
+        Producto nuevo = guardados.getValue().get(0);
+        assertEquals(12L, nuevo.getMedicamentoId());
+        assertEquals("Paracetamol", nuevo.getPrincipioActivo());
+    }
+
+    @Test
+    void conMedicamentoId_cambiaElEnlaceDeUnProductoExistente() {
+        conBotica("APROBADO");
+        Producto panadol = producto(7L, "Panadol", "Tableta 500 mg x 10", "8.50", 40, 5);
+        panadol.setMedicamentoId(3L);
+        conCatalogo(panadol);
+        when(medicamentos.enlace(12L)).thenReturn(new MedicamentoService.EnlaceMedicamento("Paracetamol", null));
+
+        ResultadoCarga r = service.cargar(10L, csv(CAB_MED, "Panadol,Otro,Tableta 500 mg x 10,8.50,40,5,12"));
+
+        assertEquals(1, r.actualizados());
+        assertEquals(12L, panadol.getMedicamentoId());
+        assertEquals("Paracetamol", panadol.getPrincipioActivo());
+    }
+
+    @Test
+    void sinMedicamentoId_conservaElEnlaceActual() {
+        conBotica("APROBADO");
+        Producto panadol = producto(7L, "Panadol", "Tableta 500 mg x 10", "8.50", 40, 5);
+        panadol.setMedicamentoId(3L);
+        conCatalogo(panadol);
+
+        service.cargar(10L, csv(CAB_MED, "Panadol,Paracetamol,Tableta 500 mg x 10,8.50,35,"));
+
+        assertEquals(3L, panadol.getMedicamentoId());
+        assertEquals("Principio", panadol.getPrincipioActivo());
+        verifyNoInteractions(medicamentos);
+    }
+
+    @Test
+    void medicamentoQueNoExiste_esErrorDeEsaFilaYLasDemasSeGuardan() {
+        conBotica("APROBADO");
+        conCatalogo();
+        when(medicamentos.enlace(99L)).thenReturn(
+                new MedicamentoService.EnlaceMedicamento(null, "El medicamento no existe en el catálogo"));
+
+        ResultadoCarga r = service.cargar(10L, csv(CAB_MED,
+                "Panadol,Paracetamol,Tableta 500 mg x 10,8.50,40,5,99",
+                "Ibuprofeno,Ibuprofeno,Tableta 400 mg x 10,3.20,100,10,"));
+
+        assertEquals(1, r.creados());
+        assertEquals(List.of(new ErrorFila(2, "El medicamento no existe en el catálogo")), r.errores());
+        verify(productos).saveAll(guardados.capture());
+        assertEquals(1, guardados.getValue().size());
+        assertEquals("Ibuprofeno", guardados.getValue().get(0).getNombreComercial());
+    }
+
+    @Test
+    void mismoMedicamentoEnVariasFilas_seConsultaUnaSolaVez() {
+        conBotica("APROBADO");
+        conCatalogo();
+        when(medicamentos.enlace(12L)).thenReturn(new MedicamentoService.EnlaceMedicamento("Paracetamol", null));
+
+        service.cargar(10L, csv(CAB_MED,
+                "Panadol,x,Tableta 500 mg x 10,8.50,40,5,12",
+                "Panadol Forte,x,Tableta 1 g x 10,9.50,40,5,12"));
+
+        verify(medicamentos, times(1)).enlace(12L);
     }
 }
