@@ -5,6 +5,7 @@ import com.boticompara.usuario.entity.Usuario;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.TokenUsuarioRepository;
 import com.boticompara.usuario.repository.UsuarioRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import java.util.HexFormat;
 import java.util.List;
 
 /** H17: recuperación de contraseña con un código de 6 dígitos enviado por correo. */
+@Slf4j
 @Service
 public class RecuperacionService {
 
@@ -30,6 +32,9 @@ public class RecuperacionService {
     static final Duration VIGENCIA = Duration.ofMinutes(15);
     static final Duration ESPERA = Duration.ofMinutes(1);
     static final int MAX_INTENTOS = 5;
+    /** SEC-05: tope de códigos nuevos por usuario en una hora. Con 5 intentos por código, unos 15 intentos por hora. */
+    static final int MAX_CODIGOS_POR_HORA = 3;
+    static final Duration VENTANA = Duration.ofHours(1);
 
     private final UsuarioRepository usuarios;
     private final TokenUsuarioRepository tokens;
@@ -64,6 +69,12 @@ public class RecuperacionService {
         if (reciente) {
             return;
         }
+
+        if (tokens.countByUsuarioIdAndTipoAndCreadoEnAfter(u.getId(), TIPO, ahora.minus(VENTANA)) >= MAX_CODIGOS_POR_HORA) {
+            log.warn("Recuperación: el usuario {} alcanzó el tope de {} códigos por hora", u.getId(), MAX_CODIGOS_POR_HORA);
+            return;
+        }
+
         pendientes.forEach(t -> t.setUsado(true));
         tokens.saveAll(pendientes);
 

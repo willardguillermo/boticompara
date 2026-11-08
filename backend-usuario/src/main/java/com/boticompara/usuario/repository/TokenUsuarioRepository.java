@@ -4,6 +4,7 @@ import com.boticompara.usuario.entity.TokenUsuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import java.time.Instant;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
@@ -20,4 +21,8 @@ public interface TokenUsuarioRepository extends JpaRepository<TokenUsuario, Long
     @Modifying
     @Query("update TokenUsuario t set t.usado = true where t.usuarioId = :usuarioId and t.usado = false")
     int invalidarPendientes(@Param("usuarioId") Long usuarioId);
+
+
+    /** SEC-05: cuántos códigos de un tipo se generaron desde cierto momento (usados o no). */
+    long countByUsuarioIdAndTipoAndCreadoEnAfter(Long usuarioId, String tipo, Instant desde);
 }
