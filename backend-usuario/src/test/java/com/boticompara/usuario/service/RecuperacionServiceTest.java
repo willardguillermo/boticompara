@@ -174,6 +174,45 @@ class RecuperacionServiceTest {
         verify(correo).enviar(eq(CORREO), anyString(), anyString());
     }
 
+    @Test
+    void solicitarAlLlegarAlTopeDeCodigosPorHoraNoEmiteNiEnviaOtro() {
+        conUsuario(usuario(true));
+        pendientes();
+        when(tokens.countByUsuarioIdAndTipoAndCreadoEnAfter(eq(10L), eq("RECUPERACION"), any(Instant.class)))
+                .thenReturn(3L);
+
+        service.solicitar(CORREO);
+
+        verify(tokens, never()).save(any(TokenUsuario.class));
+        verifyNoInteractions(correo);
+    }
+
+    @Test
+    void solicitarBajoElTopeDeCodigosPorHoraSigueEnviando() {
+        conUsuario(usuario(true));
+        pendientes();
+        when(tokens.countByUsuarioIdAndTipoAndCreadoEnAfter(eq(10L), eq("RECUPERACION"), any(Instant.class)))
+                .thenReturn(2L);
+
+        service.solicitar(CORREO);
+
+        verify(tokens).save(any(TokenUsuario.class));
+        verify(correo).enviar(eq(CORREO), anyString(), anyString());
+    }
+
+    @Test
+    void solicitarCuentaLosCodigosDeLaUltimaHora() {
+        conUsuario(usuario(true));
+        pendientes();
+
+        service.solicitar(CORREO);
+
+        ArgumentCaptor<Instant> desde = ArgumentCaptor.forClass(Instant.class);
+        verify(tokens).countByUsuarioIdAndTipoAndCreadoEnAfter(eq(10L), eq("RECUPERACION"), desde.capture());
+        long minutos = Duration.between(desde.getValue(), Instant.now()).toMinutes();
+        assertTrue(minutos >= 59 && minutos <= 60);
+    }
+
     // ---------- restablecer ----------
 
     @Test

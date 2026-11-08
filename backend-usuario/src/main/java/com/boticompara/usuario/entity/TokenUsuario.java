@@ -37,4 +37,8 @@ public class TokenUsuario {
     /** smallint en la base de datos */
     @Column(nullable = false)
     private short intentos = 0;
+
+    /** Solo lectura: la llena la base de datos con now() al insertar (SEC-05). */
+    @Column(name = "creado_en", insertable = false, updatable = false)
+    private Instant creadoEn;
 }
