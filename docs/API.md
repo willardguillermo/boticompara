@@ -306,20 +306,24 @@ El tipo se detecta por el contenido del archivo, no por su extensión. Para los 
 
 **CSV:** UTF-8, separador coma.
 ```
-nombreComercial,principioActivo,presentacion,precio,stock,stockMinimo
-Panadol,Paracetamol,Tableta 500 mg x 10,8.50,40,5
-Ibuprofeno Genérico,Ibuprofeno,Tableta 400 mg x 10,3.20,100,10
+nombreComercial,principioActivo,presentacion,precio,stock,stockMinimo,medicamentoId
+Panadol,Paracetamol,Tableta 500 mg x 10,8.50,40,5,12
+Ibuprofeno Genérico,Ibuprofeno,Tableta 400 mg x 10,3.20,100,10,
 ```
 
-**Excel (`.xlsx`):** las mismas columnas, en la primera hoja. Las celdas pueden ser de texto o numéricas; de una fórmula se toma el valor calculado. Los `.xls` de Excel 97-2003 no se admiten: hay que guardarlos como `.xlsx` o como CSV UTF-8.
+**Excel (`.xlsx`):** las mismas columnas, en la primera hoja (también con `medicamentoId` al final, con valor o vacía). Las celdas pueden ser de texto o numéricas; de una fórmula se toma el valor calculado. Los `.xls` de Excel 97-2003 no se admiten: hay que guardarlos como `.xlsx` o como CSV UTF-8.
 
-La columna `stockMinimo` es opcional.
+Las columnas `stockMinimo` y `medicamentoId` son opcionales. Las columnas se reconocen por su nombre en el encabezado, no por su posición.
 
 **Reglas por fila:**
 - Se validan los mismos campos que en `POST /productos`.
 - Si la botica ya tiene un producto activo con el mismo `nombreComercial` y `presentacion` (sin distinguir mayúsculas), se **actualizan** su precio y su stock (y `stockMinimo` si la fila lo trae). Si no existe, se **crea**.
 - Si el mismo producto aparece dos veces en el archivo, la segunda aparición se informa como error.
 - Las filas válidas se guardan aunque otras tengan errores.
+- `medicamentoId` enlaza el producto con un medicamento del catálogo maestro (H31), igual que en `POST /productos`.
+- Si `medicamentoId` no es un número entero, el medicamento no existe o está oculto, esa fila se informa como error (con el mismo mensaje que da `POST /productos`) y las demás se siguen procesando.
+- Si `medicamentoId` está vacío o el archivo no trae la columna, se conserva el enlace actual del producto: la carga masiva no quita enlaces (para eso se usa `DELETE /productos/{id}/medicamento`).
+- **Regla D2:** al crear o actualizar un producto con `medicamentoId`, su `principioActivo` pasa a ser el del medicamento y se ignora el texto de la fila. Si el producto ya estaba enlazado a otro medicamento, se cambia el enlace.
 
 ```json
 // 200 OK
@@ -328,7 +332,8 @@ La columna `stockMinimo` es opcional.
   "actualizados": 3,
   "errores": [
     { "fila": 7, "mensaje": "El precio debe ser mayor a 0." },
-    { "fila": 9, "mensaje": "Producto duplicado en el archivo (ya aparece en la fila 2)." }
+    { "fila": 9, "mensaje": "Producto duplicado en el archivo (ya aparece en la fila 2)." },
+    { "fila": 11, "mensaje": "El medicamento no existe en el catálogo" }
   ]
 }
 ```
