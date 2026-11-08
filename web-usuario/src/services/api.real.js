@@ -75,4 +75,5 @@ export const apiReal = {
     formulario.append('archivo', archivo)
     return solicitar('POST', '/productos/carga-masiva', formulario)
   },
+  buscarMedicamentos: (q) => solicitar('GET', `/medicamentos?q=${encodeURIComponent(q.trim())}`),
 }

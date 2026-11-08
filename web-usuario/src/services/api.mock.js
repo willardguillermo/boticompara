@@ -22,7 +22,26 @@ const RUCS_SUNAT = {
   },
 }
 
+// H31: catálogo maestro con los mismos ID que la BD (database/seed_v3_catalogo.sql, TEST-001 a TEST-012)
+const MEDICAMENTOS = [
+  [2, 'Panadol', 'Paracetamol', 'Caja x 100 tabletas', '500 mg'],
+  [11, 'Paracetamol Genérico', 'Paracetamol', 'Tableta', '500 mg'],
+  [12, 'Advil', 'Ibuprofeno', 'Tableta', '400 mg'],
+  [23, 'Ibuprofeno Genérico', 'Ibuprofeno', 'Tableta', '400 mg'],
+  [24, 'Amoxil', 'Amoxicilina', 'Caja x 100 cápsulas', '500 mg'],
+  [25, 'Amoxicilina Genérica', 'Amoxicilina', 'Cápsula', '500 mg'],
+  [26, 'Cozaar', 'Losartán', 'Tableta', '50 mg'],
+  [27, 'Losartán Genérico', 'Losartán', 'Tableta', '50 mg'],
+  [28, 'Omeprazol Genérico', 'Omeprazol', 'Cápsula', '20 mg'],
+  [29, 'Nexium', 'Esomeprazol', 'Caja x 14 tabletas', '40 mg'],
+  [30, 'Aspirina Genérica', 'Ácido Acetilsalicílico', 'Tableta', '100 mg'],
+  [31, 'Loratadina Genérica', 'Loratadina', 'Tableta', '10 mg'],
+].map(([id, nombreComercial, principioActivo, presentacion, concentracion]) => ({
+  id, nombreComercial, principioActivo, presentacion, concentracion, oculto: false,
+}))
+
 const db = {
+  medicamentos: MEDICAMENTOS,
   usuarios: [
     { id: 1, nombre: 'Rosa Quispe', correo: 'rosa@boticompara.nissidev.dev', password: PASSWORD_PRUEBA, telefono: '987654321', direccion: null, rol: 'DUENO_BOTICA' },
     { id: 2, nombre: 'Jorge Mendoza', correo: 'jorge@boticompara.nissidev.dev', password: PASSWORD_PRUEBA, telefono: '976543210', direccion: null, rol: 'DUENO_BOTICA' },
@@ -52,6 +71,8 @@ const db = {
   ].map(([boticaId, nombreComercial, principioActivo, presentacion, precio, stock], i) => ({
     id: i + 1, boticaId, nombreComercial, principioActivo, presentacion, precio, stock,
     stockMinimo: STOCK_MINIMO_DEFECTO, activo: true,
+    // Enlazado por nombre comercial, como el paso 5 de seed_v3_catalogo.sql
+    medicamentoId: MEDICAMENTOS.find((m) => m.nombreComercial === nombreComercial)?.id ?? null,
   })),
 }
 
@@ -66,8 +87,19 @@ const usuarioCorto = ({ id, nombre, correo, rol }) => ({ id, nombre, correo, rol
 const perfil = ({ id, nombre, correo, telefono, direccion, rol }) => ({ id, nombre, correo, telefono, direccion, rol })
 // eslint-disable-next-line no-unused-vars
 const boticaDto = ({ usuarioId, ...botica }) => botica
-const productoDto = ({ id, nombreComercial, principioActivo, presentacion, precio, stock, stockMinimo }) =>
-  ({ id, nombreComercial, principioActivo, presentacion, precio, stock, stockMinimo })
+const productoDto = ({ id, nombreComercial, principioActivo, presentacion, precio, stock, stockMinimo, medicamentoId }) =>
+  ({ id, nombreComercial, principioActivo, presentacion, precio, stock, stockMinimo, medicamentoId: medicamentoId ?? null })
+
+const medicamentoDto = ({ id, nombreComercial, principioActivo, presentacion, concentracion }) =>
+  ({ id, nombreComercial, principioActivo, presentacion, concentracion: concentracion ?? null })
+
+/** D4: igual que MedicamentoService.enlace del backend: { principioActivo } o { error }. */
+function enlaceMedicamento(id) {
+  const medicamento = db.medicamentos.find((m) => m.id === id)
+  if (!medicamento) return { error: 'El medicamento no existe en el catálogo' }
+  if (medicamento.oculto) return { error: 'El medicamento no está disponible en el catálogo' }
+  return { principioActivo: medicamento.principioActivo }
+}
 
 // H3: igual que el backend, ambas coordenadas o ninguna, dentro de rango
 function validarCoordenadas({ latitud, longitud }) {
@@ -283,7 +315,7 @@ async function leerFilasProductos(archivo) {
     indice[nombre.trim().toLowerCase()] ??= i
   })
   if (!COLUMNAS_OBLIGATORIAS.every((c) => c in indice)) {
-    throw crearError(400, 'Encabezado inválido. Se esperan las columnas nombreComercial,principioActivo,presentacion,precio,stock[,stockMinimo] separadas por coma')
+    throw crearError(400, 'Encabezado inválido. Se esperan las columnas nombreComercial,principioActivo,presentacion,precio,stock[,stockMinimo][,medicamentoId] separadas por coma.')
   }
   if (!filas.length) throw crearError(400, 'El archivo no tiene filas de productos')
   if (filas.length > MAX_FILAS_CSV) throw crearError(400, `El archivo supera el máximo de ${MAX_FILAS_CSV} filas`)
@@ -305,8 +337,14 @@ async function leerFilasProductos(archivo) {
       stock: celda('stock'),
       stockMinimo: celda('stockminimo'),
     })
-    if (error) {
-      errores.push({ fila: linea, mensaje: error })
+    // D4: medicamentoId es opcional; vacío o sin columna conserva el enlace actual
+    const medicamentoId = celda('medicamentoid').trim()
+    const errorMedicamento =
+      medicamentoId && !(/^[+-]?\d+$/.test(medicamentoId) && Number(medicamentoId) > 0 && Number(medicamentoId) <= Number.MAX_SAFE_INTEGER)
+        ? 'El medicamentoId debe ser un número entero mayor a 0.'
+        : ''
+    if (error || errorMedicamento) {
+      errores.push({ fila: linea, mensaje: error || errorMedicamento })
       continue
     }
     const clave = claveProducto(producto.nombreComercial, producto.presentacion)
@@ -315,7 +353,7 @@ async function leerFilasProductos(archivo) {
       continue
     }
     vistos.set(clave, linea)
-    validas.push(producto)
+    validas.push({ ...producto, fila: linea, medicamentoId: medicamentoId ? Number(medicamentoId) : null })
   }
   return { validas, errores }
 }
@@ -475,21 +513,45 @@ export const apiMock = {
     }
     let creados = 0
     let actualizados = 0
-    for (const { stockMinimo, ...fila } of validas) {
-      const existente = existentes.get(claveProducto(fila.nombreComercial, fila.presentacion))
-      if (existente) {
-        Object.assign(existente, { precio: fila.precio, stock: fila.stock })
-        if (stockMinimo !== undefined) existente.stockMinimo = stockMinimo
+    for (const { stockMinimo, fila: numeroFila, medicamentoId, ...fila } of validas) {
+      // D4: un medicamento inexistente u oculto deja la fila como error y las demás siguen
+      const enlace = medicamentoId === null ? null : enlaceMedicamento(medicamentoId)
+      if (enlace?.error) {
+        errores.push({ fila: numeroFila, mensaje: enlace.error })
+        continue
+      }
+      let producto = existentes.get(claveProducto(fila.nombreComercial, fila.presentacion))
+      if (producto) {
+        Object.assign(producto, { precio: fila.precio, stock: fila.stock })
+        if (stockMinimo !== undefined) producto.stockMinimo = stockMinimo
         actualizados++
       } else {
-        db.productos.push({
+        producto = {
           id: siguienteId(db.productos), boticaId: botica.id, ...fila,
-          stockMinimo: stockMinimo ?? STOCK_MINIMO_DEFECTO, activo: true,
-        })
+          stockMinimo: stockMinimo ?? STOCK_MINIMO_DEFECTO, activo: true, medicamentoId: null,
+        }
+        db.productos.push(producto)
         creados++
       }
+      // Regla D2: enlazado, el principio activo es el del medicamento y se ignora el texto de la fila
+      if (enlace) Object.assign(producto, { medicamentoId, principioActivo: enlace.principioActivo })
     }
+    errores.sort((a, b) => a.fila - b.fila)
     return { creados, actualizados, errores }
+  },
+
+  // H31: catálogo maestro (hasta 20, sin ocultos, por nombre comercial)
+  async buscarMedicamentos(q) {
+    await esperar()
+    duenoActual()
+    const termino = texto(q).toLowerCase()
+    if (termino.length < 2) throw crearError(400, 'La búsqueda requiere mínimo 2 caracteres')
+    return db.medicamentos
+      .filter((m) => !m.oculto)
+      .filter((m) => `${m.nombreComercial}\n${m.principioActivo}`.toLowerCase().includes(termino))
+      .sort((a, b) => a.nombreComercial.localeCompare(b.nombreComercial, 'es'))
+      .slice(0, 20)
+      .map(medicamentoDto)
   },
 }
 
