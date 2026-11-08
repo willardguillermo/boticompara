@@ -387,6 +387,12 @@ private fun DialogPrecioObjetivo(
                 Spacer(Modifier.height(4.dp))
 
                 // Sugerencias rápidas: un porcentaje menos que el precio de hoy
+                Text(
+                    "Bajar respecto al precio de hoy",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(5, 10, 20).forEach { porcentaje ->
                         SuggestionChip(
@@ -395,7 +401,7 @@ private fun DialogPrecioObjetivo(
                                 texto = String.format(Locale.US, "%.2f", sugerido)
                                 error = null
                             },
-                            label = { Text("$porcentaje% menos") }
+                            label = { Text("$porcentaje%", maxLines = 1) }
                         )
                     }
                 }
