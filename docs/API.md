@@ -88,7 +88,7 @@ Inicia la recuperación de contraseña. **Siempre responde 200**, exista o no el
 // 200 OK
 { "mensaje": "Si el correo está registrado, te enviamos las instrucciones para restablecer tu contraseña" }
 ```
-Si el correo existe, se envía un mensaje con un código de 6 dígitos. El código vence a los 15 minutos, solo sirve una vez y se invalida tras 5 intentos fallidos. Si ya se pidió uno hace menos de un minuto, no se envía otro (la respuesta sigue siendo 200).
+Si el correo existe, se envía un mensaje con un código de 6 dígitos. El código vence a los 15 minutos, solo sirve una vez y se invalida tras 5 intentos fallidos. Si ya se pidió uno hace menos de un minuto, no se envía otro (la respuesta sigue siendo 200). Tampoco se genera otro código si ya se generaron 3 en la última hora (la respuesta también es 200).
 Errores: 400 (falta el campo `correo`).
 
 ### `POST /auth/restablecer` — H17
