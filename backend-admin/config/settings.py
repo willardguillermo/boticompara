@@ -14,6 +14,7 @@ import os
 import sys
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -26,16 +27,26 @@ load_dotenv(BASE_DIR.parent / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-solo-para-desarrollo-local-cambiar-en-produccion',
-)
+EN_PRUEBAS = sys.argv[1:2] == ['test']
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
+# Seguro por defecto: DEBUG solo se activa con DJANGO_DEBUG=True en el .env (desarrollo local)
+DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+# La clave de desarrollo solo se acepta con DEBUG o en las pruebas; fuera de eso es obligatoria
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', '')
+if not SECRET_KEY:
+    if not (DEBUG or EN_PRUEBAS):
+        raise ImproperlyConfigured(
+            'Falta DJANGO_SECRET_KEY en el .env. Para desarrollo local agrega DJANGO_DEBUG=True.'
+        )
+    SECRET_KEY = 'django-insecure-solo-para-desarrollo-local'
+
+# Lista separada por comas, por ejemplo "admin.boticompara.pe"
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if host.strip()
+]
 
 
 # Application definition
@@ -104,7 +115,7 @@ DATABASES = {
 # Pruebas con TestCase: el rol boticompara_app no puede crear la base de pruebas en Supabase,
 # así que "manage.py test" usa SQLite en memoria. Las tablas managed = False que una prueba
 # necesite las crea la propia prueba.
-if sys.argv[1:2] == ['test']:
+if EN_PRUEBAS:
     DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}}
 
 
