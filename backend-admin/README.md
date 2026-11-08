@@ -76,7 +76,9 @@ Requisito: el archivo `.env` en la **raíz del repo** (copia de [`.env.example`]
 con los datos de Supabase: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE`.
 Para ver las licencias: `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_BUCKET_LICENCIAS` (por defecto `licencias`).
 Para los correos al dueño: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` (sandbox de Mailtrap, con TLS) y opcionalmente `MAIL_FROM`.
-Opcionales: `DJANGO_SECRET_KEY` (obligatoria fuera de desarrollo) y `DJANGO_DEBUG` (`True` por defecto).
+Django: `DJANGO_DEBUG=True` para desarrollo local (por defecto es `False`). Con `DJANGO_DEBUG=False`,
+`DJANGO_SECRET_KEY` es obligatoria (si falta, Django no arranca). `DJANGO_ALLOWED_HOSTS` es opcional:
+lista separada por comas (por defecto `localhost,127.0.0.1`).
 
 Desde la carpeta `backend-admin/`:
 
