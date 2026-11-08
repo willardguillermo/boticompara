@@ -23,10 +23,10 @@ public final class CsvProductoParser {
     private static final List<String> OBLIGATORIAS =
             List.of("nombrecomercial", "principioactivo", "presentacion", "precio", "stock");
     private static final String COLUMNAS =
-            "nombreComercial,principioActivo,presentacion,precio,stock[,stockMinimo]";
+            "nombreComercial,principioActivo,presentacion,precio,stock[,stockMinimo][,medicamentoId]";
 
     public record FilaProducto(int fila, String nombreComercial, String principioActivo, String presentacion,
-                               BigDecimal precio, int stock, Integer stockMinimo) {
+                               BigDecimal precio, int stock, Integer stockMinimo, Long medicamentoId) {
 
         /** Mismo producto = mismo nombre y presentación, sin distinguir mayúsculas ni espacios de más. */
         public String clave() {
@@ -223,7 +223,12 @@ public final class CsvProductoParser {
         if (!sm.isEmpty()) {
             stockMinimo = entero(sm, "El stock mínimo");
         }
-        return new FilaProducto(r.linea(), nombre, principio, presentacion, precio, stock, stockMinimo);
+        Long medicamentoId = null;
+        String mid = celda(r, indice, "medicamentoid");
+        if (!mid.isEmpty()) {
+            medicamentoId = identificador(mid, "El medicamentoId");
+        }
+        return new FilaProducto(r.linea(), nombre, principio, presentacion, precio, stock, stockMinimo, medicamentoId);
     }
 
     private static String celda(Registro r, Map<String, Integer> indice, String columna) {
@@ -277,6 +282,18 @@ public final class CsvProductoParser {
         }
         if (valor < 0) {
             throw new FilaInvalida(nombre + " no puede ser negativo");
+        }
+        return valor;
+    }
+    private static Long identificador(String texto, String nombre) {
+        long valor = 0;
+        try {
+            valor = Long.parseLong(texto);
+        } catch (NumberFormatException e) {
+            // se informa abajo, junto con los valores que no son positivos
+        }
+        if (valor <= 0) {
+            throw new FilaInvalida(nombre + " debe ser un número entero mayor a 0");
         }
         return valor;
     }

@@ -51,16 +51,37 @@ public class MedicamentoService {
      * Para enlazar un producto (H31): 400 si el medicamento no existe o está oculto.
      * D2: devuelve el nombre de su principio activo, que se copia al producto.
      */
+    /** D4: resultado de evaluar un medicamento para enlazar: o su principio activo, o el motivo del rechazo. */
+    public record EnlaceMedicamento(String principioActivo, String error) {
+    }
+
+    /**
+     * D4 (carga masiva): igual que principioActivoEnlazable, pero no lanza excepción: devuelve el motivo. Así una fila
+     * con un medicamento inválido no marca la transacción de la carga como rollback-only.
+     */
     @Transactional(readOnly = true)
-    public String principioActivoEnlazable(Long id) {
+    public EnlaceMedicamento enlace(Long id) {
         List<Enlazable> filas = enlazable(id);
         if (filas.isEmpty()) {
-            throw ApiException.badRequest("El medicamento no existe en el catálogo");
+            return new EnlaceMedicamento(null, "El medicamento no existe en el catálogo");
         }
         if (filas.get(0).oculto()) {
-            throw ApiException.badRequest("El medicamento no está disponible en el catálogo");
+            return new EnlaceMedicamento(null, "El medicamento no está disponible en el catálogo");
         }
-        return filas.get(0).principioActivo();
+        return new EnlaceMedicamento(filas.get(0).principioActivo(), null);
+    }
+
+    /**
+     * Para enlazar un producto (H31): 400 si el medicamento no existe o está oculto.
+     * D2: devuelve el nombre de su principio activo, que se copia al producto.
+     */
+    @Transactional(readOnly = true)
+    public String principioActivoEnlazable(Long id) {
+        EnlaceMedicamento e = enlace(id);
+        if (e.error() != null) {
+            throw ApiException.badRequest(e.error());
+        }
+        return e.principioActivo();
     }
 
     /**

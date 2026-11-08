@@ -119,4 +119,30 @@ class MedicamentoServiceTest {
 
         assertNull(service.principioActivoDe(99L));
     }
+    @Test
+    void enlace_medicamentoVisible_devuelveSuPrincipioActivoSinError() {
+        enlazableEs(List.of(new MedicamentoService.Enlazable(false, "Paracetamol")));
+
+        MedicamentoService.EnlaceMedicamento e = service.enlace(12L);
+
+        assertNull(e.error());
+        assertEquals("Paracetamol", e.principioActivo());
+    }
+
+    @Test
+    void enlace_noExiste_devuelveElMotivoSinLanzarExcepcion() {
+        enlazableEs(List.of());
+
+        MedicamentoService.EnlaceMedicamento e = service.enlace(99L);
+
+        assertEquals("El medicamento no existe en el catálogo", e.error());
+        assertNull(e.principioActivo());
+    }
+
+    @Test
+    void enlace_oculto_devuelveElMotivoSinLanzarExcepcion() {
+        enlazableEs(List.of(new MedicamentoService.Enlazable(true, "Paracetamol")));
+
+        assertEquals("El medicamento no está disponible en el catálogo", service.enlace(12L).error());
+    }
 }

@@ -20,6 +20,8 @@ class CsvProductoParserTest {
 
     private static final String CAB = "nombreComercial,principioActivo,presentacion,precio,stock,stockMinimo";
 
+    private static final String CAB_MED = CAB + ",medicamentoId";
+
     private static byte[] csv(String... lineas) {
         return String.join("\n", lineas).getBytes(StandardCharsets.UTF_8);
     }
@@ -230,5 +232,30 @@ class CsvProductoParserTest {
         }
 
         assertBadRequest(sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void leeLaColumnaOpcionalMedicamentoId() {
+        Resultado r = CsvProductoParser.parsear(csv(CAB_MED,
+                "Panadol,Paracetamol,Tableta 500 mg x 10,8.50,40,5,12",
+                "Ibuprofeno Genérico,Ibuprofeno,Tableta 400 mg x 10,3.20,100,10,"));
+
+        assertTrue(r.errores().isEmpty());
+        assertEquals(12L, r.filas().get(0).medicamentoId());
+        assertNull(r.filas().get(1).medicamentoId());
+    }
+
+    @Test
+    void medicamentoIdQueNoEsUnEnteroPositivoEsErrorDeEsaFila() {
+        Resultado r = CsvProductoParser.parsear(csv(CAB_MED,
+                "Panadol,Paracetamol,Tableta,8.50,40,5,abc",
+                "Ibuprofeno,Ibuprofeno,Tableta,3.20,100,10,0",
+                "Aspirina,Acido acetilsalicilico,Tableta,2.00,50,5,7"));
+
+        assertEquals(1, r.filas().size());
+        assertEquals(7L, r.filas().get(0).medicamentoId());
+        assertEquals(List.of(
+                new ErrorFila(2, "El medicamentoId debe ser un número entero mayor a 0."),
+                new ErrorFila(3, "El medicamentoId debe ser un número entero mayor a 0.")), r.errores());
     }
 }
