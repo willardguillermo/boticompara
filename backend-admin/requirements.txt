@@ -2,3 +2,5 @@ Django>=5.2,<6.0
 psycopg[binary]>=3.2
 python-dotenv>=1.0
 openpyxl>=3.1
+# openpyxl lo usa si está instalado para rechazar "XML bombs" al leer el Excel de DIGEMID
+defusedxml>=0.7.1
