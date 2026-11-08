@@ -44,7 +44,7 @@ se cuentan como hallazgos; se explican en cada fase.
 | SEC-03 | Media | admin | `DEBUG` era `True` por defecto, `SECRET_KEY` tenía un valor inseguro por defecto que también valía en producción y `ALLOWED_HOSTS` estaba fijo en el código. | `backend-admin/config/settings.py:33` | Guillermo | Corregido en `01ba8cb` |
 | SEC-04 | Media | admin | `defusedxml` no estaba en `requirements.txt`: sin él openpyxl no rechaza "XML bombs" en el Excel de DIGEMID. En la Mac solo estaba instalado porque `pip-audit` lo arrastró. | `backend-admin/requirements.txt:5` | Guillermo | Corregido en `9b72c81` |
 | SEC-05 | Media | backend | Sin límite de intentos por IP o cuenta en `POST /auth/login`, `/auth/recuperar` y `/auth/restablecer`. La recuperación limita 5 intentos por código y 1 código por minuto, pero eso permite unos 7 200 intentos al día sobre un código de 6 dígitos. | `backend-usuario/.../service/AuthService.java:44`, `RecuperacionService.java:31` | Alexander | Pendiente |
-| SEC-06 | Media | web | El JWT se guarda en `localStorage`: un XSS podría leerlo. Riesgo real bajo: no hay `dangerouslySetInnerHTML` ni `innerHTML`, React escapa todo, el token vence en 24 h y se borra al cerrar sesión o con un 401. | `web-usuario/src/services/sesion.js:26` | Guillermo | Aceptado: moverlo a una cookie `HttpOnly` exige cambiar la API (Alexander); se reevalúa antes de producción |
+| SEC-06 | Media | web | El JWT se guarda en `localStorage`: un XSS podría leerlo. Riesgo real bajo: no hay `dangerouslySetInnerHTML` ni `innerHTML`, React escapa todo, el token vence en 24 h y se borra al cerrar sesión o con un 401. | `web-usuario/src/services/sesion.js:26` | Guillermo | Aceptado para el Sprint 3 (decisión del 2026-11-07): moverlo a una cookie `HttpOnly` exige cambiar la API (Alexander); se reevalúa antes de producción |
 | SEC-07 | Media | móvil | `android:usesCleartextTraffic="true"` para toda la app. Sirve para `http://10.0.2.2` en desarrollo, pero en producción permitiría enviar el token sin cifrar. | `app-movil/app/src/main/AndroidManifest.xml:10` | Mijael | Pendiente |
 | SEC-08 | Media | admin | Inyección de fórmulas en la exportación a Excel (por ejemplo `=HYPERLINK(...)` en un nombre comercial). Se detectó en la revisión de código del PR #63. | `backend-admin/reportes/exportar.py:36` | Guillermo | Corregido en `d45af3d` (PR #63) |
 | SEC-09 | Baja | móvil | El token se guarda en DataStore en texto plano y `allowBackup="true"` sin reglas de exclusión: el token puede ir en las copias de seguridad de Android. | `app-movil/.../data/local/TokenManager.kt:28`, `AndroidManifest.xml:11` | Mijael | Pendiente |
@@ -53,7 +53,7 @@ se cuentan como hallazgos; se explican en cada fase.
 | SEC-12 | Baja | backend | El login responde más rápido cuando el correo no existe (no ejecuta BCrypt): permite adivinar qué correos están registrados midiendo tiempos. | `backend-usuario/.../service/AuthService.java:45` | Alexander | Pendiente |
 | SEC-13 | Baja | backend | `JWT_SECRET` se usa también como clave HMAC de los tokens de verificación y recuperación. Si se filtra, compromete las dos cosas. | `backend-usuario/.../service/VerificacionService.java:43` | Alexander | Pendiente |
 | SEC-14 | Baja | admin | El login del admin de Django no limita intentos. | `backend-admin/config/urls.py` | Guillermo | Pendiente (para producción: `django-axes` o límite en el proxy) |
-| SEC-15 | Baja | admin | Faltan los ajustes de producción: cookies seguras, HSTS y redirección a HTTPS (`check --deploy` da W004, W008, W012 y W016). | `backend-admin/config/settings.py` | Guillermo | Pendiente (documentado en Recomendaciones) |
+| SEC-15 | Baja | admin | Faltan los ajustes de producción: cookies seguras, HSTS y redirección a HTTPS (`check --deploy` da W004, W008, W012 y W016). | `backend-admin/config/settings.py` | Guillermo | Pendiente: solo documentado hasta que haya despliegue (decisión del 2026-11-07) |
 | SEC-16 | Informativa | bd | El linter de Supabase da 10 avisos INFO "RLS enabled no policy" en las tablas internas de Django (`auth_*`, `django_*`). | `database/rls_todas_las_tablas.sql` | Guillermo | Aceptado: no es un riesgo (ver Fase 5) |
 | SEC-17 | Informativa | bd | `seed.sql` crea usuarios de prueba con una contraseña conocida y documentada. | `database/seed.sql:4` | Guillermo | Aceptado: solo para desarrollo; no cargar en producción |
 | SEC-18 | Informativa | backend | En la búsqueda, `%` y `_` del texto del usuario funcionan como comodines de `LIKE`. No es inyección (va como parámetro); solo amplía resultados. | `backend-usuario/.../service/BusquedaService.java:70` | Alexander | Aceptado |
@@ -241,6 +241,18 @@ de la raíz (ya está en `.env.example`). Sin esa línea ni `DJANGO_SECRET_KEY`,
 
 No se corrigieron ahora (fuera de mis capas, o no son rápidos y de bajo riesgo): SEC-01, SEC-05, SEC-07, SEC-09 a SEC-13 y SEC-19
 (Alexander y Mijael); SEC-06 (requiere cambiar la API), SEC-14 y SEC-15 (son de producción), SEC-20.
+
+## Decisiones tomadas
+
+Acordadas por Guillermo el 2026-11-07, después del escaneo:
+
+1. **`DJANGO_DEBUG=True` en local:** cada integrante que ejecute el admin de Django agrega `DJANGO_DEBUG=True` a su `.env` de la
+   raíz (ya está en `.env.example`). En cualquier otro entorno se deja en `False` y se define `DJANGO_SECRET_KEY`.
+2. **SEC-06 aceptado para el Sprint 3:** el JWT de la web sigue en `localStorage`. No hay puntos de inyección de HTML, el token
+   vence en 24 h y se borra al cerrar sesión o con un 401. El cambio a cookie `HttpOnly` se reevalúa con Alexander antes de
+   producción, porque requiere modificar la API.
+3. **Ajustes de producción de Django (SEC-15) solo documentados:** no se activan ahora porque con `DEBUG=False` en local
+   redirigirían a HTTPS. Se configuran cuando exista el despliegue, siguiendo la sección "Para producción".
 
 ## Recomendaciones
 
