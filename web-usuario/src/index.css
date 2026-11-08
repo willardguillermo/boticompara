@@ -1588,3 +1588,29 @@ a {
     flex: 1;
   }
 }
+
+/* ---------- Carga masiva: columnas y buscador de ID de medicamento (D4) ---------- */
+.lista-columnas {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+}
+
+.lista-columnas li + li {
+  margin-top: 0.35rem;
+}
+
+.carga-masiva .buscador {
+  max-width: 480px;
+  margin-bottom: 1rem;
+}
+
+.tabla-medicamentos {
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+}
+
+.tabla-medicamentos > .texto-suave,
+.tabla-medicamentos > .cargando {
+  margin: 0;
+  padding: 1rem;
+}
