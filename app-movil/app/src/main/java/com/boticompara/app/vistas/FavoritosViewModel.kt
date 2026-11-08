@@ -12,7 +12,7 @@ import com.boticompara.app.data.repository.ResultadoAccionFavorito
 import com.boticompara.app.data.repository.ResultadoFavoritos
 import kotlinx.coroutines.launch
 
-// ViewModel (MVVM) de la pantalla de favoritos (H44, H45)
+// ViewModel (MVVM) de la pantalla de favoritos (H44, H45, H60)
 class FavoritosViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = FavoritoRepository(application)
 
@@ -24,7 +24,7 @@ class FavoritosViewModel(application: Application) : AndroidViewModel(applicatio
         private set
     var mensajeError by mutableStateOf<String?>(null)
         private set
-    var mensajeAccion by mutableStateOf<String?>(null)   // aviso al quitar un favorito
+    var mensajeAccion by mutableStateOf<String?>(null)   // aviso al quitar o cambiar un favorito
         private set
     var sesionVencida by mutableStateOf(false)
         private set
@@ -69,6 +69,28 @@ class FavoritosViewModel(application: Application) : AndroidViewModel(applicatio
                 ResultadoAccionFavorito.SesionVencida -> sesionVencida = true
                 ResultadoAccionFavorito.SinConexion -> mensajeAccion = "No se pudo conectar con el servidor"
                 else -> mensajeAccion = "No se pudo quitar el producto"
+            }
+        }
+    }
+
+    // H60: poner, cambiar o quitar (null) el precio objetivo de un favorito
+    fun fijarPrecioObjetivo(productoId: Long, precio: Double?) {
+        viewModelScope.launch {
+            when (repository.fijarPrecioObjetivo(productoId, precio)) {
+                ResultadoAccionFavorito.Exito -> {
+                    favoritos = favoritos.map {
+                        if (it.productoId == productoId) it.copy(precioObjetivo = precio) else it
+                    }
+                    mensajeAccion =
+                        if (precio == null) "Precio objetivo quitado" else "Precio objetivo guardado"
+                }
+                ResultadoAccionFavorito.SesionVencida -> sesionVencida = true
+                ResultadoAccionFavorito.NoDisponible -> {
+                    mensajeAccion = "El producto ya no está disponible"
+                    cargar()
+                }
+                ResultadoAccionFavorito.SinConexion -> mensajeAccion = "No se pudo conectar con el servidor"
+                ResultadoAccionFavorito.ErrorServidor -> mensajeAccion = "No se pudo guardar el precio objetivo"
             }
         }
     }

@@ -4,6 +4,7 @@ import android.content.Context
 import com.boticompara.app.data.local.TokenManager
 import com.boticompara.app.data.remote.FavoritoRequest
 import com.boticompara.app.data.remote.FavoritoResponse
+import com.boticompara.app.data.remote.PrecioObjetivoRequest
 import com.boticompara.app.data.remote.RetrofitClient
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -15,7 +16,7 @@ sealed interface ResultadoFavoritos {
     data object SinConexion : ResultadoFavoritos     // no se pudo llegar al backend
 }
 
-// Resultado de guardar o quitar un favorito (H43, H45)
+// Resultado de guardar o quitar un favorito, o de cambiar su precio objetivo (H43, H45, H60)
 sealed interface ResultadoAccionFavorito {
     data object Exito : ResultadoAccionFavorito
     data object SesionVencida : ResultadoAccionFavorito   // 401: token vencido
@@ -24,7 +25,7 @@ sealed interface ResultadoAccionFavorito {
     data object SinConexion : ResultadoAccionFavorito     // no se pudo llegar al backend
 }
 
-// Repository (MVVM): única capa que habla con la API de favoritos (H43, H44, H45)
+// Repository (MVVM): única capa que habla con la API de favoritos (H43, H44, H45, H60)
 class FavoritoRepository(context: Context) {
     private val api = RetrofitClient.getInstance(context)
     private val tokenManager = TokenManager(context)
@@ -82,6 +83,29 @@ class FavoritoRepository(context: Context) {
                     tokenManager.clearSession()
                     ResultadoAccionFavorito.SesionVencida
                 }
+                else -> ResultadoAccionFavorito.ErrorServidor
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            ResultadoAccionFavorito.SinConexion
+        }
+
+    // PUT /favoritos/{productoId}/precio-objetivo (H60). precio = null quita el objetivo
+    suspend fun fijarPrecioObjetivo(productoId: Long, precio: Double?): ResultadoAccionFavorito =
+        try {
+            val response = api.actualizarPrecioObjetivo(
+                auth = tokenManager.getBearer(),
+                productoId = productoId,
+                request = PrecioObjetivoRequest(precio)
+            )
+            when {
+                response.isSuccessful -> ResultadoAccionFavorito.Exito
+                response.code() == 401 -> {
+                    tokenManager.clearSession()
+                    ResultadoAccionFavorito.SesionVencida
+                }
+                response.code() == 404 -> ResultadoAccionFavorito.NoDisponible
                 else -> ResultadoAccionFavorito.ErrorServidor
             }
         } catch (e: CancellationException) {
