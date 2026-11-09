@@ -1614,3 +1614,58 @@ a {
   margin: 0;
   padding: 1rem;
 }
+
+/* ---------- Formulario de producto: selector de medicamento del catálogo (D3) ---------- */
+.lista-medicamentos {
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.lista-medicamentos li + li {
+  border-top: 1px solid var(--color-borde);
+}
+
+.opcion-medicamento,
+.medicamento-elegido > div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.opcion-medicamento {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 0.75rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.opcion-medicamento:hover,
+.opcion-medicamento:focus-visible {
+  background: var(--color-primario-suave);
+  outline: none;
+}
+
+.opcion-medicamento .texto-suave,
+.medicamento-elegido .texto-suave {
+  font-size: 0.85rem;
+}
+
+.medicamento-elegido {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-primario);
+  border-radius: var(--radio);
+  background: var(--color-primario-suave);
+}

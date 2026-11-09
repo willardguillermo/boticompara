@@ -1,13 +1,14 @@
 // H11 - Carga masiva de productos con CSV o Excel .xlsx (POST /productos/carga-masiva)
 // D4 - Columna opcional medicamentoId para enlazar con el catálogo maestro (GET /medicamentos para buscar el ID)
 // Solo con la botica APROBADO (guardia SoloAprobada en App.jsx).
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Campo from '../components/Campo.jsx'
 import Cargando from '../components/Cargando.jsx'
 import Icono from '../components/Icono.jsx'
 import { useToast } from '../context/ToastContext.jsx'
+import { presentacionMedicamento, useBuscarMedicamentos } from '../hooks/useBuscarMedicamentos.js'
 import { api } from '../services/index.js'
 import { ACCEPT_CARGA, propsError, validarArchivoCarga } from '../utils/validacion.js'
 
@@ -31,45 +32,10 @@ function descargarPlantilla() {
   URL.revokeObjectURL(url)
 }
 
-const MIN_BUSQUEDA = 2
-
 /** D4: el dueño busca en el catálogo maestro el ID que va en la columna medicamentoId. */
 function BuscadorMedicamento() {
   const [busqueda, setBusqueda] = useState('')
-  const [medicamentos, setMedicamentos] = useState(null)
-  const [error, setError] = useState('')
-  const termino = busqueda.trim()
-  const buscando = termino.length >= MIN_BUSQUEDA
-
-  // Busca en el servidor con una pequeña espera mientras se escribe, como el catálogo
-  useEffect(() => {
-    if (!buscando) return undefined
-    let activo = true
-    const espera = setTimeout(() => {
-      api
-        .buscarMedicamentos(termino)
-        .then((lista) => {
-          if (!activo) return
-          setMedicamentos(lista)
-          setError('')
-        })
-        .catch((err) => {
-          if (!activo || err.status === 401) return
-          setMedicamentos(null)
-          setError(err.mensaje ?? 'No se pudo buscar en el catálogo de medicamentos.')
-        })
-    }, 300)
-    return () => {
-      activo = false
-      clearTimeout(espera)
-    }
-  }, [buscando, termino])
-
-  function cambiar(evento) {
-    setBusqueda(evento.target.value)
-    setMedicamentos(null)
-    setError('')
-  }
+  const { termino, buscando, medicamentos, error } = useBuscarMedicamentos(busqueda)
 
   return (
     <section className="tarjeta" aria-labelledby="titulo-buscar-medicamento">
@@ -85,7 +51,7 @@ function BuscadorMedicamento() {
           aria-label="Buscar medicamento por nombre comercial o principio activo"
           placeholder="Por ejemplo: paracetamol"
           value={busqueda}
-          onChange={cambiar}
+          onChange={(e) => setBusqueda(e.target.value)}
         />
       </div>
 
@@ -115,7 +81,7 @@ function BuscadorMedicamento() {
                     </td>
                     <td data-etiqueta="Principio activo">{m.principioActivo}</td>
                     <td data-etiqueta="Presentación">
-                      {m.concentracion ? `${m.presentacion} ${m.concentracion}` : m.presentacion}
+                      {presentacionMedicamento(m)}
                     </td>
                     <td data-etiqueta="ID" className="numero">
                       <code>{m.id}</code>

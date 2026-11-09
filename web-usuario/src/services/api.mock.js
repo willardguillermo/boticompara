@@ -101,6 +101,23 @@ function enlaceMedicamento(id) {
   return { principioActivo: medicamento.principioActivo }
 }
 
+/**
+ * D3: medicamentoId de POST/PUT /productos. Devuelve el principio activo del medicamento
+ * (regla D2) o lanza 400 si no existe o está oculto. Sin medicamentoId devuelve null.
+ */
+function enlaceDelCuerpo(datos) {
+  const id = datos?.medicamentoId
+  if (id === undefined || id === null) return null
+  if (!Number.isSafeInteger(id) || id <= 0) throw crearError(400, 'El medicamentoId debe ser un número entero mayor a 0.')
+  const enlace = enlaceMedicamento(id)
+  if (enlace.error) throw crearError(400, enlace.error)
+  return { medicamentoId: id, principioActivo: enlace.principioActivo }
+}
+
+/** Regla D2 en un PUT sin medicamentoId: el producto enlazado conserva el principio activo del medicamento. */
+const principioDelEnlace = (producto) =>
+  db.medicamentos.find((m) => m.id === producto.medicamentoId)?.principioActivo
+
 // H3: igual que el backend, ambas coordenadas o ninguna, dentro de rango
 function validarCoordenadas({ latitud, longitud }) {
   const hayLat = latitud !== undefined && latitud !== null
@@ -476,7 +493,11 @@ export const apiMock = {
       throw crearError(403, 'Tu botica debe estar aprobada para agregar productos.')
     }
     const { stockMinimo = STOCK_MINIMO_DEFECTO, ...campos } = validarProducto(datos)
-    const producto = { id: siguienteId(db.productos), boticaId: botica.id, ...campos, stockMinimo, activo: true }
+    // Regla D2: enlazado, el principio activo es el del medicamento y se ignora el texto enviado
+    const enlace = enlaceDelCuerpo(datos) ?? { medicamentoId: null }
+    const producto = {
+      id: siguienteId(db.productos), boticaId: botica.id, ...campos, stockMinimo, activo: true, ...enlace,
+    }
     db.productos.push(producto)
     return productoDto(producto)
   },
@@ -486,8 +507,20 @@ export const apiMock = {
     const producto = productoPropio(id)
     // Sin stockMinimo se conserva el valor actual
     const { stockMinimo = producto.stockMinimo, ...campos } = validarProducto(datos)
-    Object.assign(producto, campos, { stockMinimo })
+    // Sin medicamentoId se conserva el enlace actual (enviar null no lo borra); con enlace, regla D2
+    const enlace = enlaceDelCuerpo(datos)
+    Object.assign(producto, campos, { stockMinimo }, enlace ?? {})
+    if (!enlace && producto.medicamentoId) {
+      producto.principioActivo = principioDelEnlace(producto) ?? producto.principioActivo
+    }
     return productoDto(producto)
+  },
+
+  // D3: quita el enlace con el catálogo maestro; conserva el texto del principio activo
+  async quitarEnlaceMedicamento(id) {
+    await esperar()
+    productoPropio(id).medicamentoId = null
+    return null
   },
 
   async eliminarProducto(id) {
@@ -559,6 +592,7 @@ export const apiMock = {
 // puede imitar lo que haría el administrador en Django.
 //   boticomparaMock.aprobar(3)
 //   boticomparaMock.rechazar(3, 'La dirección no coincide con la ficha RUC')
+//   boticomparaMock.ocultarMedicamento(12)
 export function registrarAyudaConsola() {
   const cambiarEstado = (id, estado, motivoRechazo = null) => {
     const botica = db.boticas.find((b) => b.id === Number(id))
@@ -571,5 +605,12 @@ export function registrarAyudaConsola() {
     aprobar: (id) => cambiarEstado(id, 'APROBADO'),
     rechazar: (id, motivo = 'Datos incompletos') => cambiarEstado(id, 'RECHAZADO', motivo),
     pendiente: (id) => cambiarEstado(id, 'PENDIENTE'),
+    // D3: imita que el administrador oculte o vuelva a mostrar un medicamento del catálogo maestro
+    ocultarMedicamento: (id, oculto = true) => {
+      const medicamento = db.medicamentos.find((m) => m.id === Number(id))
+      if (!medicamento) return `No existe el medicamento ${id}`
+      medicamento.oculto = oculto
+      return `${medicamento.nombreComercial}: ${oculto ? 'oculto' : 'visible'}`
+    },
   }
 }
