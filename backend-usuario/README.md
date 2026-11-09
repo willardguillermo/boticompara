@@ -101,6 +101,15 @@ búsqueda, el detalle, las alternativas y los favoritos. Un producto que deja de
   `false`). Marcar una alerta de otro usuario responde `404`. La alerta se conserva aunque el producto deje de verse.
 - Al eliminar la cuenta (H19) se borran sus alertas.
 
+### Correo de baja de precio (H61)
+- Al crear alertas, `ProductoService.actualizar` y `CargaMasivaService` publican un evento `AlertasCreadas`.
+  `AlertaCorreoService` lo escucha con `@TransactionalEventListener(AFTER_COMMIT)` y `@Async` (`@EnableAsync`): el
+  correo sale solo si el cambio de precio se confirmó y no hace más lenta la respuesta.
+- Un correo por usuario. En `PUT /productos/{id}` es uno por alerta (asunto: "Panadol bajó a S/ 7.50 en FarmaVida");
+  en la carga masiva, uno solo con todas las bajas de ese usuario ("Bajaron de precio N productos de tus favoritos").
+- Si el correo falla, la alerta queda guardada y solo se deja un aviso en el log. Con `MAIL_HOST` vacío no se envía
+  nada y el log muestra el asunto, lo que sirve para probar sin gastar el límite de Resend.
+
 ### Enlace con el catálogo maestro (H31)
 - Un producto puede enlazarse a un medicamento con `medicamentoId` en `POST /productos` o `PUT /productos/{id}`;
   el medicamento debe existir y no estar oculto.
@@ -113,6 +122,11 @@ búsqueda, el detalle, las alternativas y los favoritos. Un producto que deja de
   `POST` o `PUT` con `medicamentoId`) y se mantiene en un `PUT` sin `medicamentoId`; el texto enviado se ignora. Al
   quitar el enlace, el producto conserva ese texto y desde entonces se usa el que envía la web. Así las alternativas
   por principio activo usan el mismo nombre que el catálogo maestro.
+- **D4:** la carga masiva (CSV y `.xlsx`) acepta la columna opcional `medicamentoId`. Con valor, enlaza el producto
+  (nuevo o existente) y copia el principio activo del medicamento, como en D2. Un id que no es un entero mayor que 0,
+  que no existe o que está oculto deja esa fila como error y las demás se guardan. Vacía o ausente, conserva el
+  enlace actual. Cada medicamento se consulta una vez por carga con `MedicamentoService.enlace`, que devuelve el
+  motivo en vez de lanzar una excepción para no marcar la transacción como *rollback-only*.
 
 ### Favoritos (H43, H44, H60)
 - Cada usuario ve y modifica solo los suyos. Guardar dos veces el mismo producto no lo duplica (`201` la primera
@@ -137,6 +151,9 @@ búsqueda, el detalle, las alternativas y los favoritos. Un producto que deja de
 - CORS permite solo `http://localhost:5173` (la web de Vite). El móvil no necesita CORS.
 - Seguridad: JWT con rol. `/productos/**` y `/boticas/**` exigen rol `DUENO_BOTICA`, salvo las rutas públicas o
   de cualquier rol de la tabla de endpoints.
+- **SEC-05:** `POST /auth/recuperar` no genera ni envía otro código si ya se generaron 3 para ese usuario en la
+  última hora (cuenta también los usados o invalidados); la respuesta sigue siendo `200` con el mismo mensaje. Cada
+  código se sigue invalidando a los 5 intentos y solo se puede pedir uno por minuto.
 
 ## Estructura
 
@@ -159,7 +176,7 @@ src/main/java/com/boticompara/usuario/
 ```powershell
 .\mvnw.cmd test
 ```
-Resultado actual: **215 tests, 0 fallas**. Los de este sprint:
+Resultado actual: **299 tests, 0 fallas**. Los de este sprint:
 
 | Clase | Tests | Historias |
 |---|---|---|
@@ -171,18 +188,24 @@ Resultado actual: **215 tests, 0 fallas**. Los de este sprint:
 
 ### Colección de Postman
 [`../docs/postman/BotiCompara.postman_collection.json`](../docs/postman/BotiCompara.postman_collection.json), con
-8 carpetas. Con la API levantada se ejecuta cada carpeta con **Run folder**. Todas las pruebas comprueban también
+9 carpetas. Con la API levantada se ejecuta cada carpeta con **Run folder**. Todas las pruebas comprueban también
 que la respuesta tarda menos de 2 s (H26).
 
 - **Carpeta 7 (H40):** Rosa sube el precio y el stock de un producto, el comprador lo ve en la búsqueda y en el
   detalle, y Rosa lo restaura. 29 pruebas.
 - **Carpeta 8 (H2, H28, H31, H36–H44):** detalle, alternativas, medicamentos, favoritos, validar RUC y el
   desenlazado del H31. 92 pruebas, todas en verde. No crea productos: lo que modifica, lo restaura.
+- **Carpeta 9 (H59, H60, H66):** Carlos guarda un producto de Rosa en favoritos con un precio objetivo, Rosa baja el
+  precio dos veces (la primera no llega al objetivo), Carlos ve la alerta y la marca como leída, y se prueba
+  desactivar y reactivar las alertas. 85 pruebas, todas en verde. No crea productos: lo que modifica, lo restaura
+  (deja una alerta ya leída en el historial de Carlos). Con `MAIL_HOST` configurado, la baja del paso 8 envía el
+  correo de H61.
 
 ### Pruebas en vivo
 Durante el sprint cada historia se probó contra Supabase con scripts locales de PowerShell, que crean productos
 `ZZ …` en la botica de Rosa, comprueban cada caso (incluida la base de datos) y los borran siempre al final, con
-doble filtro por nombre y botica. Resultados: alternativas 26 OK, favoritos 29 OK, desenlazar 17 OK. Esos scripts
+doble filtro por nombre y botica. Resultados: alternativas 26 OK, favoritos 29 OK, desenlazar 17 OK, correo de baja
+de precio 8 OK, `medicamentoId` en la carga masiva 9 OK, límite de códigos de recuperación 7 OK. Esos scripts
 no se suben al repo; la evidencia de cada prueba está en la descripción del PR correspondiente.
 
 ### Cuentas de prueba (contraseña `Boti2026!`)
@@ -199,7 +222,6 @@ Desde el Sprint 3 reciben correo real (Resend), que llega a la bandeja del equip
 
 - Que la web rellene el principio activo con el del medicamento elegido, y que muestre un botón "Quitar enlace" que
   llame a `DELETE /productos/{id}/medicamento`.
-- La carga masiva (CSV y `.xlsx`) no maneja `medicamentoId`: los productos que crea no quedan enlazados.
 - Los grupos de equivalencia se administran desde Django; esta API solo los lee.
 
 ## Convenciones
