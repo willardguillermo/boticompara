@@ -26,24 +26,27 @@ en `backend-admin/venv`). No se agregó ninguna al `requirements.txt`, `package.
 | Gravedad | Hallazgos | Corregidos | Pendientes | Aceptados |
 |---|---|---|---|---|
 | Crítica | 0 | 0 | 0 | 0 |
-| Alta | 2 | 1 | 1 | 0 |
-| Media | 6 | 3 | 2 | 1 |
+| Alta | 2 | 2 | 0 | 0 |
+| Media | 6 | 4 | 1 | 1 |
 | Baja | 7 | 0 | 7 | 0 |
 | Informativa | 5 | 0 | 2 | 3 |
-| **Total** | **20** | **4** | **12** | **4** |
+| **Total** | **20** | **6** | **10** | **4** |
 
 Sin secretos reales en el historial ni en los archivos versionados. Los falsos positivos de las herramientas no
 se cuentan como hallazgos; se explican en cada fase.
+
+**Actualización del 2026-11-09:** SEC-01 y SEC-05 se corrigieron en `main` después del informe (PR #70 y #71). Ver
+"Cierre del Sprint 3" al final.
 
 ## Tabla de hallazgos
 
 | ID | Gravedad | Capa | Descripción | Archivo:línea | Responsable | Estado |
 |---|---|---|---|---|---|---|
-| SEC-01 | Alta | backend | Spring Boot 3.3.5 trae dependencias con vulnerabilidades conocidas (Tomcat 10.1.31, Spring Framework 6.1.14, Spring Security 6.3.4, pgjdbc 42.7.4, Jackson 2.17.2…). Ver Fase 3. | `backend-usuario/pom.xml:9` | Alexander | Pendiente |
+| SEC-01 | Alta | backend | Spring Boot 3.3.5 trae dependencias con vulnerabilidades conocidas (Tomcat 10.1.31, Spring Framework 6.1.14, Spring Security 6.3.4, pgjdbc 42.7.4, Jackson 2.17.2…). Ver Fase 3. | `backend-usuario/pom.xml:9` | Alexander | Corregido en `4f81a3f` (PR #70): Spring Boot 3.5.16 y Tomcat 10.1.60. Quedan 16 avisos de dependencias transitivas (ver Cierre) |
 | SEC-02 | Alta | web | D8: vite 8.3.2 con 6 avisos (`npm audit` la marca alta). Solo afecta al servidor de desarrollo, no al `dist/` que se publica. | `web-usuario/package-lock.json` | Guillermo | Corregido en `7072e46` |
 | SEC-03 | Media | admin | `DEBUG` era `True` por defecto, `SECRET_KEY` tenía un valor inseguro por defecto que también valía en producción y `ALLOWED_HOSTS` estaba fijo en el código. | `backend-admin/config/settings.py:33` | Guillermo | Corregido en `01ba8cb` |
 | SEC-04 | Media | admin | `defusedxml` no estaba en `requirements.txt`: sin él openpyxl no rechaza "XML bombs" en el Excel de DIGEMID. En la Mac solo estaba instalado porque `pip-audit` lo arrastró. | `backend-admin/requirements.txt:5` | Guillermo | Corregido en `9b72c81` |
-| SEC-05 | Media | backend | Sin límite de intentos por IP o cuenta en `POST /auth/login`, `/auth/recuperar` y `/auth/restablecer`. La recuperación limita 5 intentos por código y 1 código por minuto, pero eso permite unos 7 200 intentos al día sobre un código de 6 dígitos. | `backend-usuario/.../service/AuthService.java:44`, `RecuperacionService.java:31` | Alexander | Pendiente |
+| SEC-05 | Media | backend | Sin límite de intentos por IP o cuenta en `POST /auth/login`, `/auth/recuperar` y `/auth/restablecer`. La recuperación limita 5 intentos por código y 1 código por minuto, pero eso permite unos 7 200 intentos al día sobre un código de 6 dígitos. | `backend-usuario/.../service/AuthService.java:44`, `RecuperacionService.java:31` | Alexander | Corregido en `14f0cba` (PR #71): tope de 3 códigos de recuperación por hora más 5 intentos por código |
 | SEC-06 | Media | web | El JWT se guarda en `localStorage`: un XSS podría leerlo. Riesgo real bajo: no hay `dangerouslySetInnerHTML` ni `innerHTML`, React escapa todo, el token vence en 24 h y se borra al cerrar sesión o con un 401. | `web-usuario/src/services/sesion.js:26` | Guillermo | Aceptado para el Sprint 3 (decisión del 2026-11-07): moverlo a una cookie `HttpOnly` exige cambiar la API (Alexander); se reevalúa antes de producción |
 | SEC-07 | Media | móvil | `android:usesCleartextTraffic="true"` para toda la app. Sirve para `http://10.0.2.2` en desarrollo, pero en producción permitiría enviar el token sin cifrar. | `app-movil/app/src/main/AndroidManifest.xml:10` | Mijael | Pendiente |
 | SEC-08 | Media | admin | Inyección de fórmulas en la exportación a Excel (por ejemplo `=HYPERLINK(...)` en un nombre comercial). Se detectó en la revisión de código del PR #63. | `backend-admin/reportes/exportar.py:36` | Guillermo | Corregido en `d45af3d` (PR #63) |
@@ -279,3 +282,44 @@ Acordadas por Guillermo el 2026-11-07, después del escaneo:
   archivo de bloqueo (SEC-20); activar el bloqueo de dependencias de Gradle (SEC-19).
 - **Claves:** rotar `JWT_SECRET`, la clave secreta de Supabase y la API key de correo antes de salir a producción, y no reutilizar
   las de desarrollo.
+
+## Cierre del Sprint 3 (2026-11-09)
+
+### SEC-01: corregido (PR #70, commit `4f81a3f`)
+
+Alexander subió `spring-boot-starter-parent` de 3.3.5 a **3.5.16** y fijó Tomcat en **10.1.60**. Probado: las pruebas de la
+API pasan y la API arranca con Hibernate 6.6 validando todas las tablas (`ddl-auto=validate`).
+
+Nuevo osv-scanner 2.7.0 sobre `backend-usuario/pom.xml` (`main` en `0166b8f`): de **98 avisos en 21 paquetes** se pasó a
+**16 avisos en 6 paquetes** (2 críticos, 6 altos, 8 medios). Ya no queda nada de Tomcat, Spring Security, Spring Boot,
+Spring Data ni logback. Lo que queda llega como dependencia transitiva:
+
+| Paquete | Versión | Avisos | CVSS máx. | Se corrige en | ¿Se usa la parte vulnerable? |
+|---|---|---|---|---|---|
+| `jackson-databind` | 2.21.4 | 9 | 7.5 | 2.21.7 | Sí, en parte: son DoS al leer JSON (referencias adelantadas, números enormes en `Duration`/`XMLGregorianCalendar`). |
+| `jackson-core` | 2.21.4 | 2 | 7.5 | 2.21.7 | Sí, en parte: DoS con tokens inválidos muy largos. |
+| `spring-webmvc` | 6.2.19 | 2 | 9.8 | 7.0.9 | No: `XsltView` y fragmentos de Server-Sent Events, que la API no usa (no hay `SseEmitter` ni `XsltView`). Solo se corrige en Spring 7 / Boot 4. |
+| `postgresql` (pgjdbc) | 42.7.11 | 1 | 8.2 | 42.7.12 | No: es del `channelBinding`, que no se configura. |
+| `commons-lang3` | 3.17.0 | 1 | 6.5 | 3.18.0 | Poco: llega con Apache POI (carga masiva). |
+| `log4j-api` | 2.24.3 | 1 | 6.3 | 2.25.5 | Poco: llega con Apache POI. |
+
+Los de Jackson, pgjdbc, commons-lang3 y log4j-api se resuelven fijando versiones en `<properties>` del `pom.xml`
+(`jackson-bom.version`, `postgresql.version`) o con la próxima 3.5.x de Spring Boot. Se dejan para el Sprint 4 (abajo).
+
+### SEC-05: corregido (PR #71, commit `14f0cba`)
+
+`RecuperacionService` ahora permite como máximo **3 códigos de recuperación por hora** por cuenta, además de los 5 intentos
+por código: de unos **7 200 intentos al día a 360 como máximo** (3 × 24 × 5) sobre un código de 6 dígitos. El tope está
+documentado en `docs/API.md` (`874ce43`) y tiene pruebas en `RecuperacionServiceTest`. El login (`POST /auth/login`) sigue
+sin límite de intentos por IP o correo; queda abajo como pendiente.
+
+## Pendiente para el Sprint 4
+
+| Pendiente | Hallazgo | Responsable |
+|---|---|---|
+| Reevaluar el JWT de la web en `localStorage` frente a una cookie `HttpOnly` antes de producción (aceptado para el Sprint 3) | SEC-06 | Guillermo, con Alexander (requiere cambiar la API) |
+| Limitar el texto plano a `10.0.2.2` con `network_security_config.xml` en la app | SEC-07 | Mijael |
+| Excluir el token de las copias de seguridad de Android y cifrarlo con Android Keystore | SEC-09 | Mijael |
+| Ajustes de producción de Django (cookies seguras, HSTS, HTTPS, `check --deploy`) y límite de intentos en el login del admin | SEC-15, SEC-14 | Guillermo |
+| Bajas del backend: CORS desde el entorno, revocación de JWT, tiempo de respuesta del login, clave HMAC separada | SEC-10 a SEC-13 | Alexander |
+| Límite de intentos en `POST /auth/login` y subir Jackson, pgjdbc, commons-lang3 y log4j-api a las versiones corregidas | SEC-05 (login), SEC-01 (restos) | Alexander |
