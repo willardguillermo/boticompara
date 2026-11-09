@@ -1,0 +1,5647 @@
+{
+  "info": {
+    "name": "BotiCompara API (backend-usuario)",
+    "description": "Pruebas del contrato docs/API.md. Importa este archivo en Postman, ejecuta primero los 3 logins de la carpeta 1 (guardan los tokens) y luego el resto. Los requests con ⚠ escriben datos en la base compartida.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api"
+    },
+    {
+      "key": "tokenCarlos",
+      "value": ""
+    },
+    {
+      "key": "tokenRosa",
+      "value": ""
+    },
+    {
+      "key": "tokenLucia",
+      "value": ""
+    },
+    {
+      "key": "tokenDesechable",
+      "value": ""
+    },
+    {
+      "key": "productoId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Autenticación (H1, H15, H18)",
+      "item": [
+        {
+          "name": "Login Carlos (COMPRADOR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"tokenCarlos\", j.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"carlos@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login Rosa (DUENO, APROBADO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"tokenRosa\", j.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"rosa@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login Lucía (DUENO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"tokenLucia\", j.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"lucia@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login con clave incorrecta (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"carlos@boticompara.nissidev.dev\",\n  \"password\": \"mala\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Registro con correo repetido (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"X\",\n  \"correo\": \"carlos@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\",\n  \"rol\": \"COMPRADOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Registro con contraseña corta (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"X\",\n  \"correo\": \"nuevo@correo.com\",\n  \"password\": \"123\",\n  \"rol\": \"COMPRADOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Registro con rol inválido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"X\",\n  \"correo\": \"nuevo@correo.com\",\n  \"password\": \"Boti2026!\",\n  \"rol\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "⚠ Registro exitoso (crea un usuario permanente)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Devuelve id y rol\", function () { const j = pm.response.json(); pm.expect(j.id).to.be.a(\"number\"); pm.expect(j.rol).to.eql(\"COMPRADOR\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Usuario Prueba\",\n  \"correo\": \"prueba+{{$timestamp}}@correo.com\",\n  \"password\": \"Boti2026!\",\n  \"rol\": \"COMPRADOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Crea una fila permanente en la base compartida. Úsalo solo cuando haga falta (por ejemplo, para obtener un usuario desechable para H19)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Perfil (H16)",
+      "item": [
+        {
+          "name": "Ver perfil de Carlos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Es Carlos\", function () { pm.expect(pm.response.json().correo).to.eql(\"carlos@boticompara.nissidev.dev\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Perfil sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "⚠ Editar perfil de Carlos (modifica datos compartidos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Carlos Ramírez\",\n  \"telefono\": \"954321098\",\n  \"direccion\": \"Av. Lima 123, Chosica\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Envía los valores originales de Carlos, así que no cambia nada visible. Si editas los valores, restáuralos después."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Botica (H1, H2, H5)",
+      "item": [
+        {
+          "name": "Validar RUC válido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"valido = true\", function () { pm.expect(pm.response.json().valido).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/validar-ruc/20601234565",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "validar-ruc",
+                "20601234565"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Validar RUC con dígito incorrecto",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"valido = false\", function () { pm.expect(pm.response.json().valido).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/validar-ruc/20601234566",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "validar-ruc",
+                "20601234566"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ver mi botica (Rosa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Botica de Rosa aprobada\", function () { pm.expect(pm.response.json().estado).to.eql(\"APROBADO\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ver mi botica como COMPRADOR (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Registrar segunda botica (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Catálogo (H8, H9, H10, H13, H14)",
+      "item": [
+        {
+          "name": "Listar mi catálogo (Rosa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Es una lista\", function () { pm.expect(pm.response.json()).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar en mi catálogo (?q=panad)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=panad",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "panad"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear producto (Rosa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"productoId\", pm.response.json().id);",
+                  "pm.test(\"Devuelve id\", function () { pm.expect(pm.response.json().id).to.be.a(\"number\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba Postman\",\n  \"principioActivo\": \"Ibuprofeno\",\n  \"presentacion\": \"Tableta 400 mg x 10\",\n  \"precio\": 5.5,\n  \"stock\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Editar producto (Rosa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Precio actualizado\", function () { pm.expect(pm.response.json().precio).to.eql(6); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{productoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{productoId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba Postman\",\n  \"principioActivo\": \"Ibuprofeno\",\n  \"presentacion\": \"Tableta 400 mg x 10\",\n  \"precio\": 6.0,\n  \"stock\": 15\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Eliminar producto (baja lógica)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{productoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{productoId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear producto como COMPRADOR (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba Postman\",\n  \"principioActivo\": \"Ibuprofeno\",\n  \"presentacion\": \"Tableta 400 mg x 10\",\n  \"precio\": 5.5,\n  \"stock\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Crear producto con precio 0 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba Postman\",\n  \"principioActivo\": \"Ibuprofeno\",\n  \"presentacion\": \"Tableta 400 mg x 10\",\n  \"precio\": 0,\n  \"stock\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Búsqueda del comprador (H22, H23, H24, H26, H27)",
+      "item": [
+        {
+          "name": "Paracetamol por principio activo (al menos 4 resultados, primero S/ 2.20)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Al menos 4 resultados\", function () { pm.expect(r.length).to.be.at.least(4); });",
+                  "pm.test(\"El primero cuesta 2.20\", function () { pm.expect(r[0].precio).to.eql(2.2); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&orden=precio_asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "orden",
+                  "value": "precio_asc"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Panadol por nombre",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=panadol&tipo=nombre",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "panadol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "nombre"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Paracetamol, precio descendente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Orden descendente\", function () { for (let i = 1; i < r.length; i++) { pm.expect(r[i-1].precio).to.be.at.least(r[i].precio); } });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&orden=precio_desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "orden",
+                  "value": "precio_desc"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Texto de 1 carácter (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=a",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "a"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Búsqueda sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cerca de Botica Salud Total: ordena por distancia, sin coordenadas al final (H27)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"El primero es Botica Salud Total a 1.07 km\", function () { pm.expect(r[0].boticaNombre).to.eql(\"Botica Salud Total\"); pm.expect(r[0].distanciaKm).to.eql(1.07); });",
+                  "pm.test(\"Las boticas sin coordenadas van al final\", function () { pm.expect(r[r.length - 1].distanciaKm).to.eql(null); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&lat=-12.046856&lng=-77.074",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "lat",
+                  "value": "-12.046856"
+                },
+                {
+                  "key": "lng",
+                  "value": "-77.074"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Radio vacío = 5 km: solo boticas con coordenadas (H27)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Al menos 1 resultado\", function () { pm.expect(r.length).to.be.at.least(1); });",
+                  "pm.test(\"Todos a 5 km o menos\", function () { r.forEach(function (p) { pm.expect(p.distanciaKm).to.be.a(\"number\"); pm.expect(p.distanciaKm).to.be.at.most(5); }); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&lat=-12.046856&lng=-77.074&radioKm=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "lat",
+                  "value": "-12.046856"
+                },
+                {
+                  "key": "lng",
+                  "value": "-77.074"
+                },
+                {
+                  "key": "radioKm",
+                  "value": ""
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Solo lat sin lng (400) (H27)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Mensaje de ubicación incompleta\", function () { pm.expect(pm.response.json().mensaje).to.eql(\"Debes enviar lat y lng juntas\"); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&lat=-12.04",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "lat",
+                  "value": "-12.04"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Segunda mitad del sprint (H3, H4, H7, H11, H12, H17, H19, H20)",
+      "description": "Endpoints de la segunda mitad del sprint, según docs/API.md. Los marcados 'No escribe nada' se pueden ejecutar sin riesgo. Los que usan {{tokenDesechable}} necesitan un usuario creado solo para pruebas (regístralo, inicia sesión y guarda su token en esa variable): nunca uses una cuenta del seed, porque H19 la elimina.",
+      "item": [
+        {
+          "name": "H3 · Registrar botica con ubicación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20998877661\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\",\n  \"latitud\": -11.9425,\n  \"longitud\": -76.699\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Deja filas permanentes. Requiere un dueño SIN botica: registra uno con 'Registro exitoso' (rol DUENO_BOTICA), inicia sesión y guarda su token en la variable tokenDesechable. Bórralos después; nunca uses una cuenta del seed."
+          }
+        },
+        {
+          "name": "H3 · Coordenadas incompletas (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\",\n  \"latitud\": -11.9425\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "No escribe nada: la validación falla antes de guardar."
+          }
+        },
+        {
+          "name": "H3 · Ver ubicación en mi botica",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Trae latitud, longitud y tieneLicencia\", function () { const j = pm.response.json(); pm.expect(j).to.have.property(\"latitud\"); pm.expect(j).to.have.property(\"longitud\"); pm.expect(j).to.have.property(\"tieneLicencia\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H7 · Corregir botica que NO está rechazada (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\",\n  \"latitud\": -11.9425,\n  \"longitud\": -76.699\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Rosa está APROBADO, así que responde 403 y no modifica nada."
+          }
+        },
+        {
+          "name": "H7 · Corregir y reenviar botica rechazada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Vuelve a PENDIENTE\", function () { const j = pm.response.json(); pm.expect(j.estado).to.eql(\"PENDIENTE\"); pm.expect(j.motivoRechazo).to.eql(null); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"telefono\": \"014567890\",\n  \"latitud\": -11.9425,\n  \"longitud\": -76.699\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requiere un dueño con botica RECHAZADA: pídele a Guillermo que rechace con motivo la de un usuario de prueba desde Django y guarda el token de ese usuario en tokenDesechable. No se puede probar con las cuentas del seed."
+          }
+        },
+        {
+          "name": "H4 · Subir licencia (PDF, JPG o PNG)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"tieneLicencia = true\", function () { pm.expect(pm.response.json().tieneLicencia).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/licencia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "licencia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Escribe en Supabase Storage y en la botica: solo con una cuenta desechable que tenga botica (tokenDesechable). Selecciona un PDF, JPG o PNG en el campo 'archivo' antes de enviar."
+          }
+        },
+        {
+          "name": "H4 · Licencia con formato no permitido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/licencia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "licencia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "No escribe nada. Selecciona un archivo .txt o .exe en el campo 'archivo'."
+          }
+        },
+        {
+          "name": "H11 · Carga masiva de productos (CSV)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Reporte completo\", function () { pm.expect(j).to.have.keys(\"creados\",\"actualizados\",\"errores\"); pm.expect(j.errores).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/carga-masiva",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "carga-masiva"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "Escribe filas reales en el catálogo de Rosa: usa un CSV con productos ZZ de prueba y bórralos después. Columnas: nombreComercial,principioActivo,presentacion,precio,stock[,stockMinimo]."
+          }
+        },
+        {
+          "name": "H11 · Carga masiva como COMPRADOR (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/carga-masiva",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "carga-masiva"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "No escribe nada."
+          }
+        },
+        {
+          "name": "H12 · Productos con stock bajo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Todos con stock <= stockMinimo\", function () { pm.response.json().forEach(p => pm.expect(p.stock).to.be.at.most(p.stockMinimo)); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?stockBajo=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "stockBajo",
+                  "value": "true"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H17 · Recuperar contraseña (siempre 200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Mensaje neutro\", function () { pm.expect(pm.response.json()).to.have.property(\"mensaje\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/recuperar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "recuperar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"carlos@boticompara.nissidev.dev\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Envía un correo a la bandeja de Mailtrap y deja un código pendiente de Carlos (queda sin efecto al pedir otro o a los 15 minutos)."
+          }
+        },
+        {
+          "name": "H17 · Recuperar con correo inexistente (también 200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/recuperar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "recuperar"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"no-existe@correo.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Debe responder igual que con un correo existente y no envía ningún correo."
+          }
+        },
+        {
+          "name": "H17 · Restablecer con código inválido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/restablecer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "restablecer"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"nadie@correo.com\",\n  \"token\": \"000000\",\n  \"password\": \"NuevaClave2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "El código es de 6 dígitos y la petición lleva el correo. Con un correo inexistente el mensaje es el mismo que con un código incorrecto."
+          }
+        },
+        {
+          "name": "H20 · Verificar correo con token inválido (400, HTML)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde HTML\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/html\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verificar?token=token-falso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verificar"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "token-falso"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H3 · Latitud fuera de rango (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\",\n  \"latitud\": 95,\n  \"longitud\": -76.7\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "No escribe nada: la validación falla antes de guardar."
+          }
+        },
+        {
+          "name": "H7 · Corregir botica como COMPRADOR (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"Botica Prueba\",\n  \"ruc\": \"20601234565\",\n  \"razonSocial\": \"Prueba S.A.C.\",\n  \"direccion\": \"Av. Prueba 123\",\n  \"distrito\": \"Ate\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H12 · stockMinimo negativo (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error con formato de API.md\", function () { const j = pm.response.json(); pm.expect(j).to.have.keys(\"status\",\"error\",\"mensaje\",\"timestamp\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba\",\n  \"principioActivo\": \"Ibuprofeno\",\n  \"presentacion\": \"Tableta\",\n  \"precio\": 5.5,\n  \"stock\": 2,\n  \"stockMinimo\": -1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "No escribe nada: la validación falla antes de guardar."
+          }
+        },
+        {
+          "name": "H20 · Verificar correo sin token (400, HTML)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde HTML\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/html\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verificar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verificar"
+              ]
+            }
+          }
+        },
+        {
+          "name": "⚠ H19 · Eliminar mi cuenta (usuario desechable)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDesechable}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "DESTRUCTIVO: anonimiza la cuenta y da de baja los productos de su botica. NUNCA con una cuenta del seed: usa un usuario creado con 'Registro exitoso'."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Flujo de cambio de precio y stock (H40)",
+      "description": "H40: el dueño cambia el precio y el stock de un producto y el comprador lo ve al instante (la búsqueda lee la vista en vivo, sin caché). Ejecuta la carpeta completa con Run folder, en orden. Usa 'Paracetamol Genérico' de Rosa (seed.sql): lo cambia unos segundos y lo restaura en el paso 6. No crea productos, así que no deja nada que limpiar. Si la ejecución se corta antes del paso 6, vuelve a ejecutarla completa: conserva los valores originales guardados y los restaura al terminar. Escribe en la base compartida: avisa al grupo si la corres mientras otros prueban.",
+      "item": [
+        {
+          "name": "1. Login de Rosa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "pm.collectionVariables.set(\"tokenRosa\", j.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"rosa@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2. Mi catálogo: guarda los valores originales de Paracetamol Genérico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const p = pm.response.json().find(function (x) { return x.nombreComercial === \"Paracetamol Genérico\"; });",
+                  "pm.test(\"Rosa tiene Paracetamol Genérico\", function () { pm.expect(p).to.be.an(\"object\"); });",
+                  "if (p) {",
+                  "  pm.collectionVariables.set(\"h40Id\", String(p.id));",
+                  "  pm.collectionVariables.set(\"h40Nombre\", p.nombreComercial);",
+                  "  pm.collectionVariables.set(\"h40Principio\", p.principioActivo);",
+                  "  pm.collectionVariables.set(\"h40Presentacion\", p.presentacion);",
+                  "  pm.collectionVariables.set(\"h40Minimo\", String(p.stockMinimo));",
+                  "  pm.collectionVariables.set(\"h40Medicamento\", String(p.medicamentoId));",
+                  "  // Si una ejecucion anterior se cortó antes de restaurar, se conservan los originales de entonces",
+                  "  if (pm.collectionVariables.get(\"h40Pendiente\") !== \"true\") {",
+                  "    pm.collectionVariables.set(\"h40PrecioOrig\", String(p.precio));",
+                  "    pm.collectionVariables.set(\"h40StockOrig\", String(p.stock));",
+                  "    pm.collectionVariables.set(\"h40Pendiente\", \"true\");",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=Paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Paracetamol"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Rosa sube el precio (+1.00) y el stock (+7)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const precio = Number(pm.collectionVariables.get(\"h40PrecioOrig\"));",
+                  "const stock = Number(pm.collectionVariables.get(\"h40StockOrig\"));",
+                  "pm.collectionVariables.set(\"h40PrecioNuevo\", (Math.round((precio + 1) * 100) / 100).toFixed(2));",
+                  "pm.collectionVariables.set(\"h40StockNuevo\", String(stock + 7));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"La respuesta trae el precio nuevo\", function () { pm.expect(j.precio).to.eql(Number(pm.collectionVariables.get(\"h40PrecioNuevo\"))); });",
+                  "pm.test(\"La respuesta trae el stock nuevo\", function () { pm.expect(j.stock).to.eql(Number(pm.collectionVariables.get(\"h40StockNuevo\"))); });",
+                  "pm.test(\"Se conservan el stock mínimo y el enlace al catálogo (no se enviaron)\", function () {",
+                  "  pm.expect(String(j.stockMinimo)).to.eql(pm.collectionVariables.get(\"h40Minimo\"));",
+                  "  pm.expect(String(j.medicamentoId)).to.eql(pm.collectionVariables.get(\"h40Medicamento\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h40Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h40Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"{{h40Nombre}}\",\n  \"principioActivo\": \"{{h40Principio}}\",\n  \"presentacion\": \"{{h40Presentacion}}\",\n  \"precio\": {{h40PrecioNuevo}},\n  \"stock\": {{h40StockNuevo}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4. Búsqueda del comprador: ve el precio y el stock nuevos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const mio = pm.response.json().find(function (p) { return String(p.productoId) === pm.collectionVariables.get(\"h40Id\"); });",
+                  "pm.test(\"El producto aparece en la búsqueda\", function () { pm.expect(mio).to.be.an(\"object\"); });",
+                  "pm.test(\"Con el precio nuevo\", function () { pm.expect(mio.precio).to.eql(Number(pm.collectionVariables.get(\"h40PrecioNuevo\"))); });",
+                  "pm.test(\"Con el stock nuevo\", function () { pm.expect(mio.stock).to.eql(Number(pm.collectionVariables.get(\"h40StockNuevo\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=nombre",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "nombre"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "5. Detalle público (sin token): también muestra lo nuevo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Con el precio nuevo\", function () { pm.expect(j.precio).to.eql(Number(pm.collectionVariables.get(\"h40PrecioNuevo\"))); });",
+                  "pm.test(\"Con el stock nuevo\", function () { pm.expect(j.stock).to.eql(Number(pm.collectionVariables.get(\"h40StockNuevo\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h40Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h40Id}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "6. Rosa restaura los valores originales",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Vuelve el precio original\", function () { pm.expect(j.precio).to.eql(Number(pm.collectionVariables.get(\"h40PrecioOrig\"))); });",
+                  "pm.test(\"Vuelve el stock original\", function () { pm.expect(j.stock).to.eql(Number(pm.collectionVariables.get(\"h40StockOrig\"))); });",
+                  "// Solo si se restauró bien se borra la marca de pendiente",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set(\"h40Pendiente\", \"false\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h40Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h40Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"{{h40Nombre}}\",\n  \"principioActivo\": \"{{h40Principio}}\",\n  \"presentacion\": \"{{h40Presentacion}}\",\n  \"precio\": {{h40PrecioOrig}},\n  \"stock\": {{h40StockOrig}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "7. Búsqueda del comprador: ya muestra los valores originales",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const mio = pm.response.json().find(function (p) { return String(p.productoId) === pm.collectionVariables.get(\"h40Id\"); });",
+                  "pm.test(\"El producto aparece en la búsqueda\", function () { pm.expect(mio).to.be.an(\"object\"); });",
+                  "pm.test(\"Con el precio original\", function () { pm.expect(mio.precio).to.eql(Number(pm.collectionVariables.get(\"h40PrecioOrig\"))); });",
+                  "pm.test(\"Con el stock original\", function () { pm.expect(mio.stock).to.eql(Number(pm.collectionVariables.get(\"h40StockOrig\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=nombre",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "nombre"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Segunda mitad del Sprint 2 (H2, H28, H31, H36-H44)",
+      "description": "Endpoints nuevos del Sprint 2. Ejecuta la carpeta completa con Run folder, en orden: el paso 2 guarda el producto que usan los demás. Los favoritos se agregan y se quitan dentro de la misma carpeta. Los requests de H31 al final le quitan el enlace al Paracetamol Genérico de Rosa y lo restauran; ningún request crea productos. No usa la cuenta de Carlos.",
+      "item": [
+        {
+          "name": "1. Login de Rosa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "pm.collectionVariables.set(\"tokenRosa\", j.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"rosa@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2. Busca paracetamol y guarda el más caro (para probar el ahorro)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Hay al menos 2 productos\", function () { pm.expect(r.length).to.be.at.least(2); });",
+                  "pm.collectionVariables.set(\"h8Id\", String(r[0].productoId));",
+                  "pm.collectionVariables.set(\"h8Precio\", String(r[0].precio));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/buscar?q=paracetamol&tipo=principio&orden=precio_desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "buscar"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "paracetamol"
+                },
+                {
+                  "key": "tipo",
+                  "value": "principio"
+                },
+                {
+                  "key": "orden",
+                  "value": "precio_desc"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H28 · Detalle del producto, sin token (público)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Es el producto pedido\", function () { pm.expect(String(j.productoId)).to.eql(pm.collectionVariables.get(\"h8Id\")); });",
+                  "pm.test(\"Trae los datos del producto y de la botica\", function () {",
+                  "  [\"nombreComercial\", \"principioActivo\", \"presentacion\", \"precio\", \"stock\", \"boticaId\", \"boticaNombre\", \"boticaDireccion\", \"boticaDistrito\"].forEach(function (c) { pm.expect(j).to.have.property(c); });",
+                  "});",
+                  "pm.test(\"boticaTelefono viene en la respuesta (puede ser null)\", function () { pm.expect(j).to.have.property(\"boticaTelefono\"); });",
+                  "pm.test(\"Solo se ven productos con stock\", function () { pm.expect(j.stock).to.be.above(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h8Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h8Id}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H28 · Detalle de un producto que no existe (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "999999"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H28 · Detalle con id no numérico (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "abc"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H36 · Alternativas, sin token (público)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "const alts = j.alternativas;",
+                  "pm.test(\"Trae productoId, sinEquivalentes y la lista\", function () {",
+                  "  pm.expect(String(j.productoId)).to.eql(pm.collectionVariables.get(\"h8Id\"));",
+                  "  pm.expect(j.sinEquivalentes).to.be.a(\"boolean\");",
+                  "  pm.expect(alts).to.be.an(\"array\");",
+                  "});",
+                  "pm.test(\"sinEquivalentes es true solo si la lista viene vacía (H41)\", function () { pm.expect(j.sinEquivalentes).to.eql(alts.length === 0); });",
+                  "pm.test(\"Máximo 20 y el consultado no aparece entre ellas\", function () {",
+                  "  pm.expect(alts.length).to.be.at.most(20);",
+                  "  pm.expect(alts.map(function (a) { return String(a.productoId); })).to.not.include(pm.collectionVariables.get(\"h8Id\"));",
+                  "});",
+                  "pm.test(\"tipoCoincidencia es EQUIVALENTE o PRINCIPIO_ACTIVO\", function () {",
+                  "  alts.forEach(function (a) { pm.expect([\"EQUIVALENTE\", \"PRINCIPIO_ACTIVO\"]).to.include(a.tipoCoincidencia); });",
+                  "});",
+                  "pm.test(\"Ordenadas de menor a mayor precio\", function () {",
+                  "  for (let i = 1; i < alts.length; i++) { pm.expect(alts[i].precio).to.be.at.least(alts[i - 1].precio); }",
+                  "});",
+                  "pm.test(\"ahorroPorcentaje es null o un número positivo (H37)\", function () {",
+                  "  alts.forEach(function (a) { if (a.ahorroPorcentaje !== null) { pm.expect(a.ahorroPorcentaje).to.be.above(0); } });",
+                  "});",
+                  "pm.test(\"El ahorro de la más barata sale de la fórmula, con 1 decimal (H37)\", function () {",
+                  "  pm.expect(alts.length).to.be.at.least(1);",
+                  "  const consultado = Number(pm.collectionVariables.get(\"h8Precio\"));",
+                  "  const esperado = Math.round(((consultado - alts[0].precio) / consultado) * 1000) / 10;",
+                  "  pm.expect(alts[0].ahorroPorcentaje).to.eql(esperado);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h8Id}}/alternativas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h8Id}}",
+                "alternativas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "El producto consultado es el paracetamol más caro (paso 2), así que su alternativa más barata debe tener ahorro."
+          }
+        },
+        {
+          "name": "H36 · Alternativas con un token inválido (la ruta es pública, 200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer token-invalido"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h8Id}}/alternativas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h8Id}}",
+                "alternativas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H36 · Alternativas de un producto que no existe (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/999999/alternativas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "999999",
+                "alternativas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H36 · Alternativas con id no numérico (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/abc/alternativas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "abc",
+                "alternativas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H31 · Buscar medicamentos en el catálogo maestro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Es una lista de 20 como máximo\", function () { pm.expect(r).to.be.an(\"array\"); pm.expect(r.length).to.be.at.most(20); });",
+                  "pm.test(\"Cada medicamento trae id, nombre, principio activo y presentación\", function () {",
+                  "  r.forEach(function (m) { [\"id\", \"nombreComercial\", \"principioActivo\", \"presentacion\"].forEach(function (c) { pm.expect(m).to.have.property(c); }); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/medicamentos?q=para",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicamentos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "para"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Buscar con 1 solo carácter (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/medicamentos?q=p",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicamentos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "p"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Crear producto con un medicamento que no existe (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400, no se crea nada\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"ZZ Prueba Postman medicamento\",\n  \"principioActivo\": \"Paracetamol\",\n  \"presentacion\": \"Tableta ZZ\",\n  \"precio\": 1.0,\n  \"stock\": 1,\n  \"medicamentoId\": 999999\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Debe responder 400 y no crear el producto. Si responde 201, hay que borrar a mano el producto ZZ."
+          }
+        },
+        {
+          "name": "H43 · Favoritos sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H43 · Agregar el producto a favoritos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201 (guardado) o 200 (ya estaba)\", function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve el producto con su fecha\", function () {",
+                  "  pm.expect(String(j.productoId)).to.eql(pm.collectionVariables.get(\"h8Id\"));",
+                  "  pm.expect(j.fecha).to.be.a(\"string\");",
+                  "  pm.expect(j).to.have.property(\"nombreComercial\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"productoId\": {{h8Id}} }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H44 · Listar favoritos: el producto aparece",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "pm.test(\"Incluye el producto guardado\", function () {",
+                  "  pm.expect(pm.response.json().map(function (f) { return String(f.productoId); })).to.include(pm.collectionVariables.get(\"h8Id\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H43 · Agregar un producto que no existe (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"productoId\": 999999 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H43 · Agregar sin productoId (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H44 · Quitar el producto de favoritos (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/{{h8Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "{{h8Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H44 · Listar favoritos: el producto ya no está",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "pm.test(\"No incluye el producto quitado\", function () {",
+                  "  pm.expect(pm.response.json().map(function (f) { return String(f.productoId); })).to.not.include(pm.collectionVariables.get(\"h8Id\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H44 · Quitar otra vez también responde 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/{{h8Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "{{h8Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H2 · Validar RUC sin sesión: solo validación local (no gasta cuota de SUNAT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"El RUC es válido y la fuente es LOCAL\", function () { pm.expect(j.valido).to.eql(true); pm.expect(j.fuente).to.eql(\"LOCAL\"); });",
+                  "pm.test(\"Sin consulta a SUNAT, los datos fiscales vienen en null\", function () {",
+                  "  [\"razonSocial\", \"estado\", \"condicion\", \"direccion\", \"distrito\"].forEach(function (c) { pm.expect(j).to.have.property(c, null); });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/validar-ruc/20601234565",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "validar-ruc",
+                "20601234565"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Sin token no se consulta SUNAT, para cuidar la cuota de Decolecta (100 consultas al mes)."
+          }
+        },
+        {
+          "name": "H31 · Guarda el Paracetamol Genérico de Rosa y su enlace original",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const p = pm.response.json().find(function (x) { return x.nombreComercial === \"Paracetamol Genérico\"; });",
+                  "pm.test(\"Rosa tiene Paracetamol Genérico\", function () { pm.expect(p).to.be.an(\"object\"); });",
+                  "if (p) {",
+                  "  const pendiente = pm.collectionVariables.get(\"h31Pendiente\") === \"true\";",
+                  "  pm.collectionVariables.set(\"h31Id\", String(p.id));",
+                  "  pm.collectionVariables.set(\"h31Nombre\", p.nombreComercial);",
+                  "  pm.collectionVariables.set(\"h31Principio\", p.principioActivo);",
+                  "  pm.collectionVariables.set(\"h31Presentacion\", p.presentacion);",
+                  "  pm.collectionVariables.set(\"h31Precio\", String(p.precio));",
+                  "  pm.collectionVariables.set(\"h31Stock\", String(p.stock));",
+                  "  // Si una ejecución anterior se cortó con el producto desenlazado, se conserva el enlace original de entonces",
+                  "  if (!pendiente) {",
+                  "    pm.test(\"El producto está enlazado al catálogo maestro\", function () { pm.expect(p.medicamentoId).to.not.equal(null); });",
+                  "    pm.collectionVariables.set(\"h31Medicamento\", String(p.medicamentoId));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=Paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Paracetamol"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Quitar el enlace sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h31Id}}/medicamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h31Id}}",
+                "medicamento"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H31 · Quitar el enlace de un producto que no existe (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/999999/medicamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "999999",
+                "medicamento"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Quitar el enlace con id no numérico (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/abc/medicamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "abc",
+                "medicamento"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Rosa quita el enlace del producto (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "// Marca pendiente: si la ejecución se corta aquí, el siguiente Run conserva el enlace original",
+                  "if (pm.response.code === 204) { pm.collectionVariables.set(\"h31Pendiente\", \"true\"); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h31Id}}/medicamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h31Id}}",
+                "medicamento"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Mi catálogo: el producto sigue activo y sin enlace",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const p = pm.response.json().find(function (x) { return String(x.id) === pm.collectionVariables.get(\"h31Id\"); });",
+                  "pm.test(\"El producto sigue en el catálogo de Rosa\", function () { pm.expect(p).to.be.an(\"object\"); });",
+                  "if (p) {",
+                  "  pm.test(\"medicamentoId ahora es null\", function () { pm.expect(p.medicamentoId).to.eql(null); });",
+                  "  pm.test(\"Conserva nombre, precio y stock\", function () {",
+                  "    pm.expect(p.nombreComercial).to.eql(pm.collectionVariables.get(\"h31Nombre\"));",
+                  "    pm.expect(String(p.precio)).to.eql(pm.collectionVariables.get(\"h31Precio\"));",
+                  "    pm.expect(String(p.stock)).to.eql(pm.collectionVariables.get(\"h31Stock\"));",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=Paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Paracetamol"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H36 · Sin enlace, las alternativas ya no son EQUIVALENTE (solo PRINCIPIO_ACTIVO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Ninguna alternativa es EQUIVALENTE\", function () {",
+                  "  j.alternativas.forEach(function (a) { pm.expect(a.tipoCoincidencia).to.eql(\"PRINCIPIO_ACTIVO\"); });",
+                  "});",
+                  "pm.test(\"sinEquivalentes es true solo si la lista viene vacía (H41)\", function () { pm.expect(j.sinEquivalentes).to.eql(j.alternativas.length === 0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h31Id}}/alternativas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h31Id}}",
+                "alternativas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H31 · Quitar el enlace otra vez también responde 204 (idempotente)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h31Id}}/medicamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h31Id}}",
+                "medicamento"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H31 · Rosa restaura el enlace original (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Vuelve el enlace original\", function () { pm.expect(String(j.medicamentoId)).to.eql(pm.collectionVariables.get(\"h31Medicamento\")); });",
+                  "pm.test(\"Se conservan precio y stock\", function () {",
+                  "  pm.expect(String(j.precio)).to.eql(pm.collectionVariables.get(\"h31Precio\"));",
+                  "  pm.expect(String(j.stock)).to.eql(pm.collectionVariables.get(\"h31Stock\"));",
+                  "});",
+                  "// Solo si se restauró bien se borra la marca de pendiente",
+                  "if (pm.response.code === 200) { pm.collectionVariables.set(\"h31Pendiente\", \"false\"); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h31Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h31Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"{{h31Nombre}}\",\n  \"principioActivo\": \"{{h31Principio}}\",\n  \"presentacion\": \"{{h31Presentacion}}\",\n  \"precio\": {{h31Precio}},\n  \"stock\": {{h31Stock}},\n  \"medicamentoId\": {{h31Medicamento}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Deja el producto como estaba. Si este request no corre, el producto de Rosa queda sin enlace: repetir el Run de la carpeta o enlazarlo a mano con este mismo PUT."
+          }
+        },
+        {
+          "name": "H31 · Mi catálogo: el enlace quedó como al inicio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });",
+                  "const p = pm.response.json().find(function (x) { return String(x.id) === pm.collectionVariables.get(\"h31Id\"); });",
+                  "pm.test(\"El enlace original está restaurado\", function () { pm.expect(p).to.be.an(\"object\"); pm.expect(String(p.medicamentoId)).to.eql(pm.collectionVariables.get(\"h31Medicamento\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=Paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Paracetamol"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Alertas de precio (H59, H60, H66)",
+      "description": "Alertas de baja de precio. Ejecuta la carpeta completa con Run folder, en orden: Carlos (COMPRADOR) guarda 'Paracetamol Genérico' de Rosa en favoritos con un precio objetivo, Rosa baja el precio dos veces (la primera no llega al objetivo y no crea alerta; la segunda sí) y Carlos ve la alerta, la marca como leída y prueba desactivar y reactivar las alertas (H66). Al final Rosa restaura el precio original, Carlos quita el objetivo y el favorito, y sus alertas sin leer quedan como al empezar. Deja 1 alerta ya leída en el historial de Carlos (no hay endpoint para borrarlas). No crea productos. El correo de H61 no se puede comprobar desde Postman: ver docs/pruebas/sprint3/H61.md. Si la ejecución se corta antes del paso 15, vuelve a ejecutarla completa: conserva el precio original guardado y lo restaura al terminar; si quedó apagada la alerta de Carlos, el paso H66 que sigue la reactiva. Escribe en la base compartida: avisa al grupo si la corres mientras otros prueban con Carlos o con Rosa.",
+      "item": [
+        {
+          "name": "1. Login de Carlos (COMPRADOR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"tokenCarlos\", j.token);",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"carlos@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2. Login de Rosa (DUENO, APROBADO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"tokenRosa\", j.token);",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"rosa@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3. Mi catálogo (Rosa): guarda los valores originales de Paracetamol Genérico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const p = pm.response.json().find(function (x) { return x.nombreComercial === \"Paracetamol Genérico\"; });",
+                  "pm.test(\"Rosa tiene Paracetamol Genérico\", function () { pm.expect(p).to.be.an(\"object\"); });",
+                  "if (p) {",
+                  "  pm.collectionVariables.set(\"h59Id\", String(p.id));",
+                  "  pm.collectionVariables.set(\"h59Nombre\", p.nombreComercial);",
+                  "  pm.collectionVariables.set(\"h59Principio\", p.principioActivo);",
+                  "  pm.collectionVariables.set(\"h59Presentacion\", p.presentacion);",
+                  "  // Si una ejecución anterior se cortó antes de restaurar, se conservan los originales de entonces",
+                  "  if (pm.collectionVariables.get(\"h59Pendiente\") !== \"true\") {",
+                  "    pm.collectionVariables.set(\"h59PrecioOrig\", String(p.precio));",
+                  "    pm.collectionVariables.set(\"h59StockOrig\", String(p.stock));",
+                  "    pm.collectionVariables.set(\"h59Pendiente\", \"true\");",
+                  "  }",
+                  "  const orig = Number(pm.collectionVariables.get(\"h59PrecioOrig\"));",
+                  "  pm.collectionVariables.set(\"h59P1\", (Math.round((orig - 0.10) * 100) / 100).toFixed(2));",
+                  "  pm.collectionVariables.set(\"h59P2\", (Math.round((orig - 0.20) * 100) / 100).toFixed(2));",
+                  "  pm.collectionVariables.set(\"h59P3\", (Math.round((orig - 0.30) * 100) / 100).toFixed(2));",
+                  "  pm.test(\"El precio original permite bajar 0.30 y seguir siendo mayor que 0\", function () { pm.expect(orig).to.be.above(0.30); });",
+                  "}",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/boticas/mia/productos?q=Paracetamol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "boticas",
+                "mia",
+                "productos"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Paracetamol"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "4. Carlos: alertas sin leer antes de empezar (H59)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"noLeidas es un número\", function () { pm.expect(j.noLeidas).to.be.a(\"number\"); });",
+                  "pm.collectionVariables.set(\"h59Base\", String(j.noLeidas));",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas/resumen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas",
+                "resumen"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "5. Carlos agrega el producto a favoritos (H43)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201 (guardado) o 200 (ya estaba)\", function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve el producto\", function () { pm.expect(String(j.productoId)).to.eql(pm.collectionVariables.get(\"h59Id\")); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"productoId\": {{h59Id}} }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H60 · Carlos pone el precio objetivo (precio original − 0.20)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve el favorito con su precio objetivo\", function () { pm.expect(String(j.productoId)).to.eql(pm.collectionVariables.get(\"h59Id\")); pm.expect(j.precioObjetivo).to.eql(Number(pm.collectionVariables.get(\"h59P2\"))); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/{{h59Id}}/precio-objetivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "{{h59Id}}",
+                "precio-objetivo"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"precioObjetivo\": {{h59P2}} }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H60 · Sin el campo precioObjetivo (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/{{h59Id}}/precio-objetivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "{{h59Id}}",
+                "precio-objetivo"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H60 · Precio objetivo 0 (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/{{h59Id}}/precio-objetivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "{{h59Id}}",
+                "precio-objetivo"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"precioObjetivo\": 0 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H60 · Producto que no está en sus favoritos (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/999999999/precio-objetivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "999999999",
+                "precio-objetivo"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"precioObjetivo\": 1.50 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H60 · Sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/{{h59Id}}/precio-objetivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "{{h59Id}}",
+                "precio-objetivo"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"precioObjetivo\": 1.50 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6. Rosa baja el precio sin llegar al objetivo (original − 0.10)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"El precio nuevo es el enviado\", function () { pm.expect(j.precio).to.eql(Number(pm.collectionVariables.get(\"h59P1\"))); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h59Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h59Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"{{h59Nombre}}\",\n  \"principioActivo\": \"{{h59Principio}}\",\n  \"presentacion\": \"{{h59Presentacion}}\",\n  \"precio\": {{h59P1}},\n  \"stock\": {{h59StockOrig}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "7. Carlos: sin alerta nueva (H60: el precio no llegó a su objetivo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Las alertas sin leer siguen igual que al empezar\", function () { pm.expect(String(j.noLeidas)).to.eql(pm.collectionVariables.get(\"h59Base\")); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas/resumen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas",
+                "resumen"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "8. Rosa baja el precio hasta el objetivo (original − 0.20)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"El precio nuevo es el enviado\", function () { pm.expect(j.precio).to.eql(Number(pm.collectionVariables.get(\"h59P2\"))); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h59Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h59Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"{{h59Nombre}}\",\n  \"principioActivo\": \"{{h59Principio}}\",\n  \"presentacion\": \"{{h59Presentacion}}\",\n  \"precio\": {{h59P2}},\n  \"stock\": {{h59StockOrig}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "9. Carlos: llegó 1 alerta nueva (H59)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Hay una alerta sin leer más que al empezar\", function () { pm.expect(j.noLeidas).to.eql(Number(pm.collectionVariables.get(\"h59Base\")) + 1); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas/resumen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas",
+                "resumen"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "10. Carlos lista sus alertas sin leer: la más reciente es esta baja (H59)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const r = pm.response.json();",
+                  "pm.test(\"La lista no está vacía\", function () { pm.expect(r.length).to.be.at.least(1); });",
+                  "const a = r[0];",
+                  "pm.test(\"La alerta es de este producto, de P1 a P2, sin leer\", function () { pm.expect(String(a.productoId)).to.eql(pm.collectionVariables.get(\"h59Id\")); pm.expect(a.precioAnterior).to.eql(Number(pm.collectionVariables.get(\"h59P1\"))); pm.expect(a.precioNuevo).to.eql(Number(pm.collectionVariables.get(\"h59P2\"))); pm.expect(a.leida).to.eql(false); });",
+                  "pm.test(\"El ahorro es precioAnterior − precioNuevo (0.10)\", function () { pm.expect(Math.abs(a.ahorro - 0.10)).to.be.below(0.001); });",
+                  "pm.test(\"Trae el nombre, la presentación, la botica y la fecha\", function () { pm.expect(a).to.have.property(\"nombreComercial\"); pm.expect(a).to.have.property(\"presentacion\"); pm.expect(a.boticaNombre).to.be.a(\"string\"); pm.expect(a.fecha).to.be.a(\"string\"); });",
+                  "pm.collectionVariables.set(\"h59AlertaId\", String(a.id));",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas?soloNoLeidas=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas"
+              ],
+              "query": [
+                {
+                  "key": "soloNoLeidas",
+                  "value": "true"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H59 · Alertas sin token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "H59 · soloNoLeidas inválido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas?soloNoLeidas=quizas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas"
+              ],
+              "query": [
+                {
+                  "key": "soloNoLeidas",
+                  "value": "quizas"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "11. Carlos marca la alerta como leída (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas/{{h59AlertaId}}/leida",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas",
+                "{{h59AlertaId}}",
+                "leida"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H59 · Marcarla otra vez también responde 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas/{{h59AlertaId}}/leida",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas",
+                "{{h59AlertaId}}",
+                "leida"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H59 · Alerta que no existe (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas/999999999/leida",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas",
+                "999999999",
+                "leida"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H59 · Id no numérico (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas/abc/leida",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas",
+                "abc",
+                "leida"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "12. Carlos: sus alertas sin leer vuelven al número inicial",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Las alertas sin leer son las de antes de empezar\", function () { pm.expect(String(j.noLeidas)).to.eql(pm.collectionVariables.get(\"h59Base\")); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas/resumen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas",
+                "resumen"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H66 · Carlos desactiva las alertas de precio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"El perfil trae notificacionesPrecio en false\", function () { pm.expect(j.notificacionesPrecio).to.eql(false); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me",
+                "notificaciones"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"notificacionesPrecio\": false }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "H66 · Sin el campo notificacionesPrecio (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me",
+                "notificaciones"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "13. Rosa baja otra vez el precio (original − 0.30) con las alertas de Carlos desactivadas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"El precio nuevo es el enviado\", function () { pm.expect(j.precio).to.eql(Number(pm.collectionVariables.get(\"h59P3\"))); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h59Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h59Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"{{h59Nombre}}\",\n  \"principioActivo\": \"{{h59Principio}}\",\n  \"presentacion\": \"{{h59Presentacion}}\",\n  \"precio\": {{h59P3}},\n  \"stock\": {{h59StockOrig}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "14. Carlos: sin alerta nueva (H66: las tiene desactivadas)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Las alertas sin leer siguen igual que al empezar\", function () { pm.expect(String(j.noLeidas)).to.eql(pm.collectionVariables.get(\"h59Base\")); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas/resumen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas",
+                "resumen"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H66 · Carlos vuelve a activar las alertas de precio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"El perfil trae notificacionesPrecio en true\", function () { pm.expect(j.notificacionesPrecio).to.eql(true); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/me/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "me",
+                "notificaciones"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"notificacionesPrecio\": true }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "15. Rosa restaura el precio original",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Vuelve el precio original\", function () { pm.expect(j.precio).to.eql(Number(pm.collectionVariables.get(\"h59PrecioOrig\"))); });",
+                  "// Solo si se restauró bien se borra la marca de pendiente",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set(\"h59Pendiente\", \"false\");",
+                  "}",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/{{h59Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "{{h59Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreComercial\": \"{{h59Nombre}}\",\n  \"principioActivo\": \"{{h59Principio}}\",\n  \"presentacion\": \"{{h59Presentacion}}\",\n  \"precio\": {{h59PrecioOrig}},\n  \"stock\": {{h59StockOrig}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "16. Carlos: la subida de precio no crea alerta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Las alertas sin leer siguen igual que al empezar\", function () { pm.expect(String(j.noLeidas)).to.eql(pm.collectionVariables.get(\"h59Base\")); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/alertas/resumen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas",
+                "resumen"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "H60 · Carlos quita el precio objetivo (null)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"El favorito queda sin precio objetivo\", function () { pm.expect(j.precioObjetivo).to.eql(null); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/{{h59Id}}/precio-objetivo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "{{h59Id}}",
+                "precio-objetivo"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"precioObjetivo\": null }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "17. Carlos quita el producto de sus favoritos (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 204\", function () { pm.response.to.have.status(204); });",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favoritos/{{h59Id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "favoritos",
+                "{{h59Id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
