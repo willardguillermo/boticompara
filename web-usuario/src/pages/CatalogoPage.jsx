@@ -210,7 +210,12 @@ export default function CatalogoPage() {
       </section>
 
       {editando && (
-        <ProductoFormModal producto={editando} onCerrar={() => setEditando(null)} onGuardado={alGuardar} />
+        <ProductoFormModal
+          producto={editando}
+          onCerrar={() => setEditando(null)}
+          onGuardado={alGuardar}
+          onEnlaceQuitado={() => setRecarga((n) => n + 1)}
+        />
       )}
       {eliminando && (
         <ConfirmarEliminarModal

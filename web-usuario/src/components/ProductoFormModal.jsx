@@ -1,11 +1,15 @@
 // H8 - Agregar producto (POST /productos)
 // H9 - Editar producto (PUT /productos/{id})
 // H12 - Stock mínimo para la alerta de stock bajo
-import { useState } from 'react'
+// D3 - Enlace con el catálogo maestro (medicamentoId, regla D2 y DELETE /productos/{id}/medicamento)
+import { useEffect, useState } from 'react'
+import { presentacionMedicamento, useBuscarMedicamentos } from '../hooks/useBuscarMedicamentos.js'
 import { api } from '../services/index.js'
 import { propsError } from '../utils/validacion.js'
 import Alerta from './Alerta.jsx'
+import Cargando from './Cargando.jsx'
 import Campo from './Campo.jsx'
+import Icono from './Icono.jsx'
 import Modal from './Modal.jsx'
 
 const PRECIO_VALIDO = /^\d+(\.\d{1,2})?$/
@@ -34,7 +38,101 @@ function validar(datos) {
   return errores
 }
 
-export default function ProductoFormModal({ producto, onCerrar, onGuardado }) {
+const ERROR_MEDICAMENTO =
+  'El medicamento elegido ya no está en el catálogo (no existe o el administrador lo ocultó). Quita la selección y elige otro.'
+
+/**
+ * La API del producto solo trae medicamentoId: el nombre se busca en el catálogo maestro por el
+ * nombre comercial o el principio activo del producto. Un medicamento oculto no aparece: se muestra su ID.
+ */
+async function buscarMedicamentoEnlazado({ medicamentoId, nombreComercial, principioActivo }) {
+  for (const termino of [nombreComercial, principioActivo].map((t) => t?.trim() ?? '')) {
+    if (termino.length < 2) continue
+    const encontrado = (await api.buscarMedicamentos(termino)).find((m) => m.id === medicamentoId)
+    if (encontrado) return encontrado
+  }
+  return null
+}
+
+/** D3: elige un medicamento del catálogo maestro, con el mismo buscador de la carga masiva. */
+function SelectorMedicamento({ medicamento, enlazadoEnServidor, quitando, error, onElegir, onQuitar }) {
+  const [busqueda, setBusqueda] = useState('')
+  const { termino, buscando, medicamentos, error: errorBusqueda } = useBuscarMedicamentos(busqueda)
+
+  if (medicamento) {
+    return (
+      <div className="campo">
+        <span className="etiqueta-campo" id="medicamento-etiqueta">
+          Medicamento del catálogo <span className="opcional">(opcional)</span>
+        </span>
+        <div className="medicamento-elegido" aria-labelledby="medicamento-etiqueta">
+          <div>
+            <strong>{medicamento.nombreComercial ?? `Medicamento ID ${medicamento.id}`}</strong>
+            <span className="texto-suave">
+              {medicamento.nombreComercial
+                ? `${medicamento.principioActivo} · ${presentacionMedicamento(medicamento)} · ID ${medicamento.id}`
+                : 'No aparece en la búsqueda del catálogo: puede estar oculto.'}
+            </span>
+          </div>
+          <button type="button" className="btn btn-secundario btn-icono" onClick={onQuitar} disabled={quitando}>
+            {quitando ? 'Quitando...' : enlazadoEnServidor ? 'Quitar enlace' : 'Quitar'}
+          </button>
+        </div>
+        {error && (
+          <span className="error-campo" role="alert">
+            {error}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <Campo
+      id="buscar-medicamento"
+      etiqueta="Medicamento del catálogo"
+      opcional
+      error={error || errorBusqueda}
+      ayuda="Búscalo por nombre comercial o principio activo para enlazar tu producto con el catálogo de medicamentos."
+    >
+      <div className="buscador">
+        <Icono nombre="buscar" />
+        <input
+          id="buscar-medicamento"
+          type="search"
+          placeholder="Por ejemplo: paracetamol"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          aria-describedby="buscar-medicamento-mensaje"
+        />
+      </div>
+      {buscando && !errorBusqueda && (
+        <div className="tabla-medicamentos" aria-live="polite">
+          {medicamentos === null ? (
+            <Cargando texto="Buscando medicamentos..." />
+          ) : medicamentos.length === 0 ? (
+            <p className="texto-suave">No hay medicamentos que coincidan con &quot;{termino}&quot;.</p>
+          ) : (
+            <ul className="lista-medicamentos">
+              {medicamentos.map((m) => (
+                <li key={m.id}>
+                  <button type="button" className="opcion-medicamento" onClick={() => onElegir(m)}>
+                    <strong>{m.nombreComercial}</strong>
+                    <span className="texto-suave">
+                      {m.principioActivo} · {presentacionMedicamento(m)} · ID {m.id}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Campo>
+  )
+}
+
+export default function ProductoFormModal({ producto, onCerrar, onGuardado, onEnlaceQuitado }) {
   const editando = Boolean(producto?.id)
   const [datos, setDatos] = useState({
     nombreComercial: producto?.nombreComercial ?? '',
@@ -47,6 +145,54 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado }) {
   const [errores, setErrores] = useState({})
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
+  // D3: medicamento elegido ({ id } solo, hasta saber su nombre) y enlace que ya está guardado en la API
+  const [medicamento, setMedicamento] = useState(producto?.medicamentoId ? { id: producto.medicamentoId } : null)
+  const [enlaceGuardado, setEnlaceGuardado] = useState(producto?.medicamentoId ?? null)
+  const [errorMedicamento, setErrorMedicamento] = useState('')
+  const [quitando, setQuitando] = useState(false)
+
+  // Al editar un producto enlazado, busca el nombre del medicamento para mostrarlo
+  useEffect(() => {
+    if (!producto?.medicamentoId) return undefined
+    let activo = true
+    buscarMedicamentoEnlazado(producto)
+      .then((encontrado) => {
+        if (activo && encontrado) setMedicamento((actual) => (actual?.id === encontrado.id ? encontrado : actual))
+      })
+      .catch(() => {}) // Sin nombre se muestra el ID
+    return () => {
+      activo = false
+    }
+  }, [producto])
+
+  function elegirMedicamento(m) {
+    setMedicamento(m)
+    setErrorMedicamento('')
+    // Regla D2: el principio activo es el del medicamento mientras esté enlazado
+    setDatos((d) => ({ ...d, principioActivo: m.principioActivo }))
+    setErrores((er) => ({ ...er, principioActivo: undefined }))
+  }
+
+  async function quitarMedicamento() {
+    setErrorMedicamento('')
+    // En un producto sin enlace guardado solo se limpia la selección
+    if (enlaceGuardado) {
+      setQuitando(true)
+      setError('')
+      try {
+        await api.quitarEnlaceMedicamento(producto.id)
+        setEnlaceGuardado(null)
+        onEnlaceQuitado?.()
+      } catch (err) {
+        setError(err.mensaje ?? 'No se pudo quitar el enlace con el catálogo.')
+        return
+      } finally {
+        setQuitando(false)
+      }
+    }
+    // El producto conserva el texto del principio activo y vuelve a ser editable
+    setMedicamento(null)
+  }
 
   const cambiar = (campo) => (e) => {
     setDatos((d) => ({ ...d, [campo]: e.target.value }))
@@ -68,6 +214,8 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado }) {
       stock: Number(datos.stock),
     }
     if (datos.stockMinimo.trim()) cuerpo.stockMinimo = Number(datos.stockMinimo)
+    // Sin medicamentoId el PUT conserva el enlace guardado: solo se envía al elegir uno nuevo
+    if (medicamento && medicamento.id !== enlaceGuardado) cuerpo.medicamentoId = medicamento.id
     setGuardando(true)
     try {
       const guardado = editando
@@ -75,7 +223,13 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado }) {
         : await api.crearProducto(cuerpo)
       onGuardado(guardado, editando)
     } catch (err) {
-      setError(err.mensaje ?? 'No se pudo guardar el producto.')
+      // 400 del backend si el medicamento ya no existe o está oculto
+      if (err.status === 400 && cuerpo.medicamentoId && /medicamento/i.test(err.mensaje ?? '')) {
+        setErrorMedicamento(ERROR_MEDICAMENTO)
+        setError('')
+      } else {
+        setError(err.mensaje ?? 'No se pudo guardar el producto.')
+      }
       setGuardando(false)
     }
   }
@@ -94,11 +248,29 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado }) {
             autoFocus
           />
         </Campo>
-        <Campo id="principioActivo" etiqueta="Principio activo" error={errores.principioActivo}>
+        <SelectorMedicamento
+          medicamento={medicamento}
+          enlazadoEnServidor={Boolean(enlaceGuardado)}
+          quitando={quitando}
+          error={errorMedicamento}
+          onElegir={elegirMedicamento}
+          onQuitar={quitarMedicamento}
+        />
+        <Campo
+          id="principioActivo"
+          etiqueta="Principio activo"
+          error={errores.principioActivo}
+          ayuda={
+            medicamento
+              ? 'Viene del catálogo de medicamentos mientras el producto esté enlazado. Para escribirlo a mano, quita el enlace.'
+              : undefined
+          }
+        >
           <input
             {...propsError('principioActivo', errores.principioActivo)}
             value={datos.principioActivo}
             onChange={cambiar('principioActivo')}
+            readOnly={Boolean(medicamento)}
             placeholder="Paracetamol"
           />
         </Campo>
@@ -159,7 +331,7 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado }) {
           <button type="button" className="btn btn-secundario" onClick={onCerrar} disabled={guardando}>
             Cancelar
           </button>
-          <button type="submit" className="btn btn-primario" disabled={guardando}>
+          <button type="submit" className="btn btn-primario" disabled={guardando || quitando}>
             {guardando ? 'Guardando...' : editando ? 'Guardar cambios' : 'Agregar producto'}
           </button>
         </div>
