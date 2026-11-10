@@ -9,3 +9,7 @@
 | H56 | Obtener la ubicación GPS del usuario | Mijael | Pendiente | — |
 | H57 | Calcular la distancia a cada botica | Alexander | ✅ Cumple | [H57.md](H57.md) |
 | H58 | Filtrar por radio de distancia máximo | Mijael, Alexander | ✅ Cumple (API) | [H58.md](H58.md) |
+| H59 | Alerta cuando baja el precio de un favorito | Mijael, Alexander | ✅ Cumple (API) | [H59.md](H59.md) |
+| H60 | Precio objetivo de un favorito | Mijael, Alexander | ✅ Cumple (API) | [H60.md](H60.md) |
+| H61 | Correo cuando baja el precio de un favorito | Alexander | ✅ Cumple (falta la captura del correo) | [H61.md](H61.md) |
+| H66 | Activar o desactivar las alertas de precio | Mijael, Alexander | ✅ Cumple (API) | [H66.md](H66.md) |
