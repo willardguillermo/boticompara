@@ -2,6 +2,9 @@ package com.boticompara.app.vistas
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -326,6 +329,16 @@ fun ProductoDetalleScreen(
     }
 }
 
+// D11: el porcentaje de ahorro sube de 0 al valor real en menos de un segundo
+@Composable
+private fun porcentajeAnimado(objetivo: Double): Double {
+    val avance = remember(objetivo) { Animatable(0f) }
+    LaunchedEffect(objetivo) {
+        avance.animateTo(1f, animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing))
+    }
+    return objetivo * avance.value
+}
+
 // ===================== TARJETA DE ALTERNATIVA (H36, H37) =====================
 @Composable
 private fun AlternativaCard(alternativa: AlternativaResponse, onClick: () -> Unit) {
@@ -355,9 +368,10 @@ private fun AlternativaCard(alternativa: AlternativaResponse, onClick: () -> Uni
                 }
                 // H37: solo aparece si la alternativa es más barata que el producto consultado
                 if (alternativa.ahorroPorcentaje != null) {
+                    val ahorroMostrado = porcentajeAnimado(alternativa.ahorroPorcentaje)   // D11
                     Spacer(Modifier.width(8.dp))
                     Etiqueta(
-                        texto = "Ahorras ${String.format(Locale.US, "%.1f", alternativa.ahorroPorcentaje)} %",
+                        texto = "Ahorras ${String.format(Locale.US, "%.1f", ahorroMostrado)} %",
                         icono = Icons.Rounded.Savings,
                         fondo = MaterialTheme.colorScheme.primary,
                         color = MaterialTheme.colorScheme.onPrimary
