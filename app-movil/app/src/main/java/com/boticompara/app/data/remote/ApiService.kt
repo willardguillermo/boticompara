@@ -130,6 +130,22 @@ class PrecioObjetivoRequestAdapter : TypeAdapter<PrecioObjetivoRequest>() {
         throw UnsupportedOperationException("Solo se usa para enviar")
 }
 
+// ---- Alertas de precio (H59) ----
+data class AlertaResponse(
+    val id: Long,
+    val productoId: Long,
+    val nombreComercial: String,
+    val presentacion: String? = null,
+    val boticaNombre: String,
+    val precioAnterior: Double,
+    val precioNuevo: Double,
+    val ahorro: Double,                    // precioAnterior - precioNuevo
+    val leida: Boolean,
+    val fecha: String                      // ISO 8601
+)
+
+data class ResumenAlertasResponse(val noLeidas: Int)
+
 interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
@@ -213,4 +229,30 @@ interface ApiService {
         @Path("productoId") productoId: Long,
         @Body request: PrecioObjetivoRequest
     ): Response<FavoritoResponse>
+
+    // H59: alertas de baja de precio, de la más reciente a la más antigua (máx. 100)
+    @GET("alertas")
+    suspend fun obtenerAlertas(
+        @Header("Authorization") auth: String,
+        @Query("soloNoLeidas") soloNoLeidas: Boolean = true
+    ): Response<List<AlertaResponse>>
+
+    // H59: número para el badge del ícono de Alertas
+    @GET("alertas/resumen")
+    suspend fun obtenerResumenAlertas(
+        @Header("Authorization") auth: String
+    ): Response<ResumenAlertasResponse>
+
+    // H59: marcar una alerta como leída (204, también si ya estaba leída)
+    @PUT("alertas/{id}/leida")
+    suspend fun marcarAlertaLeida(
+        @Header("Authorization") auth: String,
+        @Path("id") id: Long
+    ): Response<Unit>
+
+    // H59: marcar todas las alertas como leídas (204)
+    @PUT("alertas/leidas")
+    suspend fun marcarTodasLeidas(
+        @Header("Authorization") auth: String
+    ): Response<Unit>
 }
