@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -33,6 +34,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.boticompara.app.data.local.TokenManager
 import com.boticompara.app.ui.theme.BotiComparaAppTheme
+import com.boticompara.app.vistas.AlertasScreen
+import com.boticompara.app.vistas.AlertasViewModel
 import com.boticompara.app.vistas.BarraNavegacion
 import com.boticompara.app.vistas.FavoritosScreen
 import com.boticompara.app.vistas.LoginScreen
@@ -91,12 +94,19 @@ class MainActivity : ComponentActivity() {
                     val rutaActual = entradaActual?.destination?.route
                     val mostrarBarra = rutaActual in RUTAS_CON_BARRA
 
+                    // H59: un solo ViewModel para el número del ícono y la pantalla de Alertas
+                    val alertasViewModel: AlertasViewModel = viewModel()
+                    LaunchedEffect(rutaActual) {
+                        if (rutaActual == "login") alertasViewModel.limpiar()
+                        else if (rutaActual in RUTAS_CON_BARRA) alertasViewModel.actualizarResumen()
+                    }
+
                     // Scaffold principal: la barra inferior solo aparece en Buscar, Favoritos y Perfil
                     Scaffold(
                         containerColor = MaterialTheme.colorScheme.surface,
                         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
                         bottomBar = {
-                            if (mostrarBarra) BarraNavegacion(navController, rutaActual)
+                            if (mostrarBarra) BarraNavegacion(navController, rutaActual, alertasViewModel.noLeidas)
                         }
                     ) { paddingValues ->
                         val inferior = paddingValues.calculateBottomPadding()
@@ -119,6 +129,7 @@ class MainActivity : ComponentActivity() {
                             }
                             composable("busqueda") { SearchScreen(navController) }
                             composable("favoritos") { FavoritosScreen(navController) }    // H44, H45
+                            composable("alertas") { AlertasScreen(navController, alertasViewModel) }   // H59
                             composable("perfil") { ProfileScreen(navController) }
 
                             // H28: Ruta para el detalle del producto por ID
