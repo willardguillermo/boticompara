@@ -433,3 +433,79 @@ class BotonesDelDetalleTests(ConAdmin):
 
     def test_baja_no_tiene_botones(self):
         self.assertEqual(self.botones(crear_usuario(usuarios.BAJA)), set())
+
+
+class HistorialTests(ConAdmin):
+    """H94"""
+    LISTA_ACCIONES = reverse('admin:boticas_usuarioaccion_changelist')
+
+    def accion(self, usuario, accion, motivo, hace_dias, por='guillermo'):
+        return UsuarioAccion.objects.create(usuario=usuario, accion=accion, motivo=motivo, realizado_por=por,
+                                            fecha=timezone.now() - timedelta(days=hace_dias))
+
+    def ids_de_la_lista(self, parametros=''):
+        respuesta = self.client.get(self.LISTA_ACCIONES + parametros)
+        self.assertEqual(respuesta.status_code, 200)
+        return {a.pk for a in respuesta.context['cl'].result_list}
+
+    def test_detalle_muestra_el_historial_del_mas_reciente_al_mas_antiguo(self):
+        usuario = crear_usuario()
+        otro = crear_usuario()
+        self.accion(usuario, UsuarioAccion.Accion.SUSPENDER, 'Primera suspensión', 10, por='ana_admin')
+        self.accion(usuario, UsuarioAccion.Accion.REACTIVAR, None, 5)
+        self.accion(usuario, UsuarioAccion.Accion.SUSPENDER, 'Segunda suspensión', 1)
+        self.accion(otro, UsuarioAccion.Accion.SUSPENDER, 'Acción de otra cuenta', 1)
+
+        contenido = self.client.get(detalle(usuario)).content.decode()
+
+        self.assertIn('Historial de acciones', contenido)
+        self.assertIn('ana_admin', contenido)
+        self.assertNotIn('Acción de otra cuenta', contenido)
+        self.assertLess(contenido.index('Segunda suspensión'), contenido.index('Reactivación'))
+        self.assertLess(contenido.index('Reactivación'), contenido.index('Primera suspensión'))
+
+    def test_el_flujo_completo_queda_en_el_historial_con_el_admin(self):
+        usuario = crear_usuario()
+        motivo = 'Publicó reseñas ofensivas'
+        self.client.post(url_accion(usuario, 'suspender'), {'hasta': en_dias(1), 'motivo': motivo})
+        self.client.post(url_accion(usuario, 'reactivar'), {'motivo': ''})
+        self.client.force_login(User.objects.create_superuser('otro_admin', 'otro@prueba.pe', 'clave-de-prueba'))
+        self.client.post(url_accion(usuario, 'dar_baja'), {'motivo': 'Reincidió en reseñas ofensivas',
+                                                           'confirmado': 'si'})
+
+        historial = list(UsuarioAccion.objects.filter(usuario=usuario).order_by('id')
+                         .values_list('accion', 'motivo', 'realizado_por'))
+
+        self.assertEqual(historial, [('SUSPENDER', motivo, 'guillermo'), ('REACTIVAR', None, 'guillermo'),
+                                     ('DAR_BAJA', 'Reincidió en reseñas ofensivas', 'otro_admin')])
+
+    def test_listado_general_filtra_por_accion(self):
+        usuario = crear_usuario()
+        suspension = self.accion(usuario, UsuarioAccion.Accion.SUSPENDER, 'Motivo de prueba', 3)
+        reactivacion = self.accion(usuario, UsuarioAccion.Accion.REACTIVAR, None, 2)
+
+        self.assertEqual(self.ids_de_la_lista('?accion__exact=SUSPENDER'), {suspension.pk})
+        self.assertEqual(self.ids_de_la_lista('?accion__exact=REACTIVAR'), {reactivacion.pk})
+        self.assertEqual(self.ids_de_la_lista(), {suspension.pk, reactivacion.pk})
+
+    def test_listado_general_filtra_por_fecha(self):
+        usuario = crear_usuario()
+        vieja = self.accion(usuario, UsuarioAccion.Accion.SUSPENDER, 'Motivo de prueba', 20)
+        reciente = self.accion(usuario, UsuarioAccion.Accion.REACTIVAR, None, 2)
+        desde = en_dias(-5)
+
+        self.assertEqual(self.ids_de_la_lista(f'?desde={desde}'), {reciente.pk})
+        self.assertEqual(self.ids_de_la_lista(f'?hasta={desde}'), {vieja.pk})
+        self.assertEqual(self.ids_de_la_lista(f'?desde={desde}&accion__exact=SUSPENDER'), set())
+
+    def test_listado_general_es_de_solo_lectura(self):
+        accion = self.accion(crear_usuario(), UsuarioAccion.Accion.SUSPENDER, 'Motivo de prueba', 1)
+        cambio = reverse('admin:boticas_usuarioaccion_change', args=[accion.pk])
+
+        self.assertEqual(self.client.get(reverse('admin:boticas_usuarioaccion_add')).status_code, 403)
+        self.assertEqual(self.client.post(cambio, {'motivo': 'Otro'}).status_code, 403)
+        self.assertEqual(self.client.post(reverse('admin:boticas_usuarioaccion_delete', args=[accion.pk]),
+                                          {'post': 'yes'}).status_code, 403)
+        self.assertNotContains(self.client.get(cambio), 'name="_save"')
+        accion.refresh_from_db()
+        self.assertEqual(accion.motivo, 'Motivo de prueba')

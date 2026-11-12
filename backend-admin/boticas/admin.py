@@ -11,7 +11,7 @@ from django.utils.text import Truncator
 
 from . import historial, usuarios
 from .forms import BoticaRevisionForm, DarBajaForm, ReactivarForm, SuspenderForm
-from .models import Botica, BoticaRevision, Producto, Usuario
+from .models import Botica, BoticaRevision, Producto, Usuario, UsuarioAccion
 from .notificaciones import notificar_revision
 from .storage import StorageError, url_firmada_licencia
 
@@ -24,6 +24,59 @@ class SoloLecturaAdmin(admin.ModelAdmin):
     """Permite ver los registros pero no crearlos, editarlos ni borrarlos."""
 
     def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+# H94: naranja para la suspensión, verde para la reactivación y rojo para la baja
+COLORES_ACCION = {
+    UsuarioAccion.Accion.SUSPENDER: '#ef6c00',
+    UsuarioAccion.Accion.REACTIVAR: '#2e7d32',
+    UsuarioAccion.Accion.DAR_BAJA: '#ba2121',
+}
+
+
+class ColumnasAccion:
+    """H94: columnas del historial que comparten el listado general y el detalle del usuario."""
+
+    @admin.display(description='fecha', ordering='fecha')
+    def fecha_accion(self, obj):
+        return f'{timezone.localtime(obj.fecha):%d/%m/%Y %H:%M}'
+
+    @admin.display(description='acción', ordering='accion')
+    def accion_texto(self, obj):
+        return format_html(
+            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
+            ' white-space: nowrap;">{}</span>',
+            COLORES_ACCION.get(obj.accion, '#757575'), obj.get_accion_display(),
+        )
+
+    @admin.display(description='motivo')
+    def motivo_accion(self, obj):
+        return obj.motivo or '—'
+
+    @admin.display(description='realizado por', ordering='realizado_por')
+    def realizado_por_texto(self, obj):
+        return obj.realizado_por
+
+
+class UsuarioAccionInline(ColumnasAccion, admin.TabularInline):
+    """H94: historial en el detalle del usuario, de la más reciente a la más antigua, de solo lectura."""
+    model = UsuarioAccion
+    fields = ('fecha_accion', 'accion_texto', 'motivo_accion', 'realizado_por_texto')
+    readonly_fields = fields
+    ordering = ('-fecha', '-id')
+    extra = 0
+    can_delete = False
+    verbose_name = 'acción'
+    verbose_name_plural = 'historial de acciones'
+
+    def has_add_permission(self, request, obj=None):
         return False
 
     def has_change_permission(self, request, obj=None):
@@ -58,6 +111,7 @@ class UsuarioAdmin(SoloLecturaAdmin):
     fields = ('nombre', 'correo', 'rol', 'telefono', 'direccion', 'correo_verificado',
               'estado', 'motivo', 'fecha_registro', 'actualizado_en')
     readonly_fields = fields
+    inlines = [UsuarioAccionInline]  # H94
 
     @admin.display(description='estado')
     def estado(self, obj):
@@ -302,10 +356,21 @@ class RangoFechasFilter(admin.ListFilter):
         return queryset
 
 
-@admin.register(BoticaRevision)
-class BoticaRevisionAdmin(ColumnasRevision, SoloLecturaAdmin):
-    """H47: historial de aprobaciones y rechazos, de solo lectura."""
+class ConRangoFechas:
+    """Lista con los campos Desde/Hasta arriba (RangoFechasFilter va en list_filter)."""
     change_list_template = 'admin/boticas/boticarevision/change_list.html'
+
+    def changelist_view(self, request, extra_context=None):
+        # Valores que se muestran en los campos Desde/Hasta de arriba de la lista
+        extra_context = {**(extra_context or {}),
+                         'rango_desde': request.GET.get('desde', ''),
+                         'rango_hasta': request.GET.get('hasta', '')}
+        return super().changelist_view(request, extra_context)
+
+
+@admin.register(BoticaRevision)
+class BoticaRevisionAdmin(ConRangoFechas, ColumnasRevision, SoloLecturaAdmin):
+    """H47: historial de aprobaciones y rechazos, de solo lectura."""
     list_display = ('fecha_revision', 'botica_enlace', 'ruc', 'estado_revision', 'revisado_por_texto',
                     'motivo_corto')
     list_display_links = ('fecha_revision',)
@@ -326,12 +391,6 @@ class BoticaRevisionAdmin(ColumnasRevision, SoloLecturaAdmin):
     def ruc(self, obj):
         return obj.botica.ruc
 
-    def changelist_view(self, request, extra_context=None):
-        # Valores que se muestran en los campos Desde/Hasta de arriba de la lista
-        extra_context = {**(extra_context or {}),
-                         'rango_desde': request.GET.get('desde', ''),
-                         'rango_hasta': request.GET.get('hasta', '')}
-        return super().changelist_view(request, extra_context)
 
 
 class RevisionInline(ColumnasRevision, admin.TabularInline):
@@ -471,3 +530,36 @@ class BoticaAdmin(admin.ModelAdmin):
             )
             # Después del commit: si algo falla al guardar, no se avisa de un cambio que no ocurrió
             transaction.on_commit(lambda: self._notificar(request, obj))
+
+
+class RangoFechasAccionFilter(RangoFechasFilter):
+    title = 'fecha de la acción'
+
+
+@admin.register(UsuarioAccion)
+class UsuarioAccionAdmin(ConRangoFechas, ColumnasAccion, SoloLecturaAdmin):
+    """H94: todas las suspensiones, reactivaciones y bajas, de solo lectura."""
+    list_display = ('fecha_accion', 'usuario_enlace', 'correo', 'accion_texto', 'motivo_corto',
+                    'realizado_por_texto')
+    list_display_links = ('fecha_accion',)
+    list_filter = ('accion', RangoFechasAccionFilter)
+    search_fields = ('usuario__nombre', 'usuario__correo', 'realizado_por')
+    search_help_text = 'Busca por nombre o correo del usuario, o por el administrador que hizo la acción.'
+    list_select_related = ('usuario',)
+    fields = ('fecha_accion', 'usuario_enlace', 'correo', 'accion_texto', 'motivo_accion', 'realizado_por_texto')
+    readonly_fields = fields
+
+    @admin.display(description='usuario', ordering='usuario__nombre')
+    def usuario_enlace(self, obj):
+        return format_html('<a href="{}">{}</a>',
+                           reverse('admin:boticas_usuario_change', args=[obj.usuario_id],
+                                   current_app=self.admin_site.name),
+                           obj.usuario.nombre)
+
+    @admin.display(description='correo', ordering='usuario__correo')
+    def correo(self, obj):
+        return obj.usuario.correo
+
+    @admin.display(description='motivo')
+    def motivo_corto(self, obj):
+        return Truncator(obj.motivo).chars(80) if obj.motivo else '—'
