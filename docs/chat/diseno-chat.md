@@ -138,13 +138,15 @@ redirigen a `aistudio.google.com/docs`).
   | `gemini-3.5-flash-lite` | 15 | 250K | 500 | unas 166 |
   | `gemini-3.8-flash` | 5 | 250K | 20 | unas 7 |
 
-  Las cuotas son **por proyecto de cada clave, no por usuario**
-  ([límites](https://aistudio.google.com/docs/rate-limits)): todos los usuarios de un mismo backend
-  comparten la cuota del proyecto de su clave. Cada integrante debe revisar las de su propio
-  proyecto en <https://aistudio.google.com/rate-limit>.
+  Las cuotas son **por proyecto de Google AI Studio, no por clave ni por usuario**
+  ([límites](https://aistudio.google.com/docs/rate-limits)): varias claves del mismo proyecto
+  comparten la misma cuota, y todos los usuarios de un mismo backend comparten la cuota del
+  proyecto al que pertenece su clave. Cada integrante usa su propio proyecto y debe revisar sus
+  cuotas en <https://aistudio.google.com/rate-limit>.
 - **Reinicio diario:** el límite propio (por usuario y global) se reinicia a medianoche de Lima.
-  La cuota de Google se reinicia a medianoche del Pacífico, que en noviembre son las 3:00 a. m.
-  de Lima.
+  La cuota de Google se reinicia a medianoche del Pacífico: 08:00 UTC (3:00 a. m. en Lima) de
+  noviembre a marzo, con el horario estándar de EE. UU., y 07:00 UTC (2:00 a. m. en Lima) de marzo
+  a noviembre, con su horario de verano. Lima no cambia de hora (UTC−5).
 - **API:** el módulo usará `generateContent`
   (`POST https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent`, con la
   clave en el header `x-goog-api-key`), no la API de Interacciones. La documentación presenta la

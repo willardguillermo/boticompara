@@ -711,7 +711,7 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 - **Por usuario:** por defecto 3 preguntas por minuto y 15 por día. Al pasarlo → 429.
 - **Global, por backend:** por defecto 150 preguntas por día entre todos los usuarios (unas 450 llamadas a Gemini en el peor caso, con margen bajo los 500 pedidos por día de `gemini-3.5-flash-lite`). Al llegar al tope → 503 con "El asistente alcanzó su límite de hoy. Intenta mañana.", **sin llamar a Gemini**. Existe porque la cuota de Gemini es por proyecto, no por usuario: sin este tope, unos pocos usuarios intensivos podrían agotarla para todos.
 - Primero se revisa el límite por usuario (429) y después el global (503). Los pedidos que responden 400 o 401 no cuentan en ninguno.
-- **Reinicio diario:** el límite propio (por usuario y global) se reinicia a medianoche de Lima. La cuota de Google se reinicia a medianoche del Pacífico, que en noviembre son las 3:00 a. m. de Lima.
+- **Reinicio diario:** el límite propio (por usuario y global) se reinicia a medianoche de Lima. La cuota de Google se reinicia a medianoche del Pacífico: 08:00 UTC (3:00 a. m. en Lima) de noviembre a marzo, con el horario estándar de EE. UU., y 07:00 UTC (2:00 a. m. en Lima) de marzo a noviembre, con su horario de verano. Lima no cambia de hora (UTC−5).
 - Los tres valores son configurables en el backend: `chat.limite.por-minuto`, `chat.limite.por-dia` y `chat.limite.global-por-dia`. Con 3 llamadas a Gemini como máximo por pregunta, un usuario usa como máximo 9 de los 15 pedidos por minuto del plan gratis de `gemini-3.5-flash-lite`.
 
 Errores:
@@ -735,7 +735,7 @@ Errores:
 **Configuración (backend):**
 - `GEMINI_API_KEY` y `GEMINI_MODEL` en el `.env` de `backend-usuario/`. Cada integrante usa su propia clave de Google AI Studio; nunca se sube al repositorio.
 - Valor recomendado de `GEMINI_MODEL`: `gemini-3.5-flash-lite`. Alternativa, solo si la calidad no alcanza: `gemini-3.8-flash` (unas 7 preguntas al día).
-- Cuotas comprobadas el 12/11/2026 en AI Studio (plan gratuito): `gemini-3.5-flash-lite` 15 RPM, 250K TPM y 500 RPD; `gemini-3.8-flash` 5 RPM, 250K TPM y 20 RPD. Las cuotas son por proyecto de cada clave (no por usuario): cada integrante debe revisar las de su proyecto en <https://aistudio.google.com/rate-limit>.
+- Cuotas comprobadas el 12/11/2026 en AI Studio (plan gratuito): `gemini-3.5-flash-lite` 15 RPM, 250K TPM y 500 RPD; `gemini-3.8-flash` 5 RPM, 250K TPM y 20 RPD. Las cuotas son por proyecto de Google AI Studio, no por clave ni por usuario: varias claves del mismo proyecto comparten la misma cuota. Cada integrante usa su propio proyecto y debe revisar sus cuotas en <https://aistudio.google.com/rate-limit>.
 - `chat.limite.por-minuto` (por defecto 3), `chat.limite.por-dia` (por defecto 15) y `chat.limite.global-por-dia` (por defecto 150).
 - El `.env.example` y la colección de Postman se actualizan en el PR del módulo.
 
