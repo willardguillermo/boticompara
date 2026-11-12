@@ -15,8 +15,9 @@ Cliente (web o app)
    ▼
 API Spring Boot
    1. Valida el JWT (id y rol) y que la cuenta esté habilitada, como en cualquier
-      endpoint 🔒. Si no → 401 (la suspensión la define el login, no el chat).
-   2. Valida el cuerpo (400) y el límite por usuario (429).
+      endpoint 🔒. Si no → 401 (para suspendidos depende de H91, ver abajo).
+   2. Valida el cuerpo (400), el límite por usuario (429) y el tope global del
+      día (503, sin llamar a Gemini).
    3. Arma el pedido a Gemini: instrucciones del sistema + historial + mensaje
       + las herramientas del rol. Guarda aparte id, botica y ubicación.
    ▼
@@ -107,8 +108,9 @@ falsifica solo afecta su propia conversación y sigue limitado por su token.
 | Las búsquedas del asistente no se registran en H62 ni H42 | El texto lo escribe el modelo, no el usuario: mezclarlo distorsiona los reportes del administrador. Hoy `AlternativasService.alternativas` registra siempre la consulta; se resuelve en el PR del módulo de chat (H68), por ejemplo con una variante que no registre |
 | Texto plano y corto | La app lo leerá en voz alta (H71): el markdown y las listas largas se oyen mal |
 | Máximo 2 rondas de llamadas a herramientas por pregunta | Lo que gasta cuota son las llamadas a Gemini, no las herramientas: en una ronda el modelo puede pedir varias a la vez. Con 2 rondas más la respuesta, una pregunta usa como máximo 3 llamadas |
-| 429 propio: por defecto 3 por minuto y 30 por día por usuario, configurables (`chat.limite.por-minuto`, `chat.limite.por-dia`) | Con 3 llamadas como máximo por pregunta, un usuario usa como máximo 9 de los 15 pedidos por minuto de `gemini-3.5-flash-lite`, y deja margen para otro usuario. La cuota de Gemini es por proyecto, no por usuario: los 500 pedidos por día alcanzan para unas 166 preguntas en total en el peor caso. Se ajustan sin tocar código. El conteo se lleva en memoria y se reinicia con el servidor, aceptable para el curso |
-| Cuenta no habilitada → 401, sin 403 | Igual que el resto de la API: `JwtAuthFilter` no autentica una cuenta inactiva. Cómo se trata la suspensión lo define el login, no el chat |
+| 429 propio: por defecto 3 por minuto y 15 por día por usuario, configurables (`chat.limite.por-minuto`, `chat.limite.por-dia`) | Con 3 llamadas como máximo por pregunta, un usuario usa como máximo 9 de los 15 pedidos por minuto de `gemini-3.5-flash-lite`, y deja margen para otro usuario. Se ajustan sin tocar código. El conteo se lleva en memoria y se reinicia con el servidor, aceptable para el curso |
+| Tope global de 150 preguntas por día por backend (`chat.limite.global-por-dia`) → 503 sin llamar a Gemini | **Riesgo:** la cuota de Gemini es por proyecto y la comparten todos los usuarios del backend; con solo el límite por usuario, unos pocos usuarios intensivos pueden agotar la cuota del proyecto (por ejemplo, 11 usuarios × 15 preguntas × 3 llamadas ya pasan los 500 pedidos). **Mitigación:** 150 preguntas son unas 450 llamadas en el peor caso, con margen bajo los 500 por día; al llegar al tope el servidor responde antes de llamar a Gemini, así la cuota nunca se agota por uso normal y el usuario recibe un mensaje claro ("El asistente alcanzó su límite de hoy. Intenta mañana.") en vez de errores de Google |
+| Cuenta no habilitada → 401, sin 403 | Igual que el resto de la API: `JwtAuthFilter` no autentica una cuenta inactiva. Para las **suspendidas**, el 401 depende de que `JwtAuthFilter` también rechace `suspendido_hasta > now()`: ese cambio es parte de H91 (Alexander, anotado como pendiente en el PR #79) y es requisito de este contrato. Mientras no esté, un JWT vigente de una cuenta suspendida sigue entrando, como en el resto de la API |
 | Cuota de Gemini agotada → 503, no 429 | El 429 le dice al usuario "tú te pasaste". Si se acabó la cuota del proyecto, el usuario no hizo nada mal |
 | Tiempo máximo de 20 s → 504 | Evita pedidos colgados. Distinguirlo del 503 deja que el cliente ofrezca "Reintentar" |
 | Los errores 503 y 504 no dicen la causa | No exponer si falta la clave o qué modelo se usa; el detalle va al log |
@@ -124,21 +126,25 @@ redirigen a `aistudio.google.com/docs`).
 - **Modelo recomendado (`GEMINI_MODEL`):** `gemini-3.5-flash-lite`, por sus 500 pedidos por día.
   **Alternativa, solo si la calidad no alcanza:** `gemini-3.8-flash`: con 20 pedidos por día y hasta
   3 llamadas por pregunta, da para unas 7 preguntas al día. Si se usa, hay que bajar
-  `chat.limite.por-minuto` a 1 (su límite es de 5 por minuto) y `chat.limite.por-dia` a 6 o 7.
+  `chat.limite.por-minuto` a 1 (su límite es de 5 por minuto), y `chat.limite.por-dia` y
+  `chat.limite.global-por-dia` a 6.
   - [Modelos](https://aistudio.google.com/docs/models) · [Precios](https://aistudio.google.com/docs/pricing)
   - No usar la familia 2.5: desde el 1/12/2026 los pedidos a `gemini-2.5-flash` se redirigen a
     otro modelo. Los modelos Gemini 4 no están en el plan gratis.
-- **Cuota del plan gratis**, revisada el 12/11/2026 en <https://aistudio.google.com/rate-limit>:
+- **Cuota del plan gratis.** Comprobado el 12/11/2026 en AI Studio (plan gratuito):
 
-  | Modelo | Pedidos por minuto | Tokens por minuto | Pedidos por día | Preguntas por día (3 llamadas cada una) |
+  | Modelo | RPM (pedidos por minuto) | TPM (tokens por minuto) | RPD (pedidos por día) | Preguntas por día (3 llamadas cada una) |
   |---|---|---|---|---|
-  | `gemini-3.5-flash-lite` | 15 | 250 000 | 500 | unas 166 |
-  | `gemini-3.8-flash` | 5 | 250 000 | 20 | unas 7 |
+  | `gemini-3.5-flash-lite` | 15 | 250K | 500 | unas 166 |
+  | `gemini-3.8-flash` | 5 | 250K | 20 | unas 7 |
 
-  Los límites son **por proyecto, no por usuario ni por clave**
+  Las cuotas son **por proyecto de cada clave, no por usuario**
   ([límites](https://aistudio.google.com/docs/rate-limits)): todos los usuarios de un mismo backend
-  comparten la cuota. La cuota diaria se reinicia a medianoche, hora del Pacífico. Cada integrante
-  revisa la de su propio proyecto en la misma página.
+  comparten la cuota del proyecto de su clave. Cada integrante debe revisar las de su propio
+  proyecto en <https://aistudio.google.com/rate-limit>.
+- **Reinicio diario:** el límite propio (por usuario y global) se reinicia a medianoche de Lima.
+  La cuota de Google se reinicia a medianoche del Pacífico, que en noviembre son las 3:00 a. m.
+  de Lima.
 - **API:** el módulo usará `generateContent`
   (`POST https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent`, con la
   clave en el header `x-goog-api-key`), no la API de Interacciones. La documentación presenta la
@@ -161,9 +167,10 @@ redirigen a `aistudio.google.com/docs`).
   `AlternativasService.alternativas` que no registre la consulta (H42); agregar `GEMINI_API_KEY` y
   `GEMINI_MODEL` al `.env.example` y `POST /chat` a la colección de Postman; confirmar la dependencia
   del SDK de Java.
-- **Alexander:** revisar el PR del módulo.
+- **Alexander:** revisar el PR del módulo y, en H91 (pendiente del PR #79), que `JwtAuthFilter`
+  rechace `suspendido_hasta > now()`; es requisito del 401 para suspendidos en `POST /chat`.
 - **Chat en la web (H69) y en la app (H70); voz en la app (H71):** aviso de no escribir datos
   personales, tarjetas con `productos` y manejo de 429, 503 y 504.
 - **Todos:** crear su clave en Google AI Studio y revisar la cuota de su proyecto en
   <https://aistudio.google.com/rate-limit>. Si es distinta de la tabla de arriba, ajustar
-  `chat.limite.por-minuto` y `chat.limite.por-dia` en su `.env`.
+  `chat.limite.por-minuto`, `chat.limite.por-dia` y `chat.limite.global-por-dia` en su `.env`.
