@@ -88,14 +88,14 @@ function SelectorMedicamento({ medicamento, enlazadoEnServidor, quitando, error,
     )
   }
 
+  // D20: la ayuda y el error van en elementos separados para que el lector de pantalla lea los dos
+  const mensajeError = error || errorBusqueda
+  const describedBy = ['buscar-medicamento-ayuda', mensajeError && 'buscar-medicamento-error']
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <Campo
-      id="buscar-medicamento"
-      etiqueta="Medicamento del catálogo"
-      opcional
-      error={error || errorBusqueda}
-      ayuda="Búscalo por nombre comercial o principio activo para enlazar tu producto con el catálogo de medicamentos."
-    >
+    <Campo id="buscar-medicamento" etiqueta="Medicamento del catálogo" opcional>
       <div className="buscador">
         <Icono nombre="buscar" />
         <input
@@ -104,9 +104,18 @@ function SelectorMedicamento({ medicamento, enlazadoEnServidor, quitando, error,
           placeholder="Por ejemplo: paracetamol"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          aria-describedby="buscar-medicamento-mensaje"
+          aria-describedby={describedBy}
+          aria-invalid={Boolean(error)}
         />
       </div>
+      <span id="buscar-medicamento-ayuda" className="ayuda">
+        Búscalo por nombre comercial o principio activo para enlazar tu producto con el catálogo de medicamentos.
+      </span>
+      {mensajeError && (
+        <span id="buscar-medicamento-error" className="error-campo" role="alert">
+          {mensajeError}
+        </span>
+      )}
       {buscando && !errorBusqueda && (
         <div className="tabla-medicamentos" aria-live="polite">
           {medicamentos === null ? (
