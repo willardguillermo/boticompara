@@ -698,7 +698,7 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 | `buscar_medicamento` | `DUENO_BOTICA` | Buscar en el catálogo maestro (DIGEMID) | `texto` (mínimo 2 caracteres) | `MedicamentoService.buscar` (`GET /medicamentos?q=`) |
 
 - Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (nombre, presentación, precio, stock, botica, distrito y distancia en km). Nunca coordenadas ni datos de personas.
-- Por pregunta se ejecutan como máximo 4 herramientas. Si el modelo pide más, el servidor le exige responder con lo que ya tiene.
+- Por pregunta hay como máximo 2 rondas de llamadas a herramientas (en una ronda el modelo puede pedir una o varias a la vez). Si después de la segunda pide más, el servidor le exige responder con lo que ya tiene. Así una pregunta usa como máximo 3 llamadas a Gemini: 2 rondas de herramientas más la respuesta.
 - Si el dueño aún no registró su botica, sus herramientas devuelven "sin botica registrada" y el asistente lo explica: no es un error.
 - Las búsquedas del asistente **no** se registran en los reportes de búsquedas (H62) ni en el de comparaciones (H42): el texto lo escribe el modelo, no el usuario.
 
@@ -707,7 +707,7 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 - No diagnostica, no da dosis y no recomienda medicamentos por síntomas: deriva al químico farmacéutico o al médico. Ante una emergencia indica llamar al SAMU (106).
 - Estos casos responden `200` con `productos: []`; no son errores.
 
-**Límite de uso (por usuario):** por defecto 5 preguntas por minuto y 30 por día (el día cambia a las 00:00, hora de Lima). Al pasarlo → 429. Los pedidos que responden 400 o 401 no cuentan. Los dos valores son configurables en el backend (`chat.limite.por-minuto` y `chat.limite.por-dia`) y se ajustarán cuando se conozca la cuota real de Gemini.
+**Límite de uso (por usuario):** por defecto 3 preguntas por minuto y 30 por día (el día cambia a las 00:00, hora de Lima). Al pasarlo → 429. Los pedidos que responden 400 o 401 no cuentan. Los dos valores son configurables en el backend (`chat.limite.por-minuto` y `chat.limite.por-dia`). Con 3 llamadas a Gemini como máximo por pregunta, un usuario usa como máximo 9 de los 15 pedidos por minuto del plan gratis de `gemini-3.5-flash-lite`. La cuota de Gemini es por proyecto, no por usuario: la comparten todos los usuarios de un mismo backend.
 
 Errores:
 
@@ -727,8 +727,8 @@ Errores:
 
 **Configuración (backend):**
 - `GEMINI_API_KEY` y `GEMINI_MODEL` en el `.env` de `backend-usuario/`. Cada integrante usa su propia clave de Google AI Studio; nunca se sube al repositorio.
-- Valor recomendado de `GEMINI_MODEL`: `gemini-3.8-flash`. Alternativa: `gemini-3.5-flash-lite`. Cada uno confirma el modelo y su cuota en <https://aistudio.google.com/rate-limit> con su clave.
-- `chat.limite.por-minuto` (por defecto 5) y `chat.limite.por-dia` (por defecto 30).
+- Valor recomendado de `GEMINI_MODEL`: `gemini-3.5-flash-lite` (plan gratis: 15 pedidos por minuto, 250 000 tokens por minuto y 500 pedidos por día). Alternativa, solo si la calidad no alcanza: `gemini-3.8-flash` (5 pedidos por minuto y 20 por día, unas 7 preguntas al día). Son límites por proyecto, no por usuario; cada uno los confirma en <https://aistudio.google.com/rate-limit> con su clave.
+- `chat.limite.por-minuto` (por defecto 3) y `chat.limite.por-dia` (por defecto 30).
 - El `.env.example` y la colección de Postman se actualizan en el PR del módulo.
 
 ---

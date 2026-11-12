@@ -29,7 +29,7 @@ API Spring Boot
    6. Devuelve a Gemini hasta 5 resultados (solo datos de productos y boticas)
       y guarda esos productos para las tarjetas.
    ▼
-Gemini ──► (puede pedir otra herramienta: máximo 4 por pregunta) ──► texto final
+Gemini ──► (puede pedir otra ronda de herramientas: máximo 2 rondas por pregunta) ──► texto final
    ▼
 API Spring Boot
    7. Limpia el texto (sin markdown, máximo 600 caracteres) y responde
@@ -87,7 +87,7 @@ Los nombres de producto y de botica los escriben los dueños. Un dueño podría 
 3. **Los resultados viajan como datos**, en la respuesta de la herramienta (JSON), nunca pegados
    a las instrucciones del sistema. Las instrucciones dicen que lo que venga de una herramienta
    es información para mostrar y no órdenes.
-4. **Topes:** máximo 4 herramientas por pregunta, 5 resultados por herramienta, textos recortados,
+4. **Topes:** máximo 2 rondas de llamadas a herramientas por pregunta, 5 resultados por herramienta, textos recortados,
    respuesta de máximo 600 caracteres y sin enlaces.
 5. **El servidor valida lo que pide el modelo:** herramienta permitida para el rol, tipos y rangos.
    Un `productoId` inventado solo da "no encontrado".
@@ -106,7 +106,8 @@ falsifica solo afecta su propia conversación y sigue limitado por su token.
 | `productos` lo arma el servidor | Los ids, precios y stock son exactos aunque el modelo se equivoque. Además el modelo gasta menos tokens |
 | Las búsquedas del asistente no se registran en H62 ni H42 | El texto lo escribe el modelo, no el usuario: mezclarlo distorsiona los reportes del administrador. Hoy `AlternativasService.alternativas` registra siempre la consulta; se resuelve en el PR del módulo de chat (H68), por ejemplo con una variante que no registre |
 | Texto plano y corto | La app lo leerá en voz alta (H71): el markdown y las listas largas se oyen mal |
-| 429 propio: por defecto 5 por minuto y 30 por día por usuario, configurables (`chat.limite.por-minuto`, `chat.limite.por-dia`) | La cuota gratis es por proyecto (una clave por integrante) y una pregunta puede gastar hasta 5 llamadas a Gemini. Son valores prudentes mientras no se conozca la cuota real; se ajustan sin tocar código. Se lleva en memoria y se reinicia con el servidor, aceptable para el curso |
+| Máximo 2 rondas de llamadas a herramientas por pregunta | Lo que gasta cuota son las llamadas a Gemini, no las herramientas: en una ronda el modelo puede pedir varias a la vez. Con 2 rondas más la respuesta, una pregunta usa como máximo 3 llamadas |
+| 429 propio: por defecto 3 por minuto y 30 por día por usuario, configurables (`chat.limite.por-minuto`, `chat.limite.por-dia`) | Con 3 llamadas como máximo por pregunta, un usuario usa como máximo 9 de los 15 pedidos por minuto de `gemini-3.5-flash-lite`, y deja margen para otro usuario. La cuota de Gemini es por proyecto, no por usuario: los 500 pedidos por día alcanzan para unas 166 preguntas en total en el peor caso. Se ajustan sin tocar código. El conteo se lleva en memoria y se reinicia con el servidor, aceptable para el curso |
 | Cuenta no habilitada → 401, sin 403 | Igual que el resto de la API: `JwtAuthFilter` no autentica una cuenta inactiva. Cómo se trata la suspensión lo define el login, no el chat |
 | Cuota de Gemini agotada → 503, no 429 | El 429 le dice al usuario "tú te pasaste". Si se acabó la cuota del proyecto, el usuario no hizo nada mal |
 | Tiempo máximo de 20 s → 504 | Evita pedidos colgados. Distinguirlo del 503 deja que el cliente ofrezca "Reintentar" |
@@ -120,18 +121,24 @@ falsifica solo afecta su propia conversación y sigue limitado por su token.
 Revisado en la documentación oficial el 12/11/2026 (las páginas de `ai.google.dev` ahora
 redirigen a `aistudio.google.com/docs`).
 
-- **Modelo recomendado (`GEMINI_MODEL`):** `gemini-3.8-flash`. Tiene plan gratis en AI Studio y
-  es el que usan los ejemplos actuales de la guía de llamadas a funciones.
-  **Alternativa:** la Flash-Lite vigente, `gemini-3.5-flash-lite` (estable y gratis).
-  Cada integrante confirma el modelo y su cuota en <https://aistudio.google.com/rate-limit> con su
-  propia clave.
+- **Modelo recomendado (`GEMINI_MODEL`):** `gemini-3.5-flash-lite`, por sus 500 pedidos por día.
+  **Alternativa, solo si la calidad no alcanza:** `gemini-3.8-flash`: con 20 pedidos por día y hasta
+  3 llamadas por pregunta, da para unas 7 preguntas al día. Si se usa, hay que bajar
+  `chat.limite.por-minuto` a 1 (su límite es de 5 por minuto) y `chat.limite.por-dia` a 6 o 7.
   - [Modelos](https://aistudio.google.com/docs/models) · [Precios](https://aistudio.google.com/docs/pricing)
   - No usar la familia 2.5: desde el 1/12/2026 los pedidos a `gemini-2.5-flash` se redirigen a
     otro modelo. Los modelos Gemini 4 no están en el plan gratis.
-- **Límites del plan gratis:** la documentación ya **no publica** una tabla con los pedidos por
-  minuto y por día de cada modelo: se ven en <https://aistudio.google.com/rate-limit>. Lo que sí
-  dice ([límites](https://aistudio.google.com/docs/rate-limits)): los límites son **por proyecto,
-  no por clave**, y la cuota diaria se reinicia a medianoche, hora del Pacífico.
+- **Cuota del plan gratis**, revisada el 12/11/2026 en <https://aistudio.google.com/rate-limit>:
+
+  | Modelo | Pedidos por minuto | Tokens por minuto | Pedidos por día | Preguntas por día (3 llamadas cada una) |
+  |---|---|---|---|---|
+  | `gemini-3.5-flash-lite` | 15 | 250 000 | 500 | unas 166 |
+  | `gemini-3.8-flash` | 5 | 250 000 | 20 | unas 7 |
+
+  Los límites son **por proyecto, no por usuario ni por clave**
+  ([límites](https://aistudio.google.com/docs/rate-limits)): todos los usuarios de un mismo backend
+  comparten la cuota. La cuota diaria se reinicia a medianoche, hora del Pacífico. Cada integrante
+  revisa la de su propio proyecto en la misma página.
 - **API:** el módulo usará `generateContent`
   (`POST https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent`, con la
   clave en el header `x-goog-api-key`), no la API de Interacciones. La documentación presenta la
@@ -144,6 +151,7 @@ redirigen a `aistudio.google.com/docs`).
 - **Dentro de un pedido**, los pasos intermedios del modelo (su razonamiento y la llamada a la
   herramienta) deben devolverse a Gemini tal como llegaron; el SDK oficial lo hace solo. Es otra
   razón para no mandar esos pasos al cliente ni recibirlos en el `historial`.
+- **Pruebas:** las pruebas automáticas simulan el cliente de Gemini; no gastan cuota.
 - **Disponibilidad:** Perú está en la lista de
   [regiones disponibles](https://aistudio.google.com/docs/available-regions).
 
@@ -156,6 +164,6 @@ redirigen a `aistudio.google.com/docs`).
 - **Alexander:** revisar el PR del módulo.
 - **Chat en la web (H69) y en la app (H70); voz en la app (H71):** aviso de no escribir datos
   personales, tarjetas con `productos` y manejo de 429, 503 y 504.
-- **Todos:** crear su clave en Google AI Studio y revisar su cuota real en
-  <https://aistudio.google.com/rate-limit> para ajustar `chat.limite.por-minuto` y
-  `chat.limite.por-dia`.
+- **Todos:** crear su clave en Google AI Studio y revisar la cuota de su proyecto en
+  <https://aistudio.google.com/rate-limit>. Si es distinta de la tabla de arriba, ajustar
+  `chat.limite.por-minuto` y `chat.limite.por-dia` en su `.env`.
