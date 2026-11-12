@@ -44,6 +44,38 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 
 ## 1. Autenticación
 
+### POST /auth/google (H67)
+
+Inicia sesión con Google o crea la cuenta si no existe. No requiere token.
+
+**Body**
+
+```json
+{
+  "idToken": "eyJhbGciOi..."
+}
+```
+
+**Reglas**
+
+- El token de Firebase se verifica en el servidor: emisor, audiencia, firma y `email_verified = true`.
+- Si el `google_uid` ya existe, inicia sesión.
+- Si no existe, crea una cuenta solo con Google (`password_hash` nulo) con rol `COMPRADOR`.
+- Si ya existe una cuenta con contraseña y ese mismo correo, **no** se vincula.
+- Una cuenta suspendida o dada de baja no entra (mismo criterio que `POST /auth/login`).
+
+**Respuesta 200:** igual que `POST /auth/login`.
+
+**Errores**
+
+| Código | Cuándo | Mensaje |
+|---|---|---|
+| 400 | `idToken` vacío | "Falta el token de Google" |
+| 401 | Token inválido, expirado, de otro emisor o audiencia, o correo sin verificar | "No pudimos verificar tu cuenta de Google" |
+| 403 | Cuenta suspendida o dada de baja | Igual que en `POST /auth/login` |
+| 409 | Ya existe una cuenta con contraseña y ese correo | "Ya existe una cuenta con este correo. Inicia sesión con tu contraseña" |
+
+
 ### `POST /auth/registro` — H1, H15, H20
 Crea un comprador o un dueño de botica.
 
