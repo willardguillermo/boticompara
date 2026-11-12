@@ -35,6 +35,8 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 | 403 | Rol sin permiso, botica no aprobada intentando crear productos, o acción no permitida por el estado de la botica |
 | 404 | Recurso no existe o no pertenece al usuario |
 | 409 | Duplicado (correo o RUC ya registrado) |
+| 429 | Demasiados pedidos (solo `POST /chat`) |
+| 503, 504 | El asistente no está disponible o tardó demasiado (solo `POST /chat`) |
 
 Única excepción al formato JSON: `GET /auth/verificar` responde una página HTML (ver H20).
 
@@ -579,6 +581,186 @@ Errores: 400 (`id` no numérico), 401 (sin token), 404 (la alerta no existe o es
 ### `PUT /alertas/leidas` 🔒 — H59
 Marca como leídas todas las alertas del usuario. Responde `204` sin cuerpo.
 Errores: 401 (sin token).
+
+---
+
+## 8. Asistente (chat)
+
+Asistente de texto que responde preguntas sobre BotiCompara usando los mismos datos que el resto de la API. El backend le pasa la pregunta a Gemini (Google) y ejecuta por él las consultas que necesite ("herramientas"). El diseño completo está en `docs/chat/diseno-chat.md`.
+
+### `POST /chat` 🔒 — H68
+
+Roles: `COMPRADOR` y `DUENO_BOTICA`. El rol del token decide qué herramientas tiene el asistente (ver más abajo). El servidor no guarda la conversación: el cliente envía el historial en cada pedido.
+
+```json
+// Pedido
+{
+  "mensaje": "¿Dónde está más barato el paracetamol?",
+  "historial": [
+    { "rol": "usuario",   "texto": "Hola" },
+    { "rol": "asistente", "texto": "Hola, soy el asistente de BotiCompara. ¿Qué medicamento buscas?" }
+  ],
+  "lat": -11.936500,
+  "lng": -76.697200
+}
+```
+
+| Campo | Obligatorio | Validación |
+|---|---|---|
+| `mensaje` | sí | Texto de 1 a 500 caracteres, sin contar espacios al inicio ni al final |
+| `historial` | no | Lista de mensajes anteriores, del más antiguo al más reciente. Cada uno con `rol` (`usuario` o `asistente`) y `texto` (1 a 1000 caracteres). Si llegan más de 10, el servidor usa solo los 10 últimos. Sin historial: se omite, `null` o `[]` |
+| `lat`, `lng` | no | Ubicación del usuario; se envían juntas, con los mismos rangos que en `GET /productos/buscar`. Solo sirven para calcular distancias en el servidor: **no se envían a Gemini ni se guardan** |
+
+El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` enviados (`usuario`) y las `respuesta` recibidas (`asistente`). Los `productos` de respuestas anteriores no se reenvían.
+
+```json
+// 200 OK — comprador (con lat y lng)
+{
+  "respuesta": "El paracetamol más barato es el Paracetamol Genérico de FarmaVida, a 2 soles con 20, a poco más de un kilómetro de ti. También lo tiene Botica Salud Total a 2 soles con 50.",
+  "productos": [
+    {
+      "productoId": 9,
+      "nombreComercial": "Paracetamol Genérico",
+      "principioActivo": "Paracetamol",
+      "presentacion": "Tableta 500 mg x 10",
+      "precio": 2.20,
+      "stock": 90,
+      "stockMinimo": null,
+      "boticaId": 2,
+      "boticaNombre": "FarmaVida",
+      "boticaDistrito": "Lurigancho-Chosica",
+      "distanciaKm": 1.25
+    },
+    {
+      "productoId": 3,
+      "nombreComercial": "Paracetamol MK",
+      "principioActivo": "Paracetamol",
+      "presentacion": "Tableta 500 mg x 10",
+      "precio": 2.50,
+      "stock": 35,
+      "stockMinimo": null,
+      "boticaId": 1,
+      "boticaNombre": "Botica Salud Total",
+      "boticaDistrito": "Lurigancho-Chosica",
+      "distanciaKm": 2.10
+    }
+  ],
+  "respaldo": false
+}
+```
+
+```json
+// 200 OK — dueño ("¿Qué productos tengo con stock bajo?")
+{
+  "respuesta": "Tienes 2 productos con stock bajo: Amoxicilina 500 miligramos, con 3 unidades, y Loratadina, con 5 unidades. Te conviene reponerlos pronto.",
+  "productos": [
+    {
+      "productoId": 4,
+      "nombreComercial": "Amoxicilina",
+      "principioActivo": "Amoxicilina",
+      "presentacion": "Cápsula 500 mg x 10",
+      "precio": 6.00,
+      "stock": 3,
+      "stockMinimo": 5,
+      "boticaId": 1,
+      "boticaNombre": "Botica Salud Total",
+      "boticaDistrito": "Lurigancho-Chosica",
+      "distanciaKm": null
+    }
+  ],
+  "respaldo": false
+}
+```
+
+```json
+// 200 OK — pregunta fuera de alcance ("Me duele la cabeza, ¿qué tomo?")
+{
+  "respuesta": "No puedo recomendarte medicamentos ni dosis. Consulta con el químico farmacéutico de tu botica o con tu médico. Si es una emergencia, llama al SAMU al 106. Si ya sabes qué medicamento necesitas, te ayudo a encontrar dónde está más barato.",
+  "productos": [],
+  "respaldo": false
+}
+```
+
+```json
+// 200 OK — respuesta de respaldo (las herramientas devolvieron 3 productos, pero la llamada final a Gemini falló o no llegó a tiempo)
+{
+  "respuesta": "Encontré 3 opciones. La más barata es Paracetamol Genérico a 2 soles con 20 en FarmaVida, Lurigancho-Chosica.",
+  "productos": [ /* las 3 tarjetas, con las mismas reglas de siempre */ ],
+  "respaldo": true
+}
+```
+
+**`respuesta`:** texto plano en español, sin markdown, sin listas ni enlaces, de hasta 600 caracteres. Está pensada para leerse en voz alta (H71): los precios van escritos como se dicen.
+
+**`respaldo`:** `false` en una respuesta normal. `true` cuando el texto no lo escribió Gemini sino el servidor, porque la llamada final falló o no llegó a tiempo (ver "Tiempos y respuesta de respaldo").
+
+**`productos`:** siempre es una lista (vacía si la respuesta no trata de productos). Sirve para que la web y la app muestren tarjetas con enlace al detalle.
+- La arma **el servidor** con lo que devolvieron las herramientas en esta pregunta, no el modelo: los ids, precios y stock son los reales aunque el texto se equivoque. Si el texto y una tarjeta no coinciden, vale la tarjeta.
+- Máximo 10, sin repetidos, en el orden en que los devolvieron las herramientas.
+- `stockMinimo` solo tiene valor en los productos propios del dueño (herramientas `ver_stock_bajo` y `buscar_en_mi_catalogo`); en los demás es `null`.
+- `distanciaKm` solo tiene valor si el pedido trae `lat` y `lng` y la botica registró ubicación; si no, `null`. Mismo cálculo que en `GET /productos/buscar`.
+- Los resultados de `buscar_medicamento` (catálogo maestro) solo aparecen en el texto: no generan tarjetas ni una lista aparte, porque no son productos de una botica.
+
+**Herramientas del asistente, según el rol del token.** El modelo solo decide los parámetros de la tabla. El usuario, su botica y la ubicación los pone el servidor a partir del token y del pedido, nunca el modelo.
+
+| Herramienta | Rol | Para qué sirve | Parámetros que da el modelo | Servicio que usa |
+|---|---|---|---|---|
+| `buscar_precios` | `COMPRADOR`, `DUENO_BOTICA` | Buscar un medicamento en las boticas aprobadas y comparar precios | `texto` (mínimo 2 caracteres), `tipo` (`nombre` o `principio`), `cerca` (`true` = de la botica más cercana a la más lejana; solo si el pedido trae ubicación) | `BusquedaService.buscar` (`GET /productos/buscar`, vista `v_producto_busqueda`) |
+| `buscar_alternativas` | `COMPRADOR`, `DUENO_BOTICA` | Equivalentes más baratos de un producto que ya salió en una búsqueda | `productoId` | `AlternativasService.alternativas` (`GET /productos/{id}/alternativas`) |
+| `ver_stock_bajo` | `DUENO_BOTICA` | Productos de su botica con `stock <= stockMinimo` | ninguno | `CatalogoService.listar(usuarioId, null, true)` (`GET /boticas/mia/productos?stockBajo=true`) |
+| `buscar_en_mi_catalogo` | `DUENO_BOTICA` | Buscar un producto en su propio catálogo (precio y stock) | `texto` | `CatalogoService.listar(usuarioId, texto, false)` (`GET /boticas/mia/productos?q=`) |
+| `buscar_medicamento` | `DUENO_BOTICA` | Buscar en el catálogo maestro (DIGEMID) | `texto` (mínimo 2 caracteres) | `MedicamentoService.buscar` (`GET /medicamentos?q=`) |
+
+- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (nombre, presentación, precio, stock, botica, distrito y distancia en km). Nunca coordenadas ni datos de personas.
+- Por pregunta hay como máximo 2 rondas de llamadas a herramientas (en una ronda el modelo puede pedir una o varias a la vez). Si después de la segunda pide más, el servidor le exige responder con lo que ya tiene. Así una pregunta usa como máximo 3 llamadas a Gemini: 2 rondas de herramientas más la respuesta.
+- Si el dueño aún no registró su botica, sus herramientas devuelven "sin botica registrada" y el asistente lo explica: no es un error.
+- Las búsquedas del asistente **no** se registran en los reportes de búsquedas (H62) ni en el de comparaciones (H42): el texto lo escribe el modelo, no el usuario.
+
+**Límites del asistente:**
+- Solo responde sobre BotiCompara: precios, disponibilidad, boticas, alternativas y, para el dueño, su catálogo.
+- No diagnostica, no da dosis y no recomienda medicamentos por síntomas: deriva al químico farmacéutico o al médico. Ante una emergencia indica llamar al SAMU (106).
+- Estos casos responden `200` con `productos: []`; no son errores.
+
+**Límite de uso:**
+- **Por usuario:** por defecto 3 preguntas por minuto y 15 por día. Al pasarlo → 429.
+- **Global, por backend:** por defecto 150 preguntas por día entre todos los usuarios (unas 450 llamadas a Gemini en el peor caso, con margen bajo los 500 pedidos por día de `gemini-3.5-flash-lite`). Al llegar al tope → 503 con "El asistente alcanzó su límite de hoy. Intenta mañana.", **sin llamar a Gemini**. Existe porque la cuota de Gemini es por proyecto, no por usuario: sin este tope, unos pocos usuarios intensivos podrían agotarla para todos.
+- Primero se revisa el límite por usuario (429) y después el global (503). Los pedidos que responden 400 o 401 no cuentan en ninguno.
+- **Reinicio diario:** el límite propio (por usuario y global) se reinicia a medianoche de Lima. La cuota de Google se reinicia a medianoche del Pacífico: 08:00 UTC (3:00 a. m. en Lima) de noviembre a marzo, con el horario estándar de EE. UU., y 07:00 UTC (2:00 a. m. en Lima) de marzo a noviembre, con su horario de verano. Lima no cambia de hora (UTC−5).
+- Un reintento por 500 o 503 de Google (ver abajo) es un pedido más a Gemini. Es raro y el tope global deja margen: 150 preguntas × 3 llamadas = 450, 50 por debajo de los 500 del día.
+- Los tres valores son configurables en el backend: `chat.limite.por-minuto`, `chat.limite.por-dia` y `chat.limite.global-por-dia`. Con 3 llamadas a Gemini como máximo por pregunta, un usuario usa como máximo 9 de los 15 pedidos por minuto del plan gratis de `gemini-3.5-flash-lite`.
+
+**Tiempos y respuesta de respaldo:**
+- **Por llamada a Gemini:** plazo de 25 segundos. **Por pregunta completa:** plazo total de 50 segundos, contado desde que el servidor empieza a atender el pedido. Cada llamada espera lo que sea menor: 25 s o lo que falte para los 50 s.
+- **Reintento:** si Google responde 500 o 503, la llamada se reintenta **una sola vez**, y solo si todavía queda tiempo dentro de los 50 s. Otros errores de Google (por ejemplo, cuota agotada) no se reintentan.
+- **Respaldo:** si las herramientas ya devolvieron productos en esta pregunta, pero la llamada final a Gemini falla (también después del reintento) o no llega a tiempo, el servidor responde `200` con un texto armado por él a partir de esas tarjetas y `"respaldo": true`. Ejemplo: "Encontré 3 opciones. La más barata es Paracetamol Genérico a 2 soles con 20 en FarmaVida, Lurigancho-Chosica." Sigue las reglas de `respuesta` (texto plano, precios como se dicen, hasta 600 caracteres).
+- El texto de respaldo **solo describe productos** (cuántos hay, el más barato, la botica y el distrito): nunca da consejos de salud.
+- Si no hubo productos de herramientas, no hay respaldo: se responde 503 si Gemini falla y 504 si se acaba el tiempo, como antes.
+- **Clientes:** la web (`fetch`) y la app (`readTimeout` de Retrofit) deben esperar **al menos 60 segundos** la respuesta de `POST /chat`, más que los 50 s del servidor, y mostrar un indicador ("Escribiendo…") mientras tanto. Con el plazo por defecto del cliente, el pedido podría cortarse antes de que el servidor responda.
+
+Errores:
+
+| Código | Cuándo | `mensaje` |
+|---|---|---|
+| 400 | `mensaje` vacío o solo espacios | "Escribe tu pregunta" |
+| 400 | `mensaje` de más de 500 caracteres | "La pregunta no puede pasar de 500 caracteres" |
+| 400 | `historial` con un `rol` distinto de `usuario` o `asistente`, o un `texto` vacío o de más de 1000 caracteres | "El historial no es válido" |
+| 400 | Solo una de `lat` y `lng`, o coordenadas fuera de rango | Los mismos mensajes que `GET /productos/buscar` |
+| 401 | El token no es válido o la cuenta no está habilitada (dada de baja o suspendida) | El mismo que el resto de la API |
+| 429 | Se pasó el límite por minuto o por día | "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar" o "Llegaste al límite de preguntas de hoy. Vuelve mañana" |
+| 503 | Se llegó al tope global del día (`chat.limite.global-por-dia`); no se llama a Gemini | "El asistente alcanzó su límite de hoy. Intenta mañana." |
+| 503 | Gemini no responde, devuelve un error (también después del reintento), se agotó la cuota gratis del proyecto, o falta `GEMINI_API_KEY`, y no hay productos de herramientas para el respaldo | "El asistente no está disponible en este momento. Intenta más tarde" |
+| 504 | Se pasan los 50 segundos de la pregunta y no hay productos de herramientas para el respaldo | "El asistente tardó demasiado en responder. Intenta de nuevo" |
+
+- El 429 trae el header `Retry-After` con los segundos que faltan para poder preguntar otra vez.
+- **Cuentas suspendidas:** el 401 para una cuenta suspendida depende de que `JwtAuthFilter` también rechace `suspendido_hasta > now()`. Ese cambio es parte de H91 (Alexander, anotado como pendiente en el PR #79) y es requisito de este contrato. Mientras no esté, un JWT vigente de una cuenta suspendida sigue entrando, como en el resto de la API.
+- Salvo el tope global, el 503 y el 504 no dicen la causa interna (clave, cuota, modelo): eso va solo al log del servidor.
+
+**Configuración (backend):**
+- `GEMINI_API_KEY` y `GEMINI_MODEL` en el `.env` de `backend-usuario/`. Cada integrante usa su propia clave de Google AI Studio; nunca se sube al repositorio.
+- Valor recomendado de `GEMINI_MODEL`: `gemini-3.5-flash-lite`. Alternativa, solo si la calidad no alcanza: `gemini-3.8-flash` (unas 7 preguntas al día).
+- Cuotas comprobadas el 12/11/2026 en AI Studio (plan gratuito): `gemini-3.5-flash-lite` 15 RPM, 250K TPM y 500 RPD; `gemini-3.8-flash` 5 RPM, 250K TPM y 20 RPD. Las cuotas son por proyecto de Google AI Studio, no por clave ni por usuario: varias claves del mismo proyecto comparten la misma cuota. Cada integrante usa su propio proyecto y debe revisar sus cuotas en <https://aistudio.google.com/rate-limit>.
+- `chat.limite.por-minuto` (por defecto 3), `chat.limite.por-dia` (por defecto 15) y `chat.limite.global-por-dia` (por defecto 150).
+- El `.env.example` y la colección de Postman se actualizan en el PR del módulo.
 
 ---
 
