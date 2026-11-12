@@ -208,7 +208,7 @@ Resultado actual: **299 tests, 0 fallas**. Los de este sprint:
 
 ### Colección de Postman
 [`../docs/postman/BotiCompara.postman_collection.json`](../docs/postman/BotiCompara.postman_collection.json), con
-9 carpetas. Con la API levantada se ejecuta cada carpeta con **Run folder**. Todas las pruebas comprueban también
+10 carpetas. Con la API levantada se ejecuta cada carpeta con **Run folder**. Todas las pruebas comprueban también
 que la respuesta tarda menos de 2 s (H26).
 
 - **Carpeta 7 (H40):** Rosa sube el precio y el stock de un producto, el comprador lo ve en la búsqueda y en el
@@ -220,6 +220,9 @@ que la respuesta tarda menos de 2 s (H26).
   desactivar y reactivar las alertas. 85 pruebas, todas en verde. No crea productos: lo que modifica, lo restaura
   (deja una alerta ya leída en el historial de Carlos). Con `MAIL_HOST` configurado, la baja del paso 8 envía el
   correo de H61.
+- **Carpeta 10 (H68):** `POST /chat` con un ejemplo de comprador (precios cerca de él), uno de dueño (su stock
+  bajo) y uno de crisis (lo responde el servidor sin Gemini, con `"ayuda": true`). Los dos primeros llaman a Gemini:
+  necesitan `GEMINI_API_KEY` y gastan cuota del plan gratis. No escribe en la base.
 
 ### Pruebas en vivo
 Durante el sprint cada historia se probó contra Supabase con scripts locales de PowerShell, que crean productos
