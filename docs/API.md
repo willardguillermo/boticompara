@@ -744,11 +744,11 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 
    | Grupo | Frases que lo activan | Texto de la respuesta |
    |---|---|---|
-   | Autolesión | "hacerme daño", "matarme", "suicid…" (suicidio, suicidarme), "quitarme la vida", "no quiero vivir", "quiero morir", "cortarme" | "Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento." |
-   | Emergencia física | "no puedo respirar", "dolor de pecho", "me duele el pecho", "intoxicación", "envenenamiento", "convulsión", "desmayo" | "Llama al SAMU al 106 de inmediato. BotiCompara solo compara precios de medicamentos y no puede atender una emergencia: ahora lo más importante es tu salud." |
+   | Autolesión | "hacerme daño", "matarme", "quiero matarme", "suicid…" (suicidio, suicidarme), "quitarme la vida", "no quiero vivir", "no quiero seguir viviendo", "quiero morir", "me quiero morir", "acabar con mi vida", "cortarme las venas", "hacerme cortes" | "Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento." |
+   | Emergencia física | "no puedo respirar", "no puedo respirar bien", "me falta el aire", "dolor de pecho", "dolor en el pecho", "me duele el pecho", "intoxicación", "envenenamiento", "convulsión", "desmayo" | "Llama al SAMU al 106 de inmediato. BotiCompara solo compara precios de medicamentos y no puede atender una emergencia: ahora lo más importante es tu salud." |
 
    - Si el mensaje tiene frases de los dos grupos, responde el de autolesión.
-   - La lista es corta a propósito. Un falso positivo solo muestra números de ayuda, pero no debe activarse con frases comunes: "me duele la cabeza" o "dolor de cabeza" siguen su camino normal.
+   - La lista es corta a propósito. Un falso positivo solo muestra números de ayuda, pero no debe activarse con frases comunes: "me duele la cabeza", "dolor de cabeza" o "cortarme el pelo" siguen su camino normal.
    - Si el filtro no detecta nada, todo sigue igual: responde Gemini con sus instrucciones, que también indican el SAMU 106 y la Línea 113.
 2. **Red de seguridad en los errores.** Todos los mensajes de error propios del chat (429, 503 y 504) terminan con: "Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5." Así, aunque el asistente no pueda responder, nadie se queda sin esos números. Los 400 y el 401 no lo llevan.
 
