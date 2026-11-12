@@ -157,7 +157,7 @@ class ChatServiceTest {
 
     @BeforeEach
     void armar() {
-        service = servicio(new LimitadorChat(100, 1000, reloj));
+        service = servicio(new LimitadorChat(100, 1000, 10000, reloj));
     }
 
     private ChatService servicio(LimitadorChat limitador) {
@@ -490,7 +490,7 @@ class ChatServiceTest {
 
     @Test
     void losPedidosCon400NoCuentanEnElLimite() {
-        service = servicio(new LimitadorChat(1, 30, reloj));
+        service = servicio(new LimitadorChat(1, 30, 10000, reloj));
         error(CARLOS, pregunta(" "));
         error(CARLOS, pregunta(" "));
         gemini.guion.add(texto("Hola"));
@@ -500,7 +500,7 @@ class ChatServiceTest {
 
     @Test
     void alPasarElLimiteNoSeLlamaAGemini() {
-        service = servicio(new LimitadorChat(1, 30, reloj));
+        service = servicio(new LimitadorChat(1, 30, 10000, reloj));
         gemini.guion.add(texto("Hola"));
         service.responder(CARLOS, pregunta("hola"));
 
@@ -513,11 +513,49 @@ class ChatServiceTest {
 
     @Test
     void unaPreguntaQueTerminaEn503SiCuentaEnElLimite() {
-        service = servicio(new LimitadorChat(1, 30, reloj));
+        service = servicio(new LimitadorChat(1, 30, 10000, reloj));
         gemini.guion.add(GeminiException.noDisponible("cuota"));
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, error(CARLOS, pregunta("hola")).getStatus());
 
         assertThrows(LimiteChatException.class, () -> service.responder(CARLOS, pregunta("otra")));
+    }
+
+    @Test
+    void alLlegarAlTopeGlobal_503SinLlamarAGeminiAunqueElUsuarioEsteBajoSuLimite() {
+        service = servicio(new LimitadorChat(100, 1000, 2, reloj));
+        gemini.guion.add(texto("Hola"));
+        gemini.guion.add(texto("Hola"));
+        service.responder(CARLOS, pregunta("hola"));
+        service.responder(ROSA, pregunta("hola"));
+
+        // Es la primera pregunta de este usuario, pero el backend ya usó sus 2 del día
+        ApiException e = error(new UsuarioAutenticado(7L, "COMPRADOR"), pregunta("hola"));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
+        assertEquals("El asistente alcanzó su límite de hoy. Intenta mañana.", e.getMessage());
+        assertEquals(2, gemini.pedidos.size());
+    }
+
+    @Test
+    void losPedidosCon400NoCuentanEnElTopeGlobal() {
+        service = servicio(new LimitadorChat(100, 1000, 1, reloj));
+        error(CARLOS, pregunta(" "));
+        error(ROSA, new ChatRequest("hola", null, LAT, null));
+        gemini.guion.add(texto("Hola"));
+
+        assertEquals("Hola", service.responder(CARLOS, pregunta("hola")).respuesta());
+    }
+
+    @Test
+    void unaPreguntaQueTerminaEn503SiCuentaEnElTopeGlobal() {
+        service = servicio(new LimitadorChat(100, 1000, 1, reloj));
+        gemini.guion.add(GeminiException.noDisponible("cuota"));
+        assertEquals("El asistente no está disponible en este momento. Intenta más tarde",
+                error(CARLOS, pregunta("hola")).getMessage());
+
+        assertEquals("El asistente alcanzó su límite de hoy. Intenta mañana.",
+                error(ROSA, pregunta("hola")).getMessage());
+        assertEquals(1, gemini.pedidos.size());
     }
 
     // ---------- Gemini no disponible (503) y plazo (504) ----------

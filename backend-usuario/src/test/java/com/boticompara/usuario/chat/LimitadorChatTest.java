@@ -1,6 +1,8 @@
 package com.boticompara.usuario.chat;
 
+import com.boticompara.usuario.error.ApiException;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -51,7 +53,7 @@ class LimitadorChatTest {
 
     @Test
     void laCuartaPreguntaDelMinutoSeRechazaConLosSegundosQueFaltan() {
-        LimitadorChat limitador = new LimitadorChat(3, 30, reloj);
+        LimitadorChat limitador = new LimitadorChat(3, 30, 10000, reloj);
         limitador.registrar(4L);
         reloj.avanzar(Duration.ofSeconds(10));
         limitador.registrar(4L);
@@ -67,7 +69,7 @@ class LimitadorChatTest {
 
     @Test
     void pasadoElMinutoVuelveAAceptar() {
-        LimitadorChat limitador = new LimitadorChat(3, 30, reloj);
+        LimitadorChat limitador = new LimitadorChat(3, 30, 10000, reloj);
         limitador.registrar(4L);
         limitador.registrar(4L);
         limitador.registrar(4L);
@@ -79,7 +81,7 @@ class LimitadorChatTest {
 
     @Test
     void unaPreguntaRechazadaNoCuenta() {
-        LimitadorChat limitador = new LimitadorChat(1, 30, reloj);
+        LimitadorChat limitador = new LimitadorChat(1, 30, 10000, reloj);
         limitador.registrar(4L);
         reloj.avanzar(Duration.ofSeconds(59));
         rechazo(limitador, 4L);
@@ -91,7 +93,7 @@ class LimitadorChatTest {
 
     @Test
     void cadaUsuarioTieneSuPropioLimite() {
-        LimitadorChat limitador = new LimitadorChat(1, 30, reloj);
+        LimitadorChat limitador = new LimitadorChat(1, 30, 10000, reloj);
         limitador.registrar(4L);
 
         assertDoesNotThrow(() -> limitador.registrar(1L));
@@ -100,7 +102,7 @@ class LimitadorChatTest {
 
     @Test
     void alLlegarAlLimiteDelDiaSeRechazaHastaLaMedianocheDeLima() {
-        LimitadorChat limitador = new LimitadorChat(3, 5, reloj);
+        LimitadorChat limitador = new LimitadorChat(3, 5, 10000, reloj);
         for (int i = 0; i < 5; i++) {
             limitador.registrar(4L);
             reloj.avanzar(Duration.ofMinutes(2));
@@ -114,7 +116,7 @@ class LimitadorChatTest {
 
     @Test
     void elDiaCambiaALas00DeLimaYNoALas00Utc() {
-        LimitadorChat limitador = new LimitadorChat(3, 1, reloj);
+        LimitadorChat limitador = new LimitadorChat(3, 1, 10000, reloj);
         reloj.ponerEn("2026-11-12T23:30:00Z");   // 18:30 de Lima
         limitador.registrar(4L);
 
@@ -127,9 +129,80 @@ class LimitadorChatTest {
 
     @Test
     void usaLosLimitesConfigurados() {
-        LimitadorChat limitador = new LimitadorChat(1, 30, reloj);
+        LimitadorChat limitador = new LimitadorChat(1, 30, 10000, reloj);
         limitador.registrar(4L);
 
         assertEquals(60, rechazo(limitador, 4L).getReintentarEnSegundos());
+    }
+
+    // ---------- Tope global por backend ----------
+
+    private ApiException topeGlobal(LimitadorChat limitador, long usuario) {
+        ApiException e = assertThrows(ApiException.class, () -> limitador.registrar(usuario));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
+        assertEquals("El asistente alcanzó su límite de hoy. Intenta mañana.", e.getMessage());
+        return e;
+    }
+
+    @Test
+    void elTopeGlobalSeAlcanzaAunqueCadaUsuarioEsteBajoSuLimite() {
+        // Cada usuario puede hacer 15 al día, pero el backend solo acepta 6 entre todos
+        LimitadorChat limitador = new LimitadorChat(3, 15, 6, reloj);
+        for (long usuario = 1; usuario <= 3; usuario++) {
+            limitador.registrar(usuario);
+            limitador.registrar(usuario);
+        }
+
+        topeGlobal(limitador, 4L);   // usuario nuevo
+        topeGlobal(limitador, 1L);   // usuario con 2 de 15
+    }
+
+    @Test
+    void elTopeGlobalSeReiniciaALaMedianocheDeLima() {
+        LimitadorChat limitador = new LimitadorChat(3, 15, 2, reloj);
+        reloj.ponerEn("2026-11-12T23:30:00Z");   // 18:30 de Lima
+        limitador.registrar(1L);
+        limitador.registrar(2L);
+
+        reloj.ponerEn("2026-11-13T04:59:59Z");   // 23:59:59 de Lima: en UTC ya es otro día, en Lima no
+        topeGlobal(limitador, 3L);
+
+        reloj.ponerEn("2026-11-13T05:00:00Z");   // 00:00 de Lima
+        assertDoesNotThrow(() -> limitador.registrar(3L));
+        assertDoesNotThrow(() -> limitador.registrar(1L));
+        topeGlobal(limitador, 2L);
+    }
+
+    @Test
+    void primeroSeRevisaElLimiteDelUsuarioYDespuesElGlobal() {
+        LimitadorChat limitador = new LimitadorChat(1, 15, 1, reloj);
+        limitador.registrar(4L);
+
+        // Este usuario pasó su propio límite y además el backend está en su tope: gana el 429
+        rechazo(limitador, 4L);
+        topeGlobal(limitador, 1L);
+    }
+
+    @Test
+    void unaPreguntaRechazadaPorElTopeGlobalNoLeCuentaAlUsuario() {
+        LimitadorChat limitador = new LimitadorChat(1, 1, 1, reloj);
+        reloj.ponerEn("2026-11-13T04:00:00Z");   // 23:00 de Lima
+        limitador.registrar(1L);
+        topeGlobal(limitador, 2L);
+
+        reloj.ponerEn("2026-11-13T05:00:00Z");   // 00:00 de Lima: día nuevo
+        assertDoesNotThrow(() -> limitador.registrar(2L));
+    }
+
+    @Test
+    void unaPreguntaRechazadaPorElLimiteDelUsuarioNoCuentaEnElGlobal() {
+        LimitadorChat limitador = new LimitadorChat(1, 15, 2, reloj);
+        limitador.registrar(4L);
+        rechazo(limitador, 4L);
+        rechazo(limitador, 4L);
+
+        // Si los 429 contaran en el global, ya estaría lleno
+        assertDoesNotThrow(() -> limitador.registrar(1L));
+        topeGlobal(limitador, 2L);
     }
 }

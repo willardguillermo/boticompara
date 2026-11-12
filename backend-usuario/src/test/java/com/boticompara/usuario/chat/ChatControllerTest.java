@@ -53,7 +53,7 @@ class ChatControllerTest {
     void armar() {
         // El cliente de Gemini se consulta en cada pedido, así cada test puede cambiarlo
         ChatService service = new ChatService((pedido, plazo) -> gemini.generar(pedido, plazo),
-                new RegistroHerramientas(List.of()), new LimitadorChat(2, 30), new InstruccionesSistema());
+                new RegistroHerramientas(List.of()), new LimitadorChat(2, 30, 3), new InstruccionesSistema());
         // GlobalExceptionHandler va primero a propósito: ChatErrores debe ganar por su @Order
         mvc = MockMvcBuilders.standaloneSetup(new ChatController(service),
                         new BusquedaController(busqueda, registroBusquedas))
@@ -111,6 +111,29 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.mensaje")
                         .value("Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar"))
                 .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void alLlegarAlTopeGlobal_503ConSuMensajeYSinLlamarAGemini() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger llamadas = new java.util.concurrent.atomic.AtomicInteger();
+        GeminiCliente normal = gemini;
+        gemini = (pedido, plazo) -> {
+            llamadas.incrementAndGet();
+            return normal.generar(pedido, plazo);
+        };
+        // El tope global de este test es 3 y cada usuario puede hacer 2 por minuto: preguntan dos usuarios
+        preguntar("{\"mensaje\":\"uno\"}").andExpect(status().isOk());
+        preguntar("{\"mensaje\":\"dos\"}").andExpect(status().isOk());
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                new UsuarioAutenticado(1L, "DUENO_BOTICA"), null, List.of()));
+        preguntar("{\"mensaje\":\"tres\"}").andExpect(status().isOk());
+
+        preguntar("{\"mensaje\":\"cuatro\"}")
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().doesNotExist("Retry-After"))
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.mensaje").value("El asistente alcanzó su límite de hoy. Intenta mañana."));
+        assertEquals(3, llamadas.get());
     }
 
     @Test
