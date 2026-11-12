@@ -303,4 +303,67 @@ class AlternativasServiceTest {
         assertEquals(1, r.alternativas().size());
         assertFalse(r.sinEquivalentes());
     }
+
+    // ---------- H68: variante sin registro para el asistente ----------
+
+    @Test
+    void sinRegistro_devuelveLoMismoQueElMetodoActualYNoInserta() {
+        consultadoEs(List.of(consultado(5L)));
+        delGrupoEs(List.of(alt(1, "8.00", "EQUIVALENTE"), alt(3, "12.00", "EQUIVALENTE")));
+
+        AlternativasResponse sinRegistro = service.alternativasSinRegistro(7L);
+
+        verify(jdbc, never()).update(anyString(), any(SqlParameterSource.class));
+        assertEquals(new BigDecimal("20.0"), sinRegistro.alternativas().get(0).ahorroPorcentaje());
+        // El método actual responde lo mismo y sigue registrando la consulta (H42)
+        assertEquals(sinRegistro, service.alternativas(7L, 42L));
+        verify(jdbc, times(1)).update(contains(INSERT), any(SqlParameterSource.class));
+    }
+
+    @Test
+    void sinRegistro_sinAlternativas_marcaSinEquivalentesYNoInserta() {
+        consultadoEs(List.of(consultado(null)));
+        delPrincipioEs(List.of());
+
+        AlternativasResponse r = service.alternativasSinRegistro(7L);
+
+        assertTrue(r.sinEquivalentes());
+        verify(jdbc, never()).update(anyString(), any(SqlParameterSource.class));
+    }
+
+    /**
+     * La vista v_producto_busqueda deja fuera los productos de un dueño suspendido o dado de baja (H91-H93).
+     * Aquí la base está simulada: para un producto así la vista no devuelve fila, y la variante responde 404
+     * igual que el método actual, sin buscar alternativas ni registrar nada.
+     */
+    @Test
+    void sinRegistro_productoDeDuenoSuspendido_responde404() {
+        consultadoEs(List.of());
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.alternativasSinRegistro(99L));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+        assertEquals("Producto no encontrado", ex.getMessage());
+        verify(jdbc, times(1)).query(anyString(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<Object>>any());
+        verify(jdbc, never()).update(anyString(), any(SqlParameterSource.class));
+    }
+
+    /** La variante solo lee de la vista: nunca de producto ni de botica, que sí traen lo que el comprador no ve. */
+    @Test
+    void sinRegistro_todasLasLecturasSalenDeLaVistaDeBusqueda() {
+        consultadoEs(List.of(consultado(null)));
+        delPrincipioEs(List.of());
+
+        service.alternativasSinRegistro(7L);
+
+        ArgumentCaptor<String> consultas = ArgumentCaptor.forClass(String.class);
+        verify(jdbc, times(2)).query(consultas.capture(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<Object>>any());
+        for (String sql : consultas.getAllValues()) {
+            assertTrue(sql.contains(" from v_producto_busqueda v where "), sql);
+            assertFalse(sql.contains("from producto") || sql.contains("join botica"), sql);
+            assertTrue(sql.contains("not oculto and registro_vigente is not false"), sql);
+        }
+    }
 }
