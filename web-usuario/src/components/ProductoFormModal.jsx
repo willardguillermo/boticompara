@@ -2,6 +2,7 @@
 // H9 - Editar producto (PUT /productos/{id})
 // H12 - Stock mínimo para la alerta de stock bajo
 // D3 - Enlace con el catálogo maestro (medicamentoId, regla D2 y DELETE /productos/{id}/medicamento)
+// D18 - Al elegir el medicamento se sugieren nombre comercial y presentación (editables)
 import { useEffect, useState } from 'react'
 import { presentacionMedicamento, useBuscarMedicamentos } from '../hooks/useBuscarMedicamentos.js'
 import { api } from '../services/index.js'
@@ -150,6 +151,8 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado, onEn
   const [enlaceGuardado, setEnlaceGuardado] = useState(producto?.medicamentoId ?? null)
   const [errorMedicamento, setErrorMedicamento] = useState('')
   const [quitando, setQuitando] = useState(false)
+  // D18: últimos valores sugeridos desde el catálogo; si el campo aún los tiene, se pueden reemplazar
+  const [sugerencia, setSugerencia] = useState({ nombreComercial: '', presentacion: '' })
 
   // Al editar un producto enlazado, busca el nombre del medicamento para mostrarlo
   useEffect(() => {
@@ -168,9 +171,25 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado, onEn
   function elegirMedicamento(m) {
     setMedicamento(m)
     setErrorMedicamento('')
+    // D18: nombre y presentación son sugerencias; no se pisa lo que el dueño escribió.
+    // Precio, stock y stock mínimo son de cada botica y no se tocan.
+    const nueva = { nombreComercial: m.nombreComercial ?? '', presentacion: presentacionMedicamento(m) ?? '' }
+    const sugeridos = Object.keys(nueva).filter((campo) => {
+      const actual = datos[campo]
+      return !actual.trim() || actual === sugerencia[campo]
+    })
+    setSugerencia(nueva)
     // Regla D2: el principio activo es el del medicamento mientras esté enlazado
-    setDatos((d) => ({ ...d, principioActivo: m.principioActivo }))
-    setErrores((er) => ({ ...er, principioActivo: undefined }))
+    setDatos((d) => ({
+      ...d,
+      principioActivo: m.principioActivo,
+      ...Object.fromEntries(sugeridos.map((campo) => [campo, nueva[campo]])),
+    }))
+    setErrores((er) => ({
+      ...er,
+      principioActivo: undefined,
+      ...Object.fromEntries(sugeridos.map((campo) => [campo, undefined])),
+    }))
   }
 
   async function quitarMedicamento() {
