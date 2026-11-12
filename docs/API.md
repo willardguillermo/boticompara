@@ -698,7 +698,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 - La arma **el servidor** con lo que devolvieron las herramientas en esta pregunta, no el modelo: los ids, precios y stock son los reales aunque el texto se equivoque. Si el texto y una tarjeta no coinciden, vale la tarjeta.
 - Máximo 10, sin repetidos, en el orden en que los devolvieron las herramientas.
 - `stockMinimo` solo tiene valor en los productos propios del dueño (herramientas `ver_stock_bajo` y `buscar_en_mi_catalogo`); en los demás es `null`.
-- `distanciaKm` solo tiene valor si el pedido trae `lat` y `lng` y la botica registró ubicación; si no, `null`. Mismo cálculo que en `GET /productos/buscar`.
+- `distanciaKm` solo tiene valor en las tarjetas de `buscar_precios`, cuando el pedido trae `lat` y `lng` y la botica registró ubicación; si no, `null`. Mismo cálculo que en `GET /productos/buscar`. El parámetro `cerca=true` solo cambia el orden (de la más cercana a la más lejana).
+- Las tarjetas de `buscar_alternativas` llevan siempre `distanciaKm: null`, aunque el pedido traiga ubicación: `AlternativasService` no calcula distancias. Lo mismo las de los productos propios del dueño.
 - Los resultados de `buscar_medicamento` (catálogo maestro) solo aparecen en el texto: no generan tarjetas ni una lista aparte, porque no son productos de una botica.
 
 **Herramientas del asistente, según el rol del token.** El modelo solo decide los parámetros de la tabla. El usuario, su botica y la ubicación los pone el servidor a partir del token y del pedido, nunca el modelo.
