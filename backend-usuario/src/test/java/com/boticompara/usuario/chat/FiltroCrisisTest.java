@@ -23,7 +23,12 @@ class FiltroCrisisTest {
             "pienso en quitarme la vida",
             "ya no quiero vivir",
             "solo quiero morir",
-            "tengo ganas de cortarme",
+            "Me quiero morir",
+            "a veces quiero matarme",
+            "no quiero seguir viviendo así",
+            "quiero acabar con mi vida",
+            "pensé en cortarme las venas",
+            "a veces pienso en hacerme cortes",
     })
     void cadaFraseDeAutolesionActivaSuGrupo(String mensaje) {
         assertEquals(Optional.of(Grupo.AUTOLESION), FiltroCrisis.detectar(mensaje));
@@ -38,6 +43,9 @@ class FiltroCrisisTest {
             "posible envenenamiento con lejía",
             "mi hijo tiene una convulsión",
             "sufrió un desmayo",
+            "tengo dolor en el pecho",
+            "me falta el aire",
+            "no puedo respirar bien desde ayer",
     })
     void cadaFraseDeEmergenciaActivaSuGrupo(String mensaje) {
         assertEquals(Optional.of(Grupo.EMERGENCIA), FiltroCrisis.detectar(mensaje));
@@ -46,8 +54,8 @@ class FiltroCrisisTest {
     /** Una prueba por cada frase de las listas, tal como está escrita, para que ninguna quede sin cubrir. */
     @Test
     void todasLasFrasesDeLasListasSeDetectan() {
-        assertEquals(7, FiltroCrisis.AUTOLESION.size());
-        assertEquals(7, FiltroCrisis.EMERGENCIA.size());
+        assertEquals(12, FiltroCrisis.AUTOLESION.size());
+        assertEquals(10, FiltroCrisis.EMERGENCIA.size());
         FiltroCrisis.AUTOLESION.forEach(f ->
                 assertEquals(Optional.of(Grupo.AUTOLESION), FiltroCrisis.detectar("hola, " + f + " ahora"), f));
         FiltroCrisis.EMERGENCIA.forEach(f ->
@@ -58,6 +66,9 @@ class FiltroCrisisTest {
     @ValueSource(strings = {
             "me duele la cabeza",
             "dolor de cabeza",
+            "quiero cortarme el pelo",
+            "Voy a cortarme el pelo, ¿venden champú?",
+            "tengo que cortarme las uñas",
             "¿Qué tomo para el dolor de espalda?",
             "Paracetamol cerca de mí",
             "¿Hay alternativas más baratas al Panadol?",

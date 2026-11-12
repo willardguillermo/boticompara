@@ -25,10 +25,13 @@ final class FiltroCrisis {
             + "medicamentos y no puede atender una emergencia: ahora lo más importante es tu salud.";
 
     /** Las frases van ya normalizadas: en minúsculas y sin tildes ("daño" queda como "dano"). */
-    static final List<String> AUTOLESION = List.of("hacerme dano", "matarme", "suicid", "quitarme la vida",
-            "no quiero vivir", "quiero morir", "cortarme");
-    static final List<String> EMERGENCIA = List.of("no puedo respirar", "dolor de pecho", "me duele el pecho",
-            "intoxicacion", "envenenamiento", "convulsion", "desmayo");
+    static final List<String> AUTOLESION = List.of("hacerme dano", "matarme", "quiero matarme", "suicid",
+            "quitarme la vida", "no quiero vivir", "no quiero seguir viviendo", "quiero morir", "me quiero morir",
+            "acabar con mi vida", "cortarme las venas", "hacerme cortes");
+    /** "cortarme" sola no está: se activaba con "cortarme el pelo". */
+    static final List<String> EMERGENCIA = List.of("no puedo respirar", "no puedo respirar bien", "me falta el aire",
+            "dolor de pecho", "dolor en el pecho", "me duele el pecho", "intoxicacion", "envenenamiento",
+            "convulsion", "desmayo");
 
     enum Grupo {
         AUTOLESION(TEXTO_AUTOLESION), EMERGENCIA(TEXTO_EMERGENCIA);
