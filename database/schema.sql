@@ -33,16 +33,31 @@ create table if not exists usuario (
   id                bigserial primary key,
   nombre            varchar(100) not null,
   correo            varchar(150) not null unique,
-  password_hash     varchar(255) not null,               -- BCrypt
+  password_hash     varchar(255),                        -- BCrypt; null si solo entra con Google (H67)
   telefono          varchar(20),
   direccion         varchar(255),
   rol               varchar(20)  not null
                     check (rol in ('COMPRADOR', 'DUENO_BOTICA')),
   correo_verificado boolean      not null default false,
-  activo            boolean      not null default true,
+  activo            boolean      not null default true,  -- false = baja (eliminada o dada de baja)
   notificaciones_precio boolean  not null default true,      -- H66
   creado_en         timestamptz  not null default now(),
-  actualizado_en    timestamptz  not null default now()
+  actualizado_en    timestamptz  not null default now(),
+  google_uid        varchar(128),                          -- H67
+  suspendido_hasta  timestamptz,                           -- H91-H93
+  motivo_estado     text,                                  -- H91-H93
+  constraint uq_usuario_google_uid unique (google_uid),
+  -- H67: toda cuenta necesita al menos una forma de entrar
+  constraint chk_usuario_credencial
+    check (password_hash is not null or google_uid is not null),
+  -- H91-H93: activo manda, no hay columna estado.
+  --   ACTIVO     = activo and (suspendido_hasta is null or suspendido_hasta <= now())
+  --   SUSPENDIDO = activo and suspendido_hasta > now()
+  --   BAJA       = not activo
+  constraint chk_usuario_baja_sin_suspension
+    check (activo or suspendido_hasta is null),
+  constraint chk_usuario_motivo_suspension
+    check (suspendido_hasta is null or motivo_estado is not null)
 );
 
 create trigger trg_usuario_actualizado
@@ -301,6 +316,98 @@ create index if not exists idx_botica_revision_fecha  on botica_revision(fecha);
 create index if not exists idx_botica_revision_botica on botica_revision(botica_id, fecha);
 
 -- ---------------------------------------------------------------------
+-- SPRINT 4. En la BD que ya existe se agregó con v5_sprint4.sql.
+-- Sin on delete cascade: usuarios y productos se dan de baja lógica y
+-- estos registros no deben desaparecer.
+-- RESERVA (H72-H84): la botica se obtiene con el producto. precio_unitario
+-- es el precio al momento de reservar. El stock lo maneja la API.
+-- ---------------------------------------------------------------------
+create table if not exists reserva (
+  id                   bigserial primary key,
+  codigo               varchar(20)   not null,
+  usuario_id           bigint        not null references usuario(id),
+  producto_id          bigint        not null references producto(id),
+  cantidad             integer       not null,
+  precio_unitario      numeric(10,2) not null,
+  estado               varchar(20)   not null default 'PENDIENTE',
+  motivo_rechazo       text,
+  vence_en             timestamptz   not null,
+  recordatorio_enviado boolean       not null default false,
+  creado_en            timestamptz   not null default now(),
+  actualizado_en       timestamptz   not null default now(),
+  constraint uq_reserva_codigo unique (codigo),
+  constraint chk_reserva_cantidad check (cantidad > 0),
+  constraint chk_reserva_precio check (precio_unitario > 0),
+  constraint chk_reserva_estado
+    check (estado in ('PENDIENTE', 'CONFIRMADA', 'LISTA', 'ENTREGADA',
+                      'RECHAZADA', 'CANCELADA', 'VENCIDA')),
+  constraint chk_reserva_motivo_rechazo
+    check (estado <> 'RECHAZADA' or motivo_rechazo is not null)
+);
+
+create index if not exists idx_reserva_usuario  on reserva(usuario_id);
+create index if not exists idx_reserva_producto on reserva(producto_id);
+create index if not exists idx_reserva_estado   on reserva(estado);
+-- Para el job de recordatorios y de reservas vencidas (H82, H83)
+create index if not exists idx_reserva_vence_en
+  on reserva(vence_en) where estado in ('PENDIENTE', 'CONFIRMADA', 'LISTA');
+
+create trigger trg_reserva_actualizado
+before update on reserva
+for each row execute function public.set_actualizado_en();
+
+-- ---------------------------------------------------------------------
+-- RESENA (H85-H89): una por comprador y botica. respuesta/respondida_en
+-- (del dueño) van juntas; oculta/motivo_ocultamiento es la moderación del
+-- admin en Django.
+-- ---------------------------------------------------------------------
+create table if not exists resena (
+  id                  bigserial primary key,
+  botica_id           bigint       not null references botica(id),
+  usuario_id          bigint       not null references usuario(id),
+  estrellas           smallint     not null,
+  comentario          varchar(500),
+  respuesta           varchar(500),
+  respondida_en       timestamptz,
+  oculta              boolean      not null default false,
+  motivo_ocultamiento text,
+  creado_en           timestamptz  not null default now(),
+  actualizado_en      timestamptz  not null default now(),
+  constraint uq_resena_usuario_botica unique (usuario_id, botica_id),
+  constraint chk_resena_estrellas check (estrellas between 1 and 5),
+  constraint chk_resena_respuesta
+    check ((respuesta is null) = (respondida_en is null)),
+  constraint chk_resena_motivo_ocultamiento
+    check (not oculta or motivo_ocultamiento is not null)
+);
+
+create index if not exists idx_resena_botica on resena(botica_id);
+
+create trigger trg_resena_actualizado
+before update on resena
+for each row execute function public.set_actualizado_en();
+
+-- ---------------------------------------------------------------------
+-- USUARIO_ACCION (H94): historial de suspensiones, reactivaciones y bajas
+-- hechas en Django. realizado_por es el username del admin. El motivo es
+-- obligatorio salvo al reactivar.
+-- ---------------------------------------------------------------------
+create table if not exists usuario_accion (
+  id            bigserial primary key,
+  usuario_id    bigint       not null references usuario(id),
+  accion        varchar(20)  not null,
+  motivo        text,
+  realizado_por varchar(150) not null,
+  fecha         timestamptz  not null default now(),
+  constraint chk_usuario_accion_accion
+    check (accion in ('SUSPENDER', 'REACTIVAR', 'DAR_BAJA')),
+  constraint chk_usuario_accion_motivo
+    check (accion = 'REACTIVAR' or motivo is not null)
+);
+
+create index if not exists idx_usuario_accion_usuario on usuario_accion(usuario_id, fecha);
+
+-- ---------------------------------------------------------------------
 -- VISTA para la búsqueda del comprador (H22, H23, H24):
 -- solo productos activos, con stock, de boticas APROBADAS.
 -- Columnas del catálogo maestro (H29-H32), al final:
@@ -310,6 +417,8 @@ create index if not exists idx_botica_revision_botica on botica_revision(botica_
 --   quien consulta.
 --   botica_latitud, botica_longitud (H27): null si la botica no registró
 --   ubicación.
+-- H91-H93: oculta también los productos cuyo dueño está suspendido o dado
+-- de baja (join a usuario; las columnas no cambian).
 -- ---------------------------------------------------------------------
 create or replace view v_producto_busqueda
 with (security_invoker = true) as
@@ -333,10 +442,13 @@ select
   b.longitud                                     as botica_longitud
 from producto p
 join botica b on b.id = p.botica_id
+join usuario u on u.id = b.usuario_id
 left join medicamento m on m.id = p.medicamento_id
 where p.activo = true
   and p.stock > 0
-  and b.estado = 'APROBADO';
+  and b.estado = 'APROBADO'
+  and u.activo
+  and (u.suspendido_hasta is null or u.suspendido_hasta <= now());
 
 -- ---------------------------------------------------------------------
 -- SEGURIDAD EN SUPABASE
@@ -450,6 +562,37 @@ begin
       public.alerta_precio_id_seq,
       public.busqueda_id_seq,
       public.botica_revision_id_seq
+    to boticompara_app;
+  end if;
+end
+$$;
+
+-- ---------------------------------------------------------------------
+-- SEGURIDAD DEL SPRINT 4 (H72-H94): mismo esquema que el Sprint 3.
+-- RLS activado, sin acceso para la API automática de Supabase y política
+-- app_acceso_total solo para boticompara_app (si el rol ya existe).
+-- En la BD que ya existe se agregó con v5_sprint4.sql.
+-- ---------------------------------------------------------------------
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['reserva', 'resena', 'usuario_accion'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('revoke all on public.%I from anon, authenticated', t);
+  end loop;
+
+  if exists (select 1 from pg_roles where rolname = 'boticompara_app') then
+    foreach t in array array['reserva', 'resena', 'usuario_accion'] loop
+      execute format('grant select, insert, update, delete on public.%I to boticompara_app', t);
+      execute format('drop policy if exists app_acceso_total on public.%I', t);
+      execute format('create policy app_acceso_total on public.%I '
+                     'for all to boticompara_app using (true) with check (true)', t);
+    end loop;
+    grant usage, select on sequence
+      public.reserva_id_seq,
+      public.resena_id_seq,
+      public.usuario_accion_id_seq
     to boticompara_app;
   end if;
 end
