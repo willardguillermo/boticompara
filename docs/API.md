@@ -734,7 +734,11 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 - **Por llamada a Gemini:** plazo de 25 segundos. **Por pregunta completa:** plazo total de 50 segundos, contado desde que el servidor empieza a atender el pedido. Cada llamada espera lo que sea menor: 25 s o lo que falte para los 50 s.
 - **Reintento:** si Google responde 500 o 503, la llamada se reintenta **una sola vez**, y solo si todavía queda tiempo dentro de los 50 s. Otros errores de Google (por ejemplo, cuota agotada) no se reintentan.
 - **Respaldo:** si las herramientas ya devolvieron productos en esta pregunta, pero la llamada final a Gemini falla (también después del reintento) o no llega a tiempo, el servidor responde `200` con un texto armado por él a partir de esas tarjetas y `"respaldo": true`. Ejemplo: "Encontré 3 opciones. La más barata es Paracetamol Genérico a 2 soles con 20 en FarmaVida, Lurigancho-Chosica." Sigue las reglas de `respuesta` (texto plano, precios como se dicen, hasta 600 caracteres).
-- El texto de respaldo **solo describe productos** (cuántos hay, el más barato, la botica y el distrito): nunca da consejos de salud.
+- El texto de respaldo **solo describe productos**: nunca da consejos de salud. Depende de la herramienta que devolvió las tarjetas:
+  - `buscar_precios` y `buscar_alternativas`: cuántos hay, el más barato, su botica y su distrito ("Encontré 3 opciones. La más barata es…"; con uno solo, "Encontré 1 opción: …").
+  - `ver_stock_bajo`: "Tienes N productos con stock bajo. Los ves en las tarjetas." (con uno solo, "Tienes 1 producto con stock bajo. Lo ves en la tarjeta.").
+  - `buscar_en_mi_catalogo`: "Encontré N productos en tu catálogo. Los ves en las tarjetas." (con uno solo, "Encontré 1 producto en tu catálogo. Lo ves en la tarjeta."). También si las tarjetas salieron de `ver_stock_bajo` y de `buscar_en_mi_catalogo` a la vez.
+  - Si se mezclan tarjetas del catálogo propio con las de una búsqueda entre boticas, se usa el texto de la más barata.
 - Si no hubo productos de herramientas, no hay respaldo: se responde 503 si Gemini falla y 504 si se acaba el tiempo, como antes.
 - **Clientes:** la web (`fetch`) y la app (`readTimeout` de Retrofit) deben esperar **al menos 60 segundos** la respuesta de `POST /chat`, más que los 50 s del servidor, y mostrar un indicador ("Escribiendo…") mientras tanto. Con el plazo por defecto del cliente, el pedido podría cortarse antes de que el servidor responda.
 
