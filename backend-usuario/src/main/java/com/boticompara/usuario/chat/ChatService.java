@@ -20,9 +20,12 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * H68: POST /chat. Valida el pedido, cuenta la pregunta en el límite del usuario y conversa con Gemini:
@@ -86,6 +89,8 @@ public class ChatService {
         Instant inicio = reloj.instant();
         Instant limite = inicio.plus(PLAZO_TOTAL);
         Map<Long, ChatProducto> productos = new LinkedHashMap<>();
+        // De qué herramienta salió cada tarjeta: el texto de respaldo depende de eso
+        Map<Long, String> origen = new HashMap<>();
         List<String> usadas = new ArrayList<>();
         try {
             for (int ronda = 0; ; ronda++) {
@@ -103,7 +108,7 @@ public class ChatService {
                 }
                 respuesta.llamadas().forEach(llamada -> usadas.add(llamada.nombre()));
                 turnos.add(new Turno.Modelo(respuesta.contenido()));
-                turnos.add(new Turno.Resultados(ejecutar(contexto, respuesta.llamadas(), productos)));
+                turnos.add(new Turno.Resultados(ejecutar(contexto, respuesta.llamadas(), productos, origen)));
             }
         } catch (GeminiException e) {
             if (!productos.isEmpty()) {
@@ -112,7 +117,9 @@ public class ChatService {
                 log.warn("Chat {}: respuesta de respaldo con {} tarjeta(s), herramientas {}, {} ms ({})", yo.rol(),
                         tarjetas.size(), usadas, Duration.between(inicio, reloj.instant()).toMillis(),
                         e.esTiempoAgotado() ? "sin tiempo" : "Gemini no disponible");
-                return new ChatResponse(TextoRespaldo.de(tarjetas), tarjetas, true);
+                Set<String> herramientasDeLasTarjetas = tarjetas.stream()
+                        .map(t -> origen.get(t.productoId())).collect(Collectors.toSet());
+                return new ChatResponse(TextoRespaldo.de(tarjetas, herramientasDeLasTarjetas), tarjetas, true);
             }
             // La causa (clave, cuota, modelo) queda solo en el log del cliente de Gemini
             if (e.esTiempoAgotado()) {
@@ -146,7 +153,7 @@ public class ChatService {
 
     /** Ejecuta las herramientas de una ronda (máximo 3) y junta sus tarjetas, sin repetidos. */
     private List<Turno.Resultado> ejecutar(ContextoChat contexto, List<LlamadaHerramienta> llamadas,
-                                           Map<Long, ChatProducto> productos) {
+                                           Map<Long, ChatProducto> productos, Map<Long, String> origen) {
         List<Turno.Resultado> resultados = new ArrayList<>();
         for (int i = 0; i < llamadas.size(); i++) {
             LlamadaHerramienta llamada = llamadas.get(i);
@@ -155,7 +162,9 @@ public class ChatService {
                     : ResultadoHerramienta.error("Demasiadas herramientas a la vez: máximo "
                             + MAX_HERRAMIENTAS_POR_RONDA + " por ronda");
             for (ChatProducto tarjeta : resultado.tarjetas()) {
-                productos.putIfAbsent(tarjeta.productoId(), tarjeta);
+                if (productos.putIfAbsent(tarjeta.productoId(), tarjeta) == null) {
+                    origen.put(tarjeta.productoId(), llamada.nombre());
+                }
             }
             resultados.add(new Turno.Resultado(llamada.id(), llamada.nombre(), resultado.paraModelo()));
         }

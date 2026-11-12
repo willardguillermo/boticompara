@@ -132,6 +132,7 @@ class ChatServiceTest {
 
     /** Herramienta del dueño que registra si alguien la ejecutó. */
     private final List<ContextoChat> ejecucionesDelDueno = new ArrayList<>();
+    private List<ChatProducto> stockBajoDeRosa = List.of();
     private final Herramienta soloDueno = new Herramienta() {
         @Override
         public String nombre() {
@@ -151,7 +152,7 @@ class ChatServiceTest {
         @Override
         public ResultadoHerramienta ejecutar(ContextoChat contexto, JsonNode args) {
             ejecucionesDelDueno.add(contexto);
-            return ResultadoHerramienta.de(0, List.of(), List.of());
+            return ResultadoHerramienta.de(stockBajoDeRosa.size(), List.of(), stockBajoDeRosa);
         }
     };
 
@@ -699,6 +700,23 @@ class ChatServiceTest {
         assertTrue(r.respaldo());
         assertEquals(RESPALDO_3, r.respuesta());
         assertEquals(List.of(1L, 2L, 3L), r.productos().stream().map(ChatProducto::productoId).toList());
+    }
+
+    @Test
+    void elRespaldoDelStockBajoDelDuenoNoHablaDeLaMasBarata() {
+        stockBajoDeRosa = List.of(
+                new ChatProducto(4L, "Amoxicilina", "Amoxicilina", "Cápsula 500 mg x 10", new BigDecimal("6.00"), 3, 5,
+                        1L, "Botica Salud Total", "Lurigancho-Chosica", null),
+                new ChatProducto(6L, "Loratadina", "Loratadina", "Tableta 10 mg x 10", new BigDecimal("3.50"), 5, 5,
+                        1L, "Botica Salud Total", "Lurigancho-Chosica", null));
+        gemini.guion.add(pide(new LlamadaHerramienta("c1", "ver_stock_bajo", JSON.createObjectNode())));
+        gemini.guion.add(GeminiException.tiempoAgotado("timeout"));
+
+        ChatResponse r = service.responder(ROSA, pregunta("¿qué tengo con stock bajo?"));
+
+        assertTrue(r.respaldo());
+        assertEquals("Tienes 2 productos con stock bajo. Los ves en las tarjetas.", r.respuesta());
+        assertEquals(List.of(4L, 6L), r.productos().stream().map(ChatProducto::productoId).toList());
     }
 
     @Test

@@ -4,21 +4,40 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 /**
  * H68: texto de la respuesta de respaldo. Lo arma el servidor cuando las herramientas ya encontraron productos
- * pero Gemini no llegó a redactar la respuesta. Solo describe las tarjetas (cuántas hay, la más barata, su botica
- * y su distrito): nunca da consejos de salud. Sigue las reglas de respuesta: texto plano y precios como se dicen.
+ * pero Gemini no llegó a redactar la respuesta. Solo describe las tarjetas: nunca da consejos de salud. Sigue
+ * las reglas de respuesta: texto plano y precios como se dicen. El texto depende de dónde salieron las tarjetas:
+ * del stock bajo del dueño, de su catálogo, o de una búsqueda entre boticas (ahí se nombra la más barata).
  */
 final class TextoRespaldo {
 
+    static final String VER_STOCK_BAJO = "ver_stock_bajo";
+    static final String BUSCAR_EN_MI_CATALOGO = "buscar_en_mi_catalogo";
+    private static final Set<String> DEL_CATALOGO_PROPIO = Set.of(VER_STOCK_BAJO, BUSCAR_EN_MI_CATALOGO);
     private static final int MAX_NOMBRE = 80;
 
     private TextoRespaldo() {
     }
 
-    /** productos no puede estar vacío: sin productos no hay respaldo. */
-    static String de(List<ChatProducto> productos) {
+    /**
+     * productos no puede estar vacío: sin productos no hay respaldo. herramientas son las que devolvieron esas
+     * tarjetas. Si todas salieron del catálogo del dueño no se compara precios: se dice cuántas hay.
+     */
+    static String de(List<ChatProducto> productos, Set<String> herramientas) {
+        int n = productos.size();
+        if (herramientas.equals(Set.of(VER_STOCK_BAJO))) {
+            return n == 1
+                    ? "Tienes 1 producto con stock bajo. Lo ves en la tarjeta."
+                    : "Tienes " + n + " productos con stock bajo. Los ves en las tarjetas.";
+        }
+        if (!herramientas.isEmpty() && DEL_CATALOGO_PROPIO.containsAll(herramientas)) {
+            return n == 1
+                    ? "Encontré 1 producto en tu catálogo. Lo ves en la tarjeta."
+                    : "Encontré " + n + " productos en tu catálogo. Los ves en las tarjetas.";
+        }
         ChatProducto barato = productos.stream()
                 .min(Comparator.comparing(ChatProducto::precio))
                 .orElseThrow();
