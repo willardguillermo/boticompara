@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.text import Truncator
 
-from . import historial
+from . import historial, usuarios
 from .forms import BoticaRevisionForm
 from .models import Botica, BoticaRevision, Producto, Usuario
 from .notificaciones import notificar_revision
@@ -29,13 +29,46 @@ class SoloLecturaAdmin(admin.ModelAdmin):
         return False
 
 
+class EstadoUsuarioFilter(admin.SimpleListFilter):
+    """H90: no hay columna estado; se calcula con activo y suspendido_hasta (boticas/usuarios.py)."""
+    title = 'estado'
+    parameter_name = 'estado'
+
+    def lookups(self, request, model_admin):
+        return usuarios.ESTADOS
+
+    def queryset(self, request, queryset):
+        if self.value() in dict(usuarios.ESTADOS):
+            return queryset.filter(usuarios.q_estado(self.value()))
+        return queryset
+
+
 @admin.register(Usuario)
 class UsuarioAdmin(SoloLecturaAdmin):
-    list_display = ('nombre', 'correo', 'rol', 'telefono', 'correo_verificado', 'activo', 'creado_en')
-    list_filter = ('rol', 'activo', 'correo_verificado')
+    """H90: los datos personales los maneja el propio usuario; aquí nadie los edita ni borra cuentas."""
+    list_display = ('nombre', 'correo', 'rol', 'estado', 'fecha_registro')
+    list_filter = ('rol', EstadoUsuarioFilter)
     search_fields = ('nombre', 'correo')
-    # Nunca mostrar el hash de la contraseña
-    exclude = ('password_hash',)
+    search_help_text = 'Busca por nombre o correo.'
+    # Nunca se muestran el hash de la contraseña ni el identificador de Google
+    fields = ('nombre', 'correo', 'rol', 'telefono', 'direccion', 'correo_verificado',
+              'estado', 'motivo', 'fecha_registro', 'actualizado_en')
+    readonly_fields = fields
+
+    @admin.display(description='estado')
+    def estado(self, obj):
+        return usuarios.texto_estado(obj)
+
+    @admin.display(description='motivo del estado')
+    def motivo(self, obj):
+        # Una suspensión vencida deja su motivo en la BD, pero la cuenta ya está activa
+        if usuarios.estado_de(obj) == usuarios.ACTIVO:
+            return '—'
+        return obj.motivo_estado or '—'
+
+    @admin.display(description='fecha de registro', ordering='creado_en')
+    def fecha_registro(self, obj):
+        return f'{timezone.localtime(obj.creado_en):%d/%m/%Y %H:%M}'
 
 
 @admin.register(Producto)
