@@ -18,6 +18,8 @@ API Spring Boot
       endpoint 🔒. Si no → 401 (para suspendidos depende de H91, ver abajo).
    2. Valida el cuerpo (400), el límite por usuario (429) y el tope global del
       día (503, sin llamar a Gemini).
+   2b. Filtro de crisis: si el mensaje tiene una frase clara de riesgo, responde
+      al instante con un texto fijo y ayuda: true, sin llamar a Gemini.
    3. Arma el pedido a Gemini: instrucciones del sistema + historial + mensaje
       + las herramientas del rol. Guarda aparte id, botica y ubicación.
    ▼
@@ -34,7 +36,7 @@ Gemini ──► (puede pedir otra ronda de herramientas: máximo 2 rondas por p
    ▼
 API Spring Boot
    7. Limpia el texto (sin markdown, máximo 600 caracteres) y responde
-      { respuesta, productos, respaldo: false }. Si la llamada final a Gemini
+      { respuesta, productos, respaldo: false, ayuda: false }. Si la llamada final a Gemini
       falla o no llega a tiempo pero ya hay productos, arma él mismo el texto
       a partir de las tarjetas y responde con respaldo: true.
    ▼
@@ -91,6 +93,29 @@ BotiCompara compara precios; no es un servicio de salud. El asistente:
 - Fuera de BotiCompara (tareas, noticias, programación) responde que solo ayuda con la plataforma.
 
 Estos casos responden `200` con el texto de derivación y `productos: []`.
+
+## Crisis: dos capas que no dependen de Gemini
+
+En la prueba manual del 12/11/2026, la pregunta "Últimamente pienso en hacerme daño" terminó la
+primera vez en un 504 genérico: Gemini no respondió a tiempo y la persona se quedó sin ningún número
+de ayuda. Las instrucciones del sistema no bastan, porque solo sirven si el modelo llega a responder.
+
+| Capa | Qué hace | Por qué |
+|---|---|---|
+| Filtro previo, en el servidor | Antes de llamar a Gemini (después de validar y de los límites), busca en el mensaje frases claras de autolesión o de emergencia física. Si hay una, responde 200 al instante con un texto fijo, sin tarjetas, con `"ayuda": true` | No gasta cuota ni depende de la latencia: responde en milisegundos justo en el caso en que más importa. El texto es fijo, así que nunca da un consejo de salud equivocado |
+| Números de ayuda en los errores | Los mensajes del 429, del 503 (también el tope global) y del 504 terminan con "Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5." | Cubre lo que el filtro no detecta: si la frase no está en la lista y además Gemini falla o el usuario pasó su límite, igual ve los números |
+
+- **Lista corta y literal.** El mensaje se compara en minúsculas y sin tildes contra dos grupos de
+  frases (ver `docs/API.md`). Un falso positivo solo muestra números de ayuda, pero la lista evita
+  frases comunes: "me duele la cabeza" no la activa. No intenta entender el lenguaje: lo que no
+  esté en la lista lo sigue respondiendo Gemini, con las mismas reglas de salud de sus instrucciones.
+- **Autolesión gana a emergencia física** si aparecen las dos, porque su texto incluye los dos números.
+- **Va después de los límites**, igual que cualquier pregunta. Si el usuario ya pasó su límite recibe
+  el 429, que ahora también lleva los números.
+- **`ayuda: true`** permite a la web (H69) y a la app (H70) destacar la respuesta, por ejemplo con
+  un botón para llamar. El texto no depende del rol.
+- **Privacidad:** el mensaje que activa el filtro no sale hacia Gemini y el log solo registra el
+  grupo que se activó, sin el texto ni el id del usuario.
 
 ## Protección contra inyección de instrucciones
 
@@ -195,6 +220,8 @@ redirigen a `aistudio.google.com/docs`).
   personales, tarjetas con `productos` y manejo de 429, 503 y 504. Esperar al menos 60 s la
   respuesta de `POST /chat` (`fetch` en la web, `readTimeout` de Retrofit en la app) y mostrar un
   indicador mientras tanto. Una respuesta con `"respaldo": true` se muestra igual que una normal.
+  Una con `"ayuda": true` conviene destacarla (por ejemplo, con los números como botones para llamar).
+  Los mensajes de error 429, 503 y 504 ya traen los números de ayuda: se muestran completos.
 - **Todos:** crear su clave en Google AI Studio y revisar la cuota de su proyecto en
   <https://aistudio.google.com/rate-limit>. Si es distinta de la tabla de arriba, ajustar
   `chat.limite.por-minuto`, `chat.limite.por-dia` y `chat.limite.global-por-dia` en su `.env`.

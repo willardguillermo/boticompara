@@ -645,7 +645,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
       "distanciaKm": 2.10
     }
   ],
-  "respaldo": false
+  "respaldo": false,
+  "ayuda": false
 }
 ```
 
@@ -668,7 +669,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
       "distanciaKm": null
     }
   ],
-  "respaldo": false
+  "respaldo": false,
+  "ayuda": false
 }
 ```
 
@@ -677,7 +679,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 {
   "respuesta": "No puedo recomendarte medicamentos ni dosis. Consulta con el químico farmacéutico de tu botica o con tu médico. Si es una emergencia, llama al SAMU al 106. Si ya sabes qué medicamento necesitas, te ayudo a encontrar dónde está más barato.",
   "productos": [],
-  "respaldo": false
+  "respaldo": false,
+  "ayuda": false
 }
 ```
 
@@ -686,13 +689,26 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 {
   "respuesta": "Encontré 3 opciones. La más barata es Paracetamol Genérico a 2 soles con 20 en FarmaVida, Lurigancho-Chosica.",
   "productos": [ /* las 3 tarjetas, con las mismas reglas de siempre */ ],
-  "respaldo": true
+  "respaldo": true,
+  "ayuda": false
+}
+```
+
+```json
+// 200 OK — filtro de crisis ("Últimamente pienso en hacerme daño"): responde el servidor al instante, sin llamar a Gemini
+{
+  "respuesta": "Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento.",
+  "productos": [],
+  "respaldo": false,
+  "ayuda": true
 }
 ```
 
 **`respuesta`:** texto plano en español, sin markdown, sin listas ni enlaces, de hasta 600 caracteres. Está pensada para leerse en voz alta (H71): los precios van escritos como se dicen.
 
 **`respaldo`:** `false` en una respuesta normal. `true` cuando el texto no lo escribió Gemini sino el servidor, porque la llamada final falló o no llegó a tiempo (ver "Tiempos y respuesta de respaldo").
+
+**`ayuda`:** `true` solo cuando respondió el filtro de crisis (ver "Crisis y números de ayuda"); `false` en todas las demás respuestas. Sirve para que la web y la app destaquen esa respuesta.
 
 **`productos`:** siempre es una lista (vacía si la respuesta no trata de productos). Sirve para que la web y la app muestren tarjetas con enlace al detalle.
 - La arma **el servidor** con lo que devolvieron las herramientas en esta pregunta, no el modelo: los ids, precios y stock son los reales aunque el texto se equivoque. Si el texto y una tarjeta no coinciden, vale la tarjeta.
@@ -721,6 +737,20 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 - Solo responde sobre BotiCompara: precios, disponibilidad, boticas, alternativas y, para el dueño, su catálogo.
 - No diagnostica, no da dosis y no recomienda medicamentos por síntomas: deriva al químico farmacéutico o al médico. Ante una emergencia indica llamar al SAMU (106).
 - Estos casos responden `200` con `productos: []`; no son errores.
+
+**Crisis y números de ayuda.** El asistente no es un servicio de salud, pero alguien puede escribirle en un mal momento. Hay dos capas que **no dependen de Gemini**:
+
+1. **Filtro previo.** Después de validar el pedido y de pasar los límites (la pregunta cuenta en ellos), y antes de llamar a Gemini, el servidor busca en `mensaje` frases claras de riesgo. Si encuentra una, responde `200` al instante con un texto fijo, `productos: []`, `"respaldo": false` y `"ayuda": true`. No llama a Gemini: no gasta cuota ni depende de su latencia. El texto se compara en minúsculas y sin tildes. Solo se revisa `mensaje`, no el `historial`.
+
+   | Grupo | Frases que lo activan | Texto de la respuesta |
+   |---|---|---|
+   | Autolesión | "hacerme daño", "matarme", "suicid…" (suicidio, suicidarme), "quitarme la vida", "no quiero vivir", "quiero morir", "cortarme" | "Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento." |
+   | Emergencia física | "no puedo respirar", "dolor de pecho", "me duele el pecho", "intoxicación", "envenenamiento", "convulsión", "desmayo" | "Llama al SAMU al 106 de inmediato. BotiCompara solo compara precios de medicamentos y no puede atender una emergencia: ahora lo más importante es tu salud." |
+
+   - Si el mensaje tiene frases de los dos grupos, responde el de autolesión.
+   - La lista es corta a propósito. Un falso positivo solo muestra números de ayuda, pero no debe activarse con frases comunes: "me duele la cabeza" o "dolor de cabeza" siguen su camino normal.
+   - Si el filtro no detecta nada, todo sigue igual: responde Gemini con sus instrucciones, que también indican el SAMU 106 y la Línea 113.
+2. **Red de seguridad en los errores.** Todos los mensajes de error propios del chat (429, 503 y 504) terminan con: "Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5." Así, aunque el asistente no pueda responder, nadie se queda sin esos números. Los 400 y el 401 no lo llevan.
 
 **Límite de uso:**
 - **Por usuario:** por defecto 3 preguntas por minuto y 15 por día. Al pasarlo → 429.
@@ -751,11 +781,12 @@ Errores:
 | 400 | `historial` con un `rol` distinto de `usuario` o `asistente`, o un `texto` vacío o de más de 1000 caracteres | "El historial no es válido" |
 | 400 | Solo una de `lat` y `lng`, o coordenadas fuera de rango | Los mismos mensajes que `GET /productos/buscar` |
 | 401 | El token no es válido o la cuenta no está habilitada (dada de baja o suspendida) | El mismo que el resto de la API |
-| 429 | Se pasó el límite por minuto o por día | "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar" o "Llegaste al límite de preguntas de hoy. Vuelve mañana" |
-| 503 | Se llegó al tope global del día (`chat.limite.global-por-dia`); no se llama a Gemini | "El asistente alcanzó su límite de hoy. Intenta mañana." |
-| 503 | Gemini no responde, devuelve un error (también después del reintento), se agotó la cuota gratis del proyecto, o falta `GEMINI_API_KEY`, y no hay productos de herramientas para el respaldo | "El asistente no está disponible en este momento. Intenta más tarde" |
-| 504 | Se pasan los 50 segundos de la pregunta y no hay productos de herramientas para el respaldo | "El asistente tardó demasiado en responder. Intenta de nuevo" |
+| 429 | Se pasó el límite por minuto o por día | "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar. " o "Llegaste al límite de preguntas de hoy. Vuelve mañana. ", seguido de los números de ayuda |
+| 503 | Se llegó al tope global del día (`chat.limite.global-por-dia`); no se llama a Gemini | "El asistente alcanzó su límite de hoy. Intenta mañana. " seguido de los números de ayuda |
+| 503 | Gemini no responde, devuelve un error (también después del reintento), se agotó la cuota gratis del proyecto, o falta `GEMINI_API_KEY`, y no hay productos de herramientas para el respaldo | "El asistente no está disponible en este momento. Intenta más tarde. " seguido de los números de ayuda |
+| 504 | Se pasan los 50 segundos de la pregunta y no hay productos de herramientas para el respaldo | "El asistente tardó demasiado en responder. Intenta de nuevo. " seguido de los números de ayuda |
 
+- **Números de ayuda:** los mensajes del 429, del 503 y del 504 terminan siempre con "Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5." (ver "Crisis y números de ayuda"). Ejemplo completo: "El asistente tardó demasiado en responder. Intenta de nuevo. Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5."
 - El 429 trae el header `Retry-After` con los segundos que faltan para poder preguntar otra vez.
 - **Cuentas suspendidas:** el 401 para una cuenta suspendida depende de que `JwtAuthFilter` también rechace `suspendido_hasta > now()`. Ese cambio es parte de H91 (Alexander, anotado como pendiente en el PR #79) y es requisito de este contrato. Mientras no esté, un JWT vigente de una cuenta suspendida sigue entrando, como en el resto de la API.
 - Salvo el tope global, el 503 y el 504 no dicen la causa interna (clave, cuota, modelo): eso va solo al log del servidor.
