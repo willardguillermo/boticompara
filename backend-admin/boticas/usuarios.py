@@ -97,3 +97,20 @@ def suspender(usuario_id, hasta, motivo, realizado_por):
             _rechazar(usuario_id, 'suspender', REQUISITO_SUSPENDER)
         UsuarioAccion.objects.create(usuario_id=usuario_id, accion=UsuarioAccion.Accion.SUSPENDER,
                                      motivo=motivo, realizado_por=realizado_por)
+
+
+# H92: reactivación
+PUEDE_REACTIVAR = (SUSPENDIDO,)
+REQUISITO_REACTIVAR = 'Solo se reactiva una cuenta suspendida.'
+
+
+def reactivar(usuario_id, motivo, realizado_por):
+    """H92: solo una cuenta Suspendida. El motivo es opcional."""
+    motivo = motivo or None
+    with transaction.atomic():
+        filas = (Usuario.objects.filter(q_estado(SUSPENDIDO), pk=usuario_id)
+                 .update(suspendido_hasta=None, motivo_estado=None))
+        if not filas:
+            _rechazar(usuario_id, 'reactivar', REQUISITO_REACTIVAR)
+        UsuarioAccion.objects.create(usuario_id=usuario_id, accion=UsuarioAccion.Accion.REACTIVAR,
+                                     motivo=motivo, realizado_por=realizado_por)

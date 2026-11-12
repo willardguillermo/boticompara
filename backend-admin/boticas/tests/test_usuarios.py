@@ -273,6 +273,60 @@ class SuspenderTests(ConAdmin):
         self.assertIsNone(usuario.suspendido_hasta)
 
 
+class ReactivarTests(ConAdmin):
+    """H92"""
+
+    def reactivar(self, usuario, motivo=''):
+        return self.client.post(url_accion(usuario, 'reactivar'), {'motivo': motivo}, follow=True)
+
+    def test_suspendido_se_reactiva_sin_motivo(self):
+        usuario = crear_usuario(usuarios.SUSPENDIDO)
+
+        respuesta = self.reactivar(usuario)
+
+        usuario.refresh_from_db()
+        self.assertEqual(usuarios.estado_de(usuario), usuarios.ACTIVO)
+        self.assertIsNone(usuario.suspendido_hasta)
+        self.assertIsNone(usuario.motivo_estado)
+        self.assertRedirects(respuesta, detalle(usuario))
+        self.assertIn(f'Se reactivó la cuenta de {usuario.nombre}.', self.mensajes(respuesta))
+        accion = UsuarioAccion.objects.get(usuario=usuario)
+        self.assertEqual((accion.accion, accion.motivo, accion.realizado_por),
+                         (UsuarioAccion.Accion.REACTIVAR, None, 'guillermo'))
+
+    def test_suspendido_se_reactiva_con_motivo(self):
+        usuario = crear_usuario(usuarios.SUSPENDIDO)
+
+        self.reactivar(usuario, motivo='  Apelación aceptada  ')
+
+        self.assertEqual(UsuarioAccion.objects.get(usuario=usuario).motivo, 'Apelación aceptada')
+
+    def test_motivo_opcional_pero_de_10_a_300_si_se_escribe(self):
+        usuario = crear_usuario(usuarios.SUSPENDIDO)
+        for motivo, error in (('corto', 'al menos 10 caracteres'), ('x' * 301, 'como máximo 300')):
+            with self.subTest(motivo=motivo[:12]):
+                self.assertContains(self.client.post(url_accion(usuario, 'reactivar'), {'motivo': motivo}), error)
+        usuario.refresh_from_db()
+        self.assertEqual(usuarios.estado_de(usuario), usuarios.SUSPENDIDO)
+
+    def test_activo_suspension_vencida_o_baja_se_rechaza_tambien_por_url(self):
+        vencida = timezone.now() - timedelta(hours=1)
+        for nombre, usuario in (('activo', crear_usuario()),
+                                ('vencida', crear_usuario(suspendido_hasta=vencida, motivo_estado='Ya cumplida')),
+                                ('baja', crear_usuario(usuarios.BAJA))):
+            with self.subTest(nombre):
+                antes = (usuario.activo, usuario.suspendido_hasta, usuario.motivo_estado)
+
+                for respuesta in (self.client.get(url_accion(usuario, 'reactivar'), follow=True),
+                                  self.reactivar(usuario, motivo='Intento por la URL')):
+                    self.assertRedirects(respuesta, detalle(usuario))
+                    self.assertTrue(any(m.startswith(f'No se puede reactivar la cuenta de {usuario.nombre}')
+                                        for m in self.mensajes(respuesta)))
+                usuario.refresh_from_db()
+                self.assertEqual((usuario.activo, usuario.suspendido_hasta, usuario.motivo_estado), antes)
+                self.assertFalse(UsuarioAccion.objects.filter(usuario=usuario).exists())
+
+
 class BotonesDelDetalleTests(ConAdmin):
     """H91-H93: cada estado muestra solo las acciones que le corresponden."""
 
@@ -282,10 +336,10 @@ class BotonesDelDetalleTests(ConAdmin):
                 if f'{LISTA}{usuario.pk}/{accion}/' in contenido}
 
     def test_activo_puede_suspenderse(self):
-        self.assertIn('suspender', self.botones(crear_usuario()))
+        self.assertEqual(self.botones(crear_usuario()), {'suspender'})
 
-    def test_suspendido_no_puede_suspenderse(self):
-        self.assertNotIn('suspender', self.botones(crear_usuario(usuarios.SUSPENDIDO)))
+    def test_suspendido_puede_reactivarse(self):
+        self.assertEqual(self.botones(crear_usuario(usuarios.SUSPENDIDO)), {'reactivar'})
 
     def test_baja_no_tiene_botones(self):
         self.assertEqual(self.botones(crear_usuario(usuarios.BAJA)), set())

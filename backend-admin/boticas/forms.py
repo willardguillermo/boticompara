@@ -77,3 +77,9 @@ class SuspenderForm(forms.Form):
                 f'La suspensión puede durar como máximo {usuarios.MAX_DIAS_SUSPENSION} días: '
                 f'elige hasta el {self.maximo:%d/%m/%Y}.')
         return hasta
+
+
+class ReactivarForm(forms.Form):
+    """H92: el motivo es opcional; si se escribe, de 10 a 300 caracteres."""
+    motivo = campo_motivo(False, f'Opcional. Si lo escribes, de {usuarios.MOTIVO_MIN} a '
+                                 f'{usuarios.MOTIVO_MAX} caracteres. Queda en el historial de la cuenta.')

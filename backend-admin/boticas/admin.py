@@ -10,7 +10,7 @@ from django.utils.html import format_html
 from django.utils.text import Truncator
 
 from . import historial, usuarios
-from .forms import BoticaRevisionForm, SuspenderForm
+from .forms import BoticaRevisionForm, ReactivarForm, SuspenderForm
 from .models import Botica, BoticaRevision, Producto, Usuario
 from .notificaciones import notificar_revision
 from .storage import StorageError, url_firmada_licencia
@@ -82,6 +82,7 @@ class UsuarioAdmin(SoloLecturaAdmin):
         nombre = f'{self.opts.app_label}_{self.opts.model_name}'
         return [
             path('<path:object_id>/suspender/', vista(self.suspender_view), name=f'{nombre}_suspender'),
+            path('<path:object_id>/reactivar/', vista(self.reactivar_view), name=f'{nombre}_reactivar'),
             *super().get_urls(),
         ]
 
@@ -105,6 +106,8 @@ class UsuarioAdmin(SoloLecturaAdmin):
         acciones = []
         if estado in usuarios.PUEDE_SUSPENDER:
             acciones.append({'texto': 'Suspender', 'url': self.url_accion(usuario, 'suspender')})
+        if estado in usuarios.PUEDE_REACTIVAR:
+            acciones.append({'texto': 'Reactivar', 'url': self.url_accion(usuario, 'reactivar')})
         return acciones
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
@@ -162,6 +165,19 @@ class UsuarioAdmin(SoloLecturaAdmin):
                                           f'{hasta:%d/%m/%Y}.')
             return redirect(self.url_detalle(usuario))
         return self._pagina(request, usuario, form, f'Suspender la cuenta de {usuario.nombre}', 'Suspender cuenta')
+
+    def reactivar_view(self, request, object_id):
+        """H92: quita la suspensión antes de que venza."""
+        usuario, respuesta = self._cuenta_para(request, object_id, usuarios.PUEDE_REACTIVAR,
+                                               'reactivar', usuarios.REQUISITO_REACTIVAR)
+        if respuesta:
+            return respuesta
+        form = ReactivarForm(request.POST if request.method == 'POST' else None)
+        if form.is_valid():
+            if self._ejecutar(request, usuario, usuarios.reactivar, form.cleaned_data['motivo']):
+                messages.success(request, f'Se reactivó la cuenta de {usuario.nombre}.')
+            return redirect(self.url_detalle(usuario))
+        return self._pagina(request, usuario, form, f'Reactivar la cuenta de {usuario.nombre}', 'Reactivar cuenta')
 
 
 @admin.register(Producto)
