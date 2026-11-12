@@ -766,7 +766,9 @@ Errores:
 
 ## 9. Reservas del comprador (rol `COMPRADOR`)
 
-El comprador aparta un producto para recogerlo en la botica. La reserva **no descuenta el stock**: el stock se descuenta cuando el dueño la entrega (sección 10). Todos los endpoints piden token de `COMPRADOR`; con otro rol responden 403. El usuario sale siempre del token (`UsuarioAutenticado.id`), nunca del cuerpo.
+El comprador aparta un producto para recogerlo en la botica. La reserva **aparta unidades pero no descuenta el stock**: mientras está activa resta de la cantidad disponible, y el stock se descuenta recién cuando el dueño la entrega (sección 10).
+
+**Cantidad disponible** de un producto = `producto.stock` − la suma de `cantidad` de sus reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`). Ejemplo: stock 5 y una reserva `CONFIRMADA` de 2 → disponible 3. Al entregarse esa reserva, el stock baja a 3 y la reserva deja de estar activa: el disponible sigue en 3. Se calcula con `select coalesce(sum(cantidad), 0) from reserva where producto_id = :id and estado in ('PENDIENTE', 'CONFIRMADA', 'LISTA')` (índice `idx_reserva_producto`). Todos los endpoints piden token de `COMPRADOR`; con otro rol responden 403. El usuario sale siempre del token (`UsuarioAutenticado.id`), nunca del cuerpo.
 
 **Estados de una reserva** (`chk_reserva_estado` en `reserva`):
 
@@ -821,14 +823,15 @@ Respuesta: 201 con la reserva (formato de arriba), en estado `PENDIENTE`.
 Validaciones y reglas:
 - `productoId` obligatorio. El producto debe verse en `v_producto_busqueda` con el mismo criterio que `GET /productos/{id}` (activo, con stock, botica `APROBADO`, dueño no suspendido ni dado de baja, sin medicamento oculto ni registro vencido). Si no → 404 "El producto no está disponible".
 - `cantidad` obligatoria, entero de **1 a 10** → si no, 400.
-- `cantidad` no puede pasar del stock actual → 409 "Solo quedan {stock} unidades de este producto".
+- `cantidad` no puede pasar de la cantidad disponible (stock menos reservas activas) → 409 "Solo hay {disponible} unidades disponibles de este producto". Si el disponible es 0 → 409 "Todas las unidades de este producto ya están reservadas".
+- **Sin carreras:** dentro de la misma transacción, primero se bloquea la fila del producto (`select ... from producto where id = :id for update`), luego se calcula el disponible y se inserta la reserva. Si dos compradores reservan las últimas unidades a la vez, el segundo espera al primero y ve su reserva en la suma, así que recibe el 409.
 - Un comprador no puede tener dos reservas activas (`PENDIENTE`, `CONFIRMADA` o `LISTA`) del mismo producto → 409 "Ya tienes una reserva activa de este producto" (propuesta, ver decisiones).
 - `precio_unitario` se copia de `producto.precio` en ese momento.
 - `estado = PENDIENTE` y `vence_en = ahora + 24 h`. Confirmar la reserva **no** amplía ese plazo; solo pasar a `LISTA` lo cambia (sección 10).
 - **Código de confirmación:** `BC-` seguido de 6 caracteres tomados de `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (sin `0`, `O`, `1` ni `I`, para que no se confundan al dictarlo). Se genera con `SecureRandom`; si choca con `uq_reserva_codigo` se genera otro (hasta 3 intentos). Hay 32⁶ ≈ 1 070 millones de combinaciones. El comprador lo muestra al recoger.
 - Al crearse, se avisa por correo al dueño de la botica (ver "Correos" en la sección 10).
 
-Errores: 400 (falta `productoId` o `cantidad`, o `cantidad` fuera de 1 a 10), 401 (sin token), 403 (el rol no es `COMPRADOR`), 404 (el producto no existe o no se ve), 409 (cantidad mayor que el stock, o ya tiene una reserva activa de ese producto).
+Errores: 400 (falta `productoId` o `cantidad`, o `cantidad` fuera de 1 a 10), 401 (sin token), 403 (el rol no es `COMPRADOR`), 404 (el producto no existe o no se ve), 409 (cantidad mayor que la disponible, o ya tiene una reserva activa de ese producto).
 
 ### `GET /reservas/mias?estado=PENDIENTE` 🔒 — H76
 Historial de reservas del comprador, de la más reciente a la más antigua (por `creadoEn`), máximo 100. `estado` es opcional: sin él devuelve todas.
@@ -855,7 +858,8 @@ Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `COMPRADOR`
 Sin cuerpo. Pasa la reserva a `CANCELADA`. Respuesta: 200 con la reserva actualizada.
 - Solo desde `PENDIENTE`, `CONFIRMADA` o `LISTA`. Desde cualquier otro estado → 409 "No se puede cancelar una reserva {estado}".
 - Si `venceEn` ya pasó (aunque el proceso de H84 todavía no la haya marcado) → 409 "La reserva ya venció".
-- No se descuenta ni se devuelve stock (nunca se descontó).
+- No se descuenta ni se devuelve stock (nunca se descontó). Como la reserva deja de estar activa, sus unidades vuelven a la cantidad disponible.
+- No se envía correo (ver "Correos" en la sección 10).
 
 Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `COMPRADOR`), 404 (no existe o es de otro comprador), 409 (estado que no se puede cancelar o reserva vencida).
 
@@ -864,7 +868,7 @@ Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `COMPRADOR`
 2. **Plazo de 24 h** desde la creación para `PENDIENTE` y `CONFIRMADA`; confirmar no lo amplía.
 3. **Cantidad máxima de 10** unidades por reserva.
 4. **Una sola reserva activa por producto** y comprador (409 si intenta otra).
-5. **La reserva no aparta stock:** se valida contra el stock al crearla y se descuenta recién al entregar. Varias reservas pueden competir por las últimas unidades; el dueño decide al confirmar.
+5. **La reserva aparta unidades:** disponible = stock − reservas activas (`PENDIENTE`, `CONFIRMADA`, `LISTA`). Se valida al crear (con la fila del producto bloqueada con `for update`) y al confirmar (sección 10); el stock se descuenta recién al entregar.
 6. **Reserva con `venceEn` pasado y aún sin marcar** → se trata como vencida (409 al cancelar o cambiar de estado).
 7. **Máximo 100** en el historial, sin paginación (como `GET /alertas`).
 
@@ -887,14 +891,14 @@ Las reservas vistas desde la botica. Todos los endpoints piden token de `DUENO_B
   "precioUnitario": 2.20,
   "total": 4.40,
   "stockActual": 90,
-  "compradorNombre": "Carlos Ramírez",
+  "compradorNombre": "Carlos R.",
   "motivoRechazo": null,
   "venceEn": "2026-11-13T15:30:00.123456Z",
   "creadoEn": "2026-11-12T15:30:00.123456Z",
   "actualizadoEn": "2026-11-12T15:30:00.123456Z"
 }
 ```
-- Del comprador **solo** se muestra `compradorNombre`: nunca su correo, teléfono ni dirección. Si el comprador eliminó su cuenta, sale `"Usuario eliminado"` (el nombre anonimizado de H19).
+- Del comprador **solo** se muestra `compradorNombre`, con la misma regla que `autor` en las reseñas (sección 11): **nombre de pila más la inicial del apellido** (`"Carlos Ramírez"` → `"Carlos R."`). Nunca su correo, teléfono ni dirección. Si el comprador eliminó su cuenta, sale `"Usuario eliminado"` (el nombre anonimizado de H19).
 - `stockActual`: el stock de hoy del producto, para que el dueño sepa si puede atender antes de confirmar.
 - `precioUnitario`, `total` y `motivoRechazo`: igual que en la sección 9.
 
@@ -906,7 +910,7 @@ Pedidos de la botica, del más reciente al más antiguo (por `creadoEn`), máxim
   { "id": 15, "codigo": "BC-7K2QXM", "estado": "PENDIENTE", "productoId": 9,
     "nombreComercial": "Paracetamol Genérico", "presentacion": "Tableta 500 mg x 10",
     "cantidad": 2, "precioUnitario": 2.20, "total": 4.40, "stockActual": 90,
-    "compradorNombre": "Carlos Ramírez", "motivoRechazo": null,
+    "compradorNombre": "Carlos R.", "motivoRechazo": null,
     "venceEn": "2026-11-13T15:30:00.123456Z", "creadoEn": "2026-11-12T15:30:00.123456Z",
     "actualizadoEn": "2026-11-12T15:30:00.123456Z" }
 ]
@@ -929,16 +933,17 @@ Respuesta: 200 con el pedido actualizado.
 
 | Desde | Hacia | Qué más pasa |
 |---|---|---|
-| `PENDIENTE` | `CONFIRMADA` | Nada más; `venceEn` no cambia |
+| `PENDIENTE` | `CONFIRMADA` | Se vuelve a validar el stock (ver abajo); `venceEn` no cambia |
 | `CONFIRMADA` | `LISTA` | `vence_en = ahora + 48 h` (plazo para recoger) y `recordatorio_enviado = false` |
 | `LISTA` | `ENTREGADA` | Se descuenta `cantidad` del stock del producto, en la misma transacción |
 
 - Cualquier otro cambio (saltarse un paso, volver atrás, salir de un estado final, o enviar `RECHAZADA`, `CANCELADA`, `VENCIDA` o `PENDIENTE`) → 409 "No se puede pasar de {actual} a {nuevo}". Para rechazar se usa `PATCH /pedidos/{id}/rechazar`.
 - **Descuento de stock:** `update producto set stock = stock - :cantidad where id = :id and stock >= :cantidad`. Si no actualiza ninguna fila → 409 "Stock insuficiente: quedan {stock} unidades" y el pedido sigue en `LISTA`. Así dos entregas a la vez no dejan el stock en negativo. El producto se descuenta aunque esté dado de baja (la venta ocurrió). Si queda en 0, deja de verse en la búsqueda.
+- **Validación al confirmar:** el stock debe cubrir este pedido y las demás reservas activas del producto: `producto.stock` − (suma de `cantidad` de las **otras** reservas `PENDIENTE`, `CONFIRMADA` y `LISTA` del producto) ≥ `cantidad`. Si no → 409 "No alcanza el stock para confirmar: hay {disponible} unidades disponibles y el pedido es de {cantidad}" y el pedido sigue en `PENDIENTE`. Puede pasar si el dueño bajó el stock en su catálogo después de que se creó la reserva. Ejemplo: stock 3, otra reserva `CONFIRMADA` de 2 y este pedido de 2 → disponible 3 − 2 = 1, menor que 2 → 409.
 - Si `venceEn` ya pasó → 409 "La reserva ya venció".
-- Cada cambio avisa al comprador por correo (ver "Correos").
+- Correo al comprador **solo** al pasar a `LISTA`. Al pasar a `CONFIRMADA` o `ENTREGADA` no se envía correo: el estado se ve en la app (ver "Correos").
 
-Errores: 400 (falta `estado` o no es uno de los 7 estados), 401, 403, 404 (no tiene botica o el pedido no es suyo), 409 (cambio no permitido, stock insuficiente o reserva vencida).
+Errores: 400 (falta `estado` o no es uno de los 7 estados), 401, 403, 404 (no tiene botica o el pedido no es suyo), 409 (cambio no permitido, stock insuficiente al confirmar o al entregar, o reserva vencida).
 
 ### `PATCH /pedidos/{id}/rechazar` 🔒 — H80
 ```json
@@ -948,28 +953,34 @@ Errores: 400 (falta `estado` o no es uno de los 7 estados), 401, 403, 404 (no ti
 Respuesta: 200 con el pedido en `RECHAZADA` y `motivoRechazo` guardado (`reserva.motivo_rechazo`; `chk_reserva_motivo_rechazo` lo exige).
 - `motivo` obligatorio, de 10 a 300 caracteres sin contar espacios al inicio ni al final → si no, 400.
 - Solo desde `PENDIENTE` o `CONFIRMADA`. Desde `LISTA` o un estado final → 409 "No se puede rechazar un pedido {estado}". (Desde `LISTA` el comprador ya puede estar en camino.)
-- No toca el stock.
+- No toca el stock. Sus unidades vuelven a la cantidad disponible.
+- Envía un correo al comprador con el motivo (ver "Correos").
 
 Errores: 400 (`motivo` ausente, muy corto o muy largo), 401, 403, 404, 409 (estado que no se puede rechazar o reserva vencida).
 
 ### Reservas vencidas y recordatorio — H84
 No es un endpoint. Un proceso programado (`@Scheduled`, zona `America/Lima`, como `AlertaStockJob`) corre **cada 5 minutos** y hace dos cosas:
-1. **Vencer:** pasa a `VENCIDA` las reservas en `PENDIENTE`, `CONFIRMADA` o `LISTA` con `vence_en <= now()`. Usa el índice `idx_reserva_vence_en`. No toca el stock. Avisa al comprador por correo.
+1. **Vencer:** pasa a `VENCIDA` las reservas en `PENDIENTE`, `CONFIRMADA` o `LISTA` con `vence_en <= now()`. Usa el índice `idx_reserva_vence_en`. No toca el stock (sus unidades vuelven a la cantidad disponible). No envía correo: el estado se ve en la app.
 2. **Recordar:** a las reservas `LISTA` con `recordatorio_enviado = false` y `vence_en` entre ahora y ahora + 6 h, les envía el recordatorio y pone `recordatorio_enviado = true`. Se marca aunque el correo falle, para no reintentar cada 5 minutos (solo queda el aviso en el log).
 
 Como el proceso corre cada 5 minutos, una reserva puede verse con su estado anterior hasta 5 minutos después de `venceEn`; por eso los endpoints de cambio de estado revisan `venceEn` por su cuenta (409 "La reserva ya venció").
 
 ### Correos — H82, H83, H84
-No hay endpoint. Se usa el mismo `CorreoService` de las alertas: texto plano por SMTP (Resend), desde `MAIL_FROM`. Igual que en H61, se envían **después del commit y en segundo plano** (`@TransactionalEventListener(AFTER_COMMIT)` + `@Async`): no hacen más lenta la respuesta y no sale ningún correo si la transacción se deshace. Si el correo falla, el cambio igual queda guardado. Con `MAIL_HOST` vacío no se envía nada y solo queda el asunto en el log. Las fechas del correo van en hora de Lima (`dd/MM/yyyy HH:mm`) y los precios como `S/ 4.40`.
+No hay endpoint. Se usa el mismo `CorreoService` de las alertas: texto plano por SMTP (Resend), desde `MAIL_FROM`. Igual que en H61, se envían **después del commit y en segundo plano** (`@TransactionalEventListener(AFTER_COMMIT)` + `@Async`): no hacen más lenta la respuesta y no sale ningún correo si la transacción se deshace. Con `MAIL_HOST` vacío no se envía nada y solo queda el asunto en el log. Las fechas del correo van en hora de Lima (`dd/MM/yyyy HH:mm`) y los precios como `S/ 4.40`.
+
+**Si el correo falla**, la reserva y el cambio de estado siguen funcionando: ya están guardados y la respuesta ya salió. El error solo va al log; no se reintenta ni se devuelve error al cliente.
+
+**Como máximo 3 correos por reserva.** Solo estos tres:
 
 | Correo | Para | Cuándo | Asunto de ejemplo | Lleva |
 |---|---|---|---|---|
-| Nueva reserva | Dueño (correo del usuario de la botica) | `POST /reservas` | "Nueva reserva BC-7K2QXM: Paracetamol Genérico x 2" | Código, producto y presentación, cantidad, precio unitario, total, nombre del comprador, fecha de la reserva, vence en, y que la atienda desde "Pedidos" en la web. **Sin** correo ni teléfono del comprador |
-| Cambio de estado | Comprador | El dueño la pasa a `CONFIRMADA`, `LISTA`, `ENTREGADA` o `RECHAZADA`, o el proceso la pasa a `VENCIDA` | "Tu reserva BC-7K2QXM está lista para recoger" | Código, estado nuevo en palabras, producto y presentación, cantidad, total, nombre, dirección, distrito y teléfono de la botica. En `LISTA`: hasta cuándo puede recoger (`venceEn`). En `RECHAZADA`: el motivo. En `VENCIDA`: que puede volver a reservar si aún hay stock |
-| Recordatorio | Comprador | Faltan 6 h o menos para que venza una reserva `LISTA` (una sola vez, `recordatorio_enviado`) | "Tu reserva BC-7K2QXM vence hoy a las 15:30" | Código, producto, cantidad, total, datos de la botica y la hora de vencimiento |
+| Nueva reserva (H82) | Dueño (correo del usuario de la botica) | `POST /reservas` | "Nueva reserva BC-7K2QXM: Paracetamol Genérico x 2" | Código, producto y presentación, cantidad, precio unitario, total, nombre del comprador (`"Carlos R."`), fecha de la reserva, vence en, y que la atienda desde "Pedidos" en la web. **Sin** correo ni teléfono del comprador |
+| Lista o rechazada (H83) | Comprador | El dueño la pasa a `LISTA` o la rechaza (`RECHAZADA`) | `LISTA`: "Tu reserva BC-7K2QXM está lista para recoger". `RECHAZADA`: "Tu reserva BC-7K2QXM fue rechazada" | Código, estado nuevo en palabras, producto y presentación, cantidad, total, nombre, dirección, distrito y teléfono de la botica. En `LISTA`: hasta cuándo puede recoger (`venceEn`). En `RECHAZADA`: el motivo |
+| Recordatorio (H84) | Comprador | Faltan 6 h o menos para que venza una reserva `LISTA` (una sola vez, `recordatorio_enviado`) | "Tu reserva BC-7K2QXM vence hoy a las 15:30" | Código, producto, cantidad, total, datos de la botica y la hora de vencimiento |
 
-Asuntos por estado: `CONFIRMADA` "Tu reserva {codigo} fue confirmada"; `LISTA` "Tu reserva {codigo} está lista para recoger"; `ENTREGADA` "Tu reserva {codigo} fue entregada"; `RECHAZADA` "Tu reserva {codigo} fue rechazada"; `VENCIDA` "Tu reserva {codigo} venció".
-No se envía correo cuando el propio comprador cancela.
+**No se envían correos** cuando la reserva pasa a `CONFIRMADA`, `ENTREGADA`, `CANCELADA` ni `VENCIDA`: el comprador ve el estado en la app y el dueño en la web.
+
+Una reserva que llega a recogerse usa los 3 (nueva, lista y recordatorio); una rechazada usa 2 (nueva y rechazada). **La cuenta:** Resend permite 100 correos al día para todo el equipo; con 3 por reserva son unas 33 reservas al día (100 ÷ 3 = 33.3), **sin contar** los correos de verificación, de recuperación de contraseña y de alertas de precio, que salen del mismo límite.
 
 ### Notas para el backend (secciones 9 a 11)
 - `SecurityConfig` hoy pide `DUENO_BOTICA` para todo `/boticas/**`. Las reglas de las reseñas (sección 11) deben ir **antes** de esa línea: `GET /boticas/{id}/resenas` público y `PUT /boticas/{id}/resenas/mia` con `COMPRADOR`. `/reservas/**` va con `COMPRADOR`; `/pedidos/**` y `/resenas/**` con `DUENO_BOTICA`.
@@ -979,11 +990,13 @@ No se envía correo cuando el propio comprador cancela.
 ### Decisiones a confirmar con Alexander (sección 10)
 1. **Plazo de 48 h** para recoger, contado desde que pasa a `LISTA`.
 2. **El stock se descuenta al pasar a `ENTREGADA`** (no al crear ni al confirmar), con un `update` condicionado para no quedar en negativo; si no alcanza, 409.
-3. **Sin saltos:** no se puede ir de `PENDIENTE` o `CONFIRMADA` directo a `ENTREGADA`.
-4. **Rechazo solo desde `PENDIENTE` o `CONFIRMADA`**, no desde `LISTA`.
-5. **Proceso cada 5 minutos** para vencer y recordar; el recordatorio se marca como enviado aunque falle el correo.
-6. **Correos:** también se avisa al comprador en `ENTREGADA` y `VENCIDA`; no se avisa al dueño cuando el comprador cancela. Si el límite de 100 correos al día de Resend aprieta, lo primero que se quita es el de `ENTREGADA`.
-7. **`stockActual`** en el pedido y **máximo 100** pedidos en la lista, sin paginación.
+3. **Validación al confirmar:** al pasar a `CONFIRMADA`, stock − otras reservas activas debe alcanzar para el pedido; si no, 409 y sigue en `PENDIENTE`.
+4. **Sin saltos:** no se puede ir de `PENDIENTE` o `CONFIRMADA` directo a `ENTREGADA`.
+5. **Rechazo solo desde `PENDIENTE` o `CONFIRMADA`**, no desde `LISTA`.
+6. **Proceso cada 5 minutos** para vencer y recordar; el recordatorio se marca como enviado aunque falle el correo.
+7. **Correos: máximo 3 por reserva** (nueva al dueño, `LISTA` o `RECHAZADA` al comprador, y el recordatorio). Ninguno en `CONFIRMADA`, `ENTREGADA`, `CANCELADA` ni `VENCIDA`. Si un correo falla, la reserva o el cambio de estado siguen igual (solo log). Alcanza para unas 33 reservas al día, sin contar verificación, recuperación y alertas de precio.
+8. **`compradorNombre`** con nombre de pila más la inicial del apellido (`"Carlos R."`), igual que `autor` en las reseñas.
+9. **`stockActual`** en el pedido y **máximo 100** pedidos en la lista, sin paginación.
 
 ---
 
@@ -995,7 +1008,7 @@ Calificación de 1 a 5 estrellas con comentario opcional. Una reseña por compra
 ```json
 {
   "id": 8,
-  "autor": "Carlos",
+  "autor": "Carlos R.",
   "estrellas": 4,
   "comentario": "Me atendieron rápido y tenían todo.",
   "respuesta": "¡Gracias, Carlos! Te esperamos.",
@@ -1004,7 +1017,7 @@ Calificación de 1 a 5 estrellas con comentario opcional. Una reseña por compra
   "actualizadoEn": "2026-11-13T18:20:00.123456Z"
 }
 ```
-- `autor`: **solo el nombre de pila** (la primera palabra de `usuario.nombre`). Nunca el apellido, correo ni id del usuario. Si la cuenta se eliminó (H19), sale `"Usuario eliminado"`.
+- `autor`: **nombre de pila más la inicial del apellido**, la misma regla que `compradorNombre` en los pedidos (sección 10): la primera palabra de `usuario.nombre`, un espacio, la primera letra de la segunda palabra en mayúscula y un punto (`"Carlos Ramírez"` → `"Carlos R."`). Si `usuario.nombre` tiene una sola palabra, sale solo esa. Nunca el apellido completo, el correo ni el id del usuario. Si la cuenta se eliminó (H19), sale `"Usuario eliminado"`.
 - `comentario`, `respuesta` y `respondidaEn` son `null` si no hay.
 
 ### `PUT /boticas/{id}/resenas/mia` 🔒 — H85, H86
@@ -1052,7 +1065,7 @@ Páginas de 10 reseñas.
   "page": 0,
   "totalPages": 2,
   "resenas": [
-    { "id": 8, "autor": "Carlos", "estrellas": 4, "comentario": "Me atendieron rápido y tenían todo.",
+    { "id": 8, "autor": "Carlos R.", "estrellas": 4, "comentario": "Me atendieron rápido y tenían todo.",
       "respuesta": "¡Gracias, Carlos! Te esperamos.", "respondidaEn": "2026-11-14T10:00:00.123456Z",
       "creadoEn": "2026-11-13T18:20:00.123456Z", "actualizadoEn": "2026-11-13T18:20:00.123456Z" }
   ],
@@ -1086,8 +1099,9 @@ No es un endpoint de esta API. El administrador oculta reseñas desde el panel D
 2. **`PUT` que crea o actualiza** (201 o 200) en lugar de `POST` + `PUT` separados.
 3. **Páginas de 10 desde `page=0`**, ordenadas de la más reciente a la más antigua.
 4. **`GET` público** y con `miResena` cuando viene token de comprador (evita un endpoint más para la app).
-5. **Reseñas de cuentas eliminadas** se conservan con autor `"Usuario eliminado"`.
-6. **Editar no quita el ocultamiento** y las reseñas ocultas no se pueden responder.
+5. **`autor` con nombre de pila más la inicial del apellido** (`"Carlos R."`), la misma regla que `compradorNombre` en los pedidos.
+6. **Reseñas de cuentas eliminadas** se conservan con autor `"Usuario eliminado"`.
+7. **Editar no quita el ocultamiento** y las reseñas ocultas no se pueden responder.
 
 ---
 
