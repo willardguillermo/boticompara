@@ -34,13 +34,30 @@ Gemini ──► (puede pedir otra ronda de herramientas: máximo 2 rondas por p
    ▼
 API Spring Boot
    7. Limpia el texto (sin markdown, máximo 600 caracteres) y responde
-      { respuesta, productos }.
+      { respuesta, productos, respaldo: false }. Si la llamada final a Gemini
+      falla o no llega a tiempo pero ya hay productos, arma él mismo el texto
+      a partir de las tarjetas y responde con respaldo: true.
    ▼
 Cliente: muestra el texto (y lo lee en voz alta, H71) y las tarjetas con enlace al detalle.
 ```
 
-Todo ocurre dentro de un solo pedido HTTP, con un máximo de 20 segundos. El servidor no guarda
-nada entre un pedido y el siguiente.
+Todo ocurre dentro de un solo pedido HTTP: cada llamada a Gemini tiene un plazo de 25 segundos y
+la pregunta completa un plazo total de 50 segundos (ver "Latencia del plan gratis"). El servidor no
+guarda nada entre un pedido y el siguiente.
+
+## Latencia del plan gratis
+
+En la prueba real del 12/11/2026, `gemini-3.5-flash-lite` en el plan gratis tardó **de 5 a 19
+segundos por llamada**, y alguna vez respondió **503**. Como una pregunta usa 2 o 3 llamadas, el
+plazo anterior, uno solo para toda la pregunta, no alcanzaba: con dos llamadas lentas ya se pasaba.
+
+| Decisión | Por qué |
+|---|---|
+| 25 s por llamada | Cubre la llamada más lenta medida (19 s) con 6 s de margen, sin dejar un pedido colgado si Google no contesta |
+| 50 s por pregunta | Alcanza para dos llamadas en el plazo máximo (2 × 25 = 50) o para tres llamadas de duración media. Si la tercera no entra, actúa el respaldo |
+| Un reintento ante 500 o 503, solo si queda tiempo | El 503 medido fue ocasional: un segundo intento suele bastar. Uno solo, porque cada intento gasta cuota y tiempo; y solo dentro de los 50 s, para no pasar el plazo total |
+| Respuesta de respaldo (`"respaldo": true`) | Lo caro ya se hizo: las herramientas encontraron los productos. Si falla solo la redacción, el usuario recibe las tarjetas y un texto simple ("Encontré 3 opciones. La más barata es…") en vez de un error. El texto lo arma el servidor solo con datos de las tarjetas, así que nunca da consejos de salud. Sin productos no hay nada que describir: 503 o 504 como antes |
+| Clientes esperan al menos 60 s y muestran un indicador | Más que los 50 s del servidor, para que el cliente no corte un pedido que todavía puede responder. El indicador evita que el usuario crea que la app se colgó |
 
 ## Qué datos van al modelo y cuáles no
 
@@ -109,10 +126,10 @@ falsifica solo afecta su propia conversación y sigue limitado por su token.
 | Texto plano y corto | La app lo leerá en voz alta (H71): el markdown y las listas largas se oyen mal |
 | Máximo 2 rondas de llamadas a herramientas por pregunta | Lo que gasta cuota son las llamadas a Gemini, no las herramientas: en una ronda el modelo puede pedir varias a la vez. Con 2 rondas más la respuesta, una pregunta usa como máximo 3 llamadas |
 | 429 propio: por defecto 3 por minuto y 15 por día por usuario, configurables (`chat.limite.por-minuto`, `chat.limite.por-dia`) | Con 3 llamadas como máximo por pregunta, un usuario usa como máximo 9 de los 15 pedidos por minuto de `gemini-3.5-flash-lite`, y deja margen para otro usuario. Se ajustan sin tocar código. El conteo se lleva en memoria y se reinicia con el servidor, aceptable para el curso |
-| Tope global de 150 preguntas por día por backend (`chat.limite.global-por-dia`) → 503 sin llamar a Gemini | **Riesgo:** la cuota de Gemini es por proyecto y la comparten todos los usuarios del backend; con solo el límite por usuario, unos pocos usuarios intensivos pueden agotar la cuota del proyecto (por ejemplo, 11 usuarios × 15 preguntas × 3 llamadas ya pasan los 500 pedidos). **Mitigación:** 150 preguntas son unas 450 llamadas en el peor caso, con margen bajo los 500 por día; al llegar al tope el servidor responde antes de llamar a Gemini, así la cuota nunca se agota por uso normal y el usuario recibe un mensaje claro ("El asistente alcanzó su límite de hoy. Intenta mañana.") en vez de errores de Google |
+| Tope global de 150 preguntas por día por backend (`chat.limite.global-por-dia`) → 503 sin llamar a Gemini | **Riesgo:** la cuota de Gemini es por proyecto y la comparten todos los usuarios del backend; con solo el límite por usuario, unos pocos usuarios intensivos pueden agotar la cuota del proyecto (por ejemplo, 12 usuarios × 15 preguntas × 3 llamadas = 540 pedidos, más que los 500 del día; con 11 serían 495, justo por debajo). **Mitigación:** 150 preguntas son unas 450 llamadas en el peor caso, con margen bajo los 500 por día; al llegar al tope el servidor responde antes de llamar a Gemini, así la cuota nunca se agota por uso normal y el usuario recibe un mensaje claro ("El asistente alcanzó su límite de hoy. Intenta mañana.") en vez de errores de Google |
 | Cuenta no habilitada → 401, sin 403 | Igual que el resto de la API: `JwtAuthFilter` no autentica una cuenta inactiva. Para las **suspendidas**, el 401 depende de que `JwtAuthFilter` también rechace `suspendido_hasta > now()`: ese cambio es parte de H91 (Alexander, anotado como pendiente en el PR #79) y es requisito de este contrato. Mientras no esté, un JWT vigente de una cuenta suspendida sigue entrando, como en el resto de la API |
 | Cuota de Gemini agotada → 503, no 429 | El 429 le dice al usuario "tú te pasaste". Si se acabó la cuota del proyecto, el usuario no hizo nada mal |
-| Tiempo máximo de 20 s → 504 | Evita pedidos colgados. Distinguirlo del 503 deja que el cliente ofrezca "Reintentar" |
+| 25 s por llamada y 50 s por pregunta → 504 si no hay respaldo | Evita pedidos colgados con la latencia real del plan gratis (ver "Latencia del plan gratis"). Distinguirlo del 503 deja que el cliente ofrezca "Reintentar" |
 | Los errores 503 y 504 no dicen la causa | No exponer si falta la clave o qué modelo se usa; el detalle va al log |
 | `GEMINI_MODEL` configurable | Los modelos y sus cuotas gratis cambian seguido; cambiar de modelo no debe requerir tocar código |
 | `generateContent` en vez de la API de Interacciones | Sigue con soporte completo y la guía de function calling trae ejemplos con él. Recibe el historial completo en cada pedido, que es justo el diseño sin estado del chat |
@@ -159,6 +176,9 @@ redirigen a `aistudio.google.com/docs`).
 - **Dentro de un pedido**, los pasos intermedios del modelo (su razonamiento y la llamada a la
   herramienta) deben devolverse a Gemini tal como llegaron; el SDK oficial lo hace solo. Es otra
   razón para no mandar esos pasos al cliente ni recibirlos en el `historial`.
+- **Reintento:** ante un 500 o 503 de Google se reintenta una vez si queda tiempo. Ese intento
+  es un pedido más a la cuota; como es raro, el margen del tope global (150 × 3 = 450, 50 por
+  debajo de los 500) lo absorbe.
 - **Pruebas:** las pruebas automáticas simulan el cliente de Gemini; no gastan cuota.
 - **Disponibilidad:** Perú está en la lista de
   [regiones disponibles](https://aistudio.google.com/docs/available-regions).
@@ -172,7 +192,9 @@ redirigen a `aistudio.google.com/docs`).
 - **Alexander:** revisar el PR del módulo y, en H91 (pendiente del PR #79), que `JwtAuthFilter`
   rechace `suspendido_hasta > now()`; es requisito del 401 para suspendidos en `POST /chat`.
 - **Chat en la web (H69) y en la app (H70); voz en la app (H71):** aviso de no escribir datos
-  personales, tarjetas con `productos` y manejo de 429, 503 y 504.
+  personales, tarjetas con `productos` y manejo de 429, 503 y 504. Esperar al menos 60 s la
+  respuesta de `POST /chat` (`fetch` en la web, `readTimeout` de Retrofit en la app) y mostrar un
+  indicador mientras tanto. Una respuesta con `"respaldo": true` se muestra igual que una normal.
 - **Todos:** crear su clave en Google AI Studio y revisar la cuota de su proyecto en
   <https://aistudio.google.com/rate-limit>. Si es distinta de la tabla de arriba, ajustar
   `chat.limite.por-minuto`, `chat.limite.por-dia` y `chat.limite.global-por-dia` en su `.env`.

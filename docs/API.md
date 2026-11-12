@@ -644,7 +644,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
       "boticaDistrito": "Lurigancho-Chosica",
       "distanciaKm": 2.10
     }
-  ]
+  ],
+  "respaldo": false
 }
 ```
 
@@ -666,7 +667,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
       "boticaDistrito": "Lurigancho-Chosica",
       "distanciaKm": null
     }
-  ]
+  ],
+  "respaldo": false
 }
 ```
 
@@ -674,11 +676,23 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 // 200 OK — pregunta fuera de alcance ("Me duele la cabeza, ¿qué tomo?")
 {
   "respuesta": "No puedo recomendarte medicamentos ni dosis. Consulta con el químico farmacéutico de tu botica o con tu médico. Si es una emergencia, llama al SAMU al 106. Si ya sabes qué medicamento necesitas, te ayudo a encontrar dónde está más barato.",
-  "productos": []
+  "productos": [],
+  "respaldo": false
+}
+```
+
+```json
+// 200 OK — respuesta de respaldo (las herramientas devolvieron 3 productos, pero la llamada final a Gemini falló o no llegó a tiempo)
+{
+  "respuesta": "Encontré 3 opciones. La más barata es Paracetamol Genérico a 2 soles con 20 en FarmaVida, Lurigancho-Chosica.",
+  "productos": [ /* las 3 tarjetas, con las mismas reglas de siempre */ ],
+  "respaldo": true
 }
 ```
 
 **`respuesta`:** texto plano en español, sin markdown, sin listas ni enlaces, de hasta 600 caracteres. Está pensada para leerse en voz alta (H71): los precios van escritos como se dicen.
+
+**`respaldo`:** `false` en una respuesta normal. `true` cuando el texto no lo escribió Gemini sino el servidor, porque la llamada final falló o no llegó a tiempo (ver "Tiempos y respuesta de respaldo").
 
 **`productos`:** siempre es una lista (vacía si la respuesta no trata de productos). Sirve para que la web y la app muestren tarjetas con enlace al detalle.
 - La arma **el servidor** con lo que devolvieron las herramientas en esta pregunta, no el modelo: los ids, precios y stock son los reales aunque el texto se equivoque. Si el texto y una tarjeta no coinciden, vale la tarjeta.
@@ -712,7 +726,16 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 - **Global, por backend:** por defecto 150 preguntas por día entre todos los usuarios (unas 450 llamadas a Gemini en el peor caso, con margen bajo los 500 pedidos por día de `gemini-3.5-flash-lite`). Al llegar al tope → 503 con "El asistente alcanzó su límite de hoy. Intenta mañana.", **sin llamar a Gemini**. Existe porque la cuota de Gemini es por proyecto, no por usuario: sin este tope, unos pocos usuarios intensivos podrían agotarla para todos.
 - Primero se revisa el límite por usuario (429) y después el global (503). Los pedidos que responden 400 o 401 no cuentan en ninguno.
 - **Reinicio diario:** el límite propio (por usuario y global) se reinicia a medianoche de Lima. La cuota de Google se reinicia a medianoche del Pacífico: 08:00 UTC (3:00 a. m. en Lima) de noviembre a marzo, con el horario estándar de EE. UU., y 07:00 UTC (2:00 a. m. en Lima) de marzo a noviembre, con su horario de verano. Lima no cambia de hora (UTC−5).
+- Un reintento por 500 o 503 de Google (ver abajo) es un pedido más a Gemini. Es raro y el tope global deja margen: 150 preguntas × 3 llamadas = 450, 50 por debajo de los 500 del día.
 - Los tres valores son configurables en el backend: `chat.limite.por-minuto`, `chat.limite.por-dia` y `chat.limite.global-por-dia`. Con 3 llamadas a Gemini como máximo por pregunta, un usuario usa como máximo 9 de los 15 pedidos por minuto del plan gratis de `gemini-3.5-flash-lite`.
+
+**Tiempos y respuesta de respaldo:**
+- **Por llamada a Gemini:** plazo de 25 segundos. **Por pregunta completa:** plazo total de 50 segundos, contado desde que el servidor empieza a atender el pedido. Cada llamada espera lo que sea menor: 25 s o lo que falte para los 50 s.
+- **Reintento:** si Google responde 500 o 503, la llamada se reintenta **una sola vez**, y solo si todavía queda tiempo dentro de los 50 s. Otros errores de Google (por ejemplo, cuota agotada) no se reintentan.
+- **Respaldo:** si las herramientas ya devolvieron productos en esta pregunta, pero la llamada final a Gemini falla (también después del reintento) o no llega a tiempo, el servidor responde `200` con un texto armado por él a partir de esas tarjetas y `"respaldo": true`. Ejemplo: "Encontré 3 opciones. La más barata es Paracetamol Genérico a 2 soles con 20 en FarmaVida, Lurigancho-Chosica." Sigue las reglas de `respuesta` (texto plano, precios como se dicen, hasta 600 caracteres).
+- El texto de respaldo **solo describe productos** (cuántos hay, el más barato, la botica y el distrito): nunca da consejos de salud.
+- Si no hubo productos de herramientas, no hay respaldo: se responde 503 si Gemini falla y 504 si se acaba el tiempo, como antes.
+- **Clientes:** la web (`fetch`) y la app (`readTimeout` de Retrofit) deben esperar **al menos 60 segundos** la respuesta de `POST /chat`, más que los 50 s del servidor, y mostrar un indicador ("Escribiendo…") mientras tanto. Con el plazo por defecto del cliente, el pedido podría cortarse antes de que el servidor responda.
 
 Errores:
 
@@ -725,8 +748,8 @@ Errores:
 | 401 | El token no es válido o la cuenta no está habilitada (dada de baja o suspendida) | El mismo que el resto de la API |
 | 429 | Se pasó el límite por minuto o por día | "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar" o "Llegaste al límite de preguntas de hoy. Vuelve mañana" |
 | 503 | Se llegó al tope global del día (`chat.limite.global-por-dia`); no se llama a Gemini | "El asistente alcanzó su límite de hoy. Intenta mañana." |
-| 503 | Gemini no responde, devuelve un error, se agotó la cuota gratis del proyecto, o falta `GEMINI_API_KEY` | "El asistente no está disponible en este momento. Intenta más tarde" |
-| 504 | La respuesta completa tarda más de 20 segundos | "El asistente tardó demasiado en responder. Intenta de nuevo" |
+| 503 | Gemini no responde, devuelve un error (también después del reintento), se agotó la cuota gratis del proyecto, o falta `GEMINI_API_KEY`, y no hay productos de herramientas para el respaldo | "El asistente no está disponible en este momento. Intenta más tarde" |
+| 504 | Se pasan los 50 segundos de la pregunta y no hay productos de herramientas para el respaldo | "El asistente tardó demasiado en responder. Intenta de nuevo" |
 
 - El 429 trae el header `Retry-After` con los segundos que faltan para poder preguntar otra vez.
 - **Cuentas suspendidas:** el 401 para una cuenta suspendida depende de que `JwtAuthFilter` también rechace `suspendido_hasta > now()`. Ese cambio es parte de H91 (Alexander, anotado como pendiente en el PR #79) y es requisito de este contrato. Mientras no esté, un JWT vigente de una cuenta suspendida sigue entrando, como en el resto de la API.
