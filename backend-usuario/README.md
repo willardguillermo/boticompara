@@ -39,9 +39,13 @@ Si el puerto 8080 ya está ocupado, hay una instancia vieja corriendo: cerrarla 
 | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET_LICENCIAS` | Licencias en Storage privado (H4) | La API arranca, pero subir la licencia responde 503 |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Correos de H12, H17, H20 y H61 (Resend por SMTP, ver `../.env.example`) | La API arranca, pero no envía correos |
 | `RUC_API_URL`, `RUC_API_TOKEN` | Consulta del RUC en SUNAT con Decolecta (H2) | El RUC solo se valida localmente |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | Asistente `POST /chat` (H68). Modelo recomendado: `gemini-3.5-flash-lite` (es el valor por defecto) | La API arranca, pero `POST /chat` responde 503 |
+| `chat.limite.por-minuto`, `chat.limite.por-dia`, `chat.limite.global-por-dia` | Opcionales: límites propios del chat (H68) | 3 por minuto y 15 por día por usuario; 150 por día entre todos |
 | `ALERTA_STOCK_CRON`, `APP_BASE_URL` | Opcionales: horario de la alerta y URL pública de los enlaces de correo | Valores por defecto (8:00 hora de Lima; `http://localhost:8080/api`) |
 
-La clave secreta de Supabase y el token de Decolecta son **secretos**: solo van en el `.env`.
+La clave secreta de Supabase, el token de Decolecta y la clave de Gemini son **secretos**: solo van en el `.env`.
+La cuota gratis de Gemini es por proyecto de Google AI Studio: cada integrante revisa la suya en
+<https://aistudio.google.com/rate-limit>.
 
 ## Endpoints
 
@@ -68,6 +72,7 @@ Detalle completo, con ejemplos de petición y respuesta, en [`../docs/API.md`](.
 | Alertas | `GET /alertas`, `GET /alertas/resumen`, `PUT /alertas/{id}/leida`, `PUT /alertas/leidas` | H59 | 🔒 cualquier rol |
 | Favoritos | `POST /favoritos`, `GET /favoritos`, `DELETE /favoritos/{productoId}` | H43, H44 | 🔒 cualquier rol |
 | | `PUT /favoritos/{productoId}/precio-objetivo` | H60 | 🔒 cualquier rol |
+| Asistente | `POST /chat` | H68 | 🔒 comprador y dueño |
 
 Todos los errores usan el mismo formato, descrito al inicio de `API.md`.
 
@@ -144,6 +149,20 @@ búsqueda, el detalle, las alternativas y los favoritos. Un producto que deja de
   `PUT /usuarios/me` no lo toca. Falta o `null` responde `400`.
 - Con `false` no se crean alertas de baja de precio ni se envían sus correos (H59, H61).
 
+### Asistente con Gemini (H68)
+- Código en el paquete `chat/` (es de Guillermo). Diseño en [`../docs/chat/diseno-chat.md`](../docs/chat/diseno-chat.md)
+  y contrato en `API.md`, sección 8.
+- El rol del token decide las herramientas: el comprador busca precios y alternativas; el dueño, además, su stock
+  bajo, su catálogo y el catálogo maestro. Todas son de solo lectura y la botica sale del token.
+- A Gemini nunca van el id, los datos ni la ubicación del usuario. Las búsquedas del asistente no se registran en
+  H62 ni H42.
+- Límites propios en memoria (se reinician con el servidor): 3 por minuto y 15 por día por usuario (429) y 150 por
+  día entre todos (503 sin llamar a Gemini).
+- 25 s por llamada y 50 s por pregunta, un reintento ante 500 o 503 de Google y respuesta de respaldo
+  (`"respaldo": true`) si ya hay productos. Un filtro de crisis responde sin Gemini (`"ayuda": true`) y los
+  errores 429, 503 y 504 terminan con el SAMU 106 y la Línea 113.
+- En las pruebas automáticas Gemini se simula: no gastan cuota.
+
 ### Otras reglas
 - `ddl-auto=validate`: la API no crea ni modifica tablas.
 - Las tablas y columnas que no están en las entidades JPA (favoritos, consultas, grupos de equivalencia) se leen y
@@ -166,6 +185,7 @@ src/main/java/com/boticompara/usuario/
   dto/          Peticiones y respuestas (camelCase, como en API.md)
   security/     JWT, filtro y reglas de acceso
   error/        ApiException y formato de error único
+  chat/         Asistente POST /chat (H68): servicio, límites, filtro de crisis, gemini/ y herramienta/
   job/          Alerta diaria de stock bajo (H12)
   util/         Ahorro, Distancia, RucValidator, lectores de CSV y xlsx
 ```
