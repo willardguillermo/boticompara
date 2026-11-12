@@ -35,6 +35,8 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 | 403 | Rol sin permiso, botica no aprobada intentando crear productos, o acción no permitida por el estado de la botica |
 | 404 | Recurso no existe o no pertenece al usuario |
 | 409 | Duplicado (correo o RUC ya registrado) |
+| 429 | Demasiados pedidos (solo `POST /chat`) |
+| 503, 504 | El asistente no está disponible o tardó demasiado (solo `POST /chat`) |
 
 Única excepción al formato JSON: `GET /auth/verificar` responde una página HTML (ver H20).
 
@@ -579,6 +581,155 @@ Errores: 400 (`id` no numérico), 401 (sin token), 404 (la alerta no existe o es
 ### `PUT /alertas/leidas` 🔒 — H59
 Marca como leídas todas las alertas del usuario. Responde `204` sin cuerpo.
 Errores: 401 (sin token).
+
+---
+
+## 8. Asistente (chat)
+
+Asistente de texto que responde preguntas sobre BotiCompara usando los mismos datos que el resto de la API. El backend le pasa la pregunta a Gemini (Google) y ejecuta por él las consultas que necesite ("herramientas"). El diseño completo está en `docs/chat/diseno-chat.md`.
+
+### `POST /chat` 🔒 — H68
+
+Roles: `COMPRADOR` y `DUENO_BOTICA`. El rol del token decide qué herramientas tiene el asistente (ver más abajo). El servidor no guarda la conversación: el cliente envía el historial en cada pedido.
+
+```json
+// Pedido
+{
+  "mensaje": "¿Dónde está más barato el paracetamol?",
+  "historial": [
+    { "rol": "usuario",   "texto": "Hola" },
+    { "rol": "asistente", "texto": "Hola, soy el asistente de BotiCompara. ¿Qué medicamento buscas?" }
+  ],
+  "lat": -11.936500,
+  "lng": -76.697200
+}
+```
+
+| Campo | Obligatorio | Validación |
+|---|---|---|
+| `mensaje` | sí | Texto de 1 a 500 caracteres, sin contar espacios al inicio ni al final |
+| `historial` | no | Lista de mensajes anteriores, del más antiguo al más reciente. Cada uno con `rol` (`usuario` o `asistente`) y `texto` (1 a 1000 caracteres). Si llegan más de 10, el servidor usa solo los 10 últimos. Sin historial: se omite, `null` o `[]` |
+| `lat`, `lng` | no | Ubicación del usuario; se envían juntas, con los mismos rangos que en `GET /productos/buscar`. Solo sirven para calcular distancias en el servidor: **no se envían a Gemini ni se guardan** |
+
+El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` enviados (`usuario`) y las `respuesta` recibidas (`asistente`). Los `productos` de respuestas anteriores no se reenvían.
+
+```json
+// 200 OK — comprador (con lat y lng)
+{
+  "respuesta": "El paracetamol más barato es el Paracetamol Genérico de FarmaVida, a 2 soles con 20, a poco más de un kilómetro de ti. También lo tiene Botica Salud Total a 2 soles con 50.",
+  "productos": [
+    {
+      "productoId": 9,
+      "nombreComercial": "Paracetamol Genérico",
+      "principioActivo": "Paracetamol",
+      "presentacion": "Tableta 500 mg x 10",
+      "precio": 2.20,
+      "stock": 90,
+      "stockMinimo": null,
+      "boticaId": 2,
+      "boticaNombre": "FarmaVida",
+      "boticaDistrito": "Lurigancho-Chosica",
+      "distanciaKm": 1.25
+    },
+    {
+      "productoId": 3,
+      "nombreComercial": "Paracetamol MK",
+      "principioActivo": "Paracetamol",
+      "presentacion": "Tableta 500 mg x 10",
+      "precio": 2.50,
+      "stock": 35,
+      "stockMinimo": null,
+      "boticaId": 1,
+      "boticaNombre": "Botica Salud Total",
+      "boticaDistrito": "Lurigancho-Chosica",
+      "distanciaKm": 2.10
+    }
+  ]
+}
+```
+
+```json
+// 200 OK — dueño ("¿Qué productos tengo con stock bajo?")
+{
+  "respuesta": "Tienes 2 productos con stock bajo: Amoxicilina 500 miligramos, con 3 unidades, y Loratadina, con 5 unidades. Te conviene reponerlos pronto.",
+  "productos": [
+    {
+      "productoId": 4,
+      "nombreComercial": "Amoxicilina",
+      "principioActivo": "Amoxicilina",
+      "presentacion": "Cápsula 500 mg x 10",
+      "precio": 6.00,
+      "stock": 3,
+      "stockMinimo": 5,
+      "boticaId": 1,
+      "boticaNombre": "Botica Salud Total",
+      "boticaDistrito": "Lurigancho-Chosica",
+      "distanciaKm": null
+    }
+  ]
+}
+```
+
+```json
+// 200 OK — pregunta fuera de alcance ("Me duele la cabeza, ¿qué tomo?")
+{
+  "respuesta": "No puedo recomendarte medicamentos ni dosis. Consulta con el químico farmacéutico de tu botica o con tu médico. Si es una emergencia, llama al SAMU al 106. Si ya sabes qué medicamento necesitas, te ayudo a encontrar dónde está más barato.",
+  "productos": []
+}
+```
+
+**`respuesta`:** texto plano en español, sin markdown, sin listas ni enlaces, de hasta 600 caracteres. Está pensada para leerse en voz alta (H71): los precios van escritos como se dicen.
+
+**`productos`:** siempre es una lista (vacía si la respuesta no trata de productos). Sirve para que la web y la app muestren tarjetas con enlace al detalle.
+- La arma **el servidor** con lo que devolvieron las herramientas en esta pregunta, no el modelo: los ids, precios y stock son los reales aunque el texto se equivoque. Si el texto y una tarjeta no coinciden, vale la tarjeta.
+- Máximo 10, sin repetidos, en el orden en que los devolvieron las herramientas.
+- `stockMinimo` solo tiene valor en los productos propios del dueño (herramientas `ver_stock_bajo` y `buscar_en_mi_catalogo`); en los demás es `null`.
+- `distanciaKm` solo tiene valor si el pedido trae `lat` y `lng` y la botica registró ubicación; si no, `null`. Mismo cálculo que en `GET /productos/buscar`.
+- Los resultados de `buscar_medicamento` (catálogo maestro) solo aparecen en el texto: no generan tarjetas ni una lista aparte, porque no son productos de una botica.
+
+**Herramientas del asistente, según el rol del token.** El modelo solo decide los parámetros de la tabla. El usuario, su botica y la ubicación los pone el servidor a partir del token y del pedido, nunca el modelo.
+
+| Herramienta | Rol | Para qué sirve | Parámetros que da el modelo | Servicio que usa |
+|---|---|---|---|---|
+| `buscar_precios` | `COMPRADOR`, `DUENO_BOTICA` | Buscar un medicamento en las boticas aprobadas y comparar precios | `texto` (mínimo 2 caracteres), `tipo` (`nombre` o `principio`), `cerca` (`true` = de la botica más cercana a la más lejana; solo si el pedido trae ubicación) | `BusquedaService.buscar` (`GET /productos/buscar`, vista `v_producto_busqueda`) |
+| `buscar_alternativas` | `COMPRADOR`, `DUENO_BOTICA` | Equivalentes más baratos de un producto que ya salió en una búsqueda | `productoId` | `AlternativasService.alternativas` (`GET /productos/{id}/alternativas`) |
+| `ver_stock_bajo` | `DUENO_BOTICA` | Productos de su botica con `stock <= stockMinimo` | ninguno | `CatalogoService.listar(usuarioId, null, true)` (`GET /boticas/mia/productos?stockBajo=true`) |
+| `buscar_en_mi_catalogo` | `DUENO_BOTICA` | Buscar un producto en su propio catálogo (precio y stock) | `texto` | `CatalogoService.listar(usuarioId, texto, false)` (`GET /boticas/mia/productos?q=`) |
+| `buscar_medicamento` | `DUENO_BOTICA` | Buscar en el catálogo maestro (DIGEMID) | `texto` (mínimo 2 caracteres) | `MedicamentoService.buscar` (`GET /medicamentos?q=`) |
+
+- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (nombre, presentación, precio, stock, botica, distrito y distancia en km). Nunca coordenadas ni datos de personas.
+- Por pregunta se ejecutan como máximo 4 herramientas. Si el modelo pide más, el servidor le exige responder con lo que ya tiene.
+- Si el dueño aún no registró su botica, sus herramientas devuelven "sin botica registrada" y el asistente lo explica: no es un error.
+- Las búsquedas del asistente **no** se registran en los reportes de búsquedas (H62) ni en el de comparaciones (H42): el texto lo escribe el modelo, no el usuario.
+
+**Límites del asistente:**
+- Solo responde sobre BotiCompara: precios, disponibilidad, boticas, alternativas y, para el dueño, su catálogo.
+- No diagnostica, no da dosis y no recomienda medicamentos por síntomas: deriva al químico farmacéutico o al médico. Ante una emergencia indica llamar al SAMU (106).
+- Estos casos responden `200` con `productos: []`; no son errores.
+
+**Límite de uso (por usuario):** por defecto 5 preguntas por minuto y 30 por día (el día cambia a las 00:00, hora de Lima). Al pasarlo → 429. Los pedidos que responden 400 o 401 no cuentan. Los dos valores son configurables en el backend (`chat.limite.por-minuto` y `chat.limite.por-dia`) y se ajustarán cuando se conozca la cuota real de Gemini.
+
+Errores:
+
+| Código | Cuándo | `mensaje` |
+|---|---|---|
+| 400 | `mensaje` vacío o solo espacios | "Escribe tu pregunta" |
+| 400 | `mensaje` de más de 500 caracteres | "La pregunta no puede pasar de 500 caracteres" |
+| 400 | `historial` con un `rol` distinto de `usuario` o `asistente`, o un `texto` vacío o de más de 1000 caracteres | "El historial no es válido" |
+| 400 | Solo una de `lat` y `lng`, o coordenadas fuera de rango | Los mismos mensajes que `GET /productos/buscar` |
+| 401 | El token no es válido o la cuenta no está habilitada (dada de baja o suspendida) | El mismo que el resto de la API |
+| 429 | Se pasó el límite por minuto o por día | "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar" o "Llegaste al límite de preguntas de hoy. Vuelve mañana" |
+| 503 | Gemini no responde, devuelve un error, se agotó la cuota gratis del proyecto, o falta `GEMINI_API_KEY` | "El asistente no está disponible en este momento. Intenta más tarde" |
+| 504 | La respuesta completa tarda más de 20 segundos | "El asistente tardó demasiado en responder. Intenta de nuevo" |
+
+- El 429 trae el header `Retry-After` con los segundos que faltan para poder preguntar otra vez.
+- El 503 y el 504 no dicen la causa interna (clave, cuota, modelo): eso va solo al log del servidor.
+
+**Configuración (backend):**
+- `GEMINI_API_KEY` y `GEMINI_MODEL` en el `.env` de `backend-usuario/`. Cada integrante usa su propia clave de Google AI Studio; nunca se sube al repositorio.
+- Valor recomendado de `GEMINI_MODEL`: `gemini-3.8-flash`. Alternativa: `gemini-3.5-flash-lite`. Cada uno confirma el modelo y su cuota en <https://aistudio.google.com/rate-limit> con su clave.
+- `chat.limite.por-minuto` (por defecto 5) y `chat.limite.por-dia` (por defecto 30).
+- El `.env.example` y la colección de Postman se actualizan en el PR del módulo.
 
 ---
 
