@@ -1,0 +1,9 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  {# H91-H93: acciones según el estado de la cuenta; una cuenta dada de baja no tiene ninguna #}
+  {% for accion in acciones_usuario %}
+    <li><a href="{{ accion.url }}"{% if accion.peligrosa %} style="background: var(--delete-button-bg);"{% endif %}>{{ accion.texto }}</a></li>
+  {% endfor %}
+  {{ block.super }}
+{% endblock %}

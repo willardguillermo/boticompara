@@ -1,12 +1,16 @@
 from django.contrib import admin, messages
+from django.contrib.admin.utils import unquote
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.urls import reverse
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.text import Truncator
 
 from . import historial, usuarios
-from .forms import BoticaRevisionForm
+from .forms import BoticaRevisionForm, SuspenderForm
 from .models import Botica, BoticaRevision, Producto, Usuario
 from .notificaciones import notificar_revision
 from .storage import StorageError, url_firmada_licencia
@@ -69,6 +73,95 @@ class UsuarioAdmin(SoloLecturaAdmin):
     @admin.display(description='fecha de registro', ordering='creado_en')
     def fecha_registro(self, obj):
         return f'{timezone.localtime(obj.creado_en):%d/%m/%Y %H:%M}'
+
+    # ---- H91-H93: acciones sobre la cuenta, cada una con su página ----
+
+    def get_urls(self):
+        # Antes que las del admin: su ruta "<id>/" atraparía estas URLs
+        vista = self.admin_site.admin_view
+        nombre = f'{self.opts.app_label}_{self.opts.model_name}'
+        return [
+            path('<path:object_id>/suspender/', vista(self.suspender_view), name=f'{nombre}_suspender'),
+            *super().get_urls(),
+        ]
+
+    def puede_gestionar(self, request):
+        """Editar datos está prohibido para todos; suspender o dar de baja exige el permiso de cambio."""
+        return request.user.has_perm(f'{self.opts.app_label}.change_{self.opts.model_name}')
+
+    def url_accion(self, usuario, accion):
+        return reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_{accion}', args=[usuario.pk],
+                       current_app=self.admin_site.name)
+
+    def url_detalle(self, usuario):
+        return reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_change', args=[usuario.pk],
+                       current_app=self.admin_site.name)
+
+    def acciones_disponibles(self, request, usuario):
+        """Botones del detalle según el estado. Una cuenta dada de baja no tiene ninguno."""
+        if not self.puede_gestionar(request):
+            return []
+        estado = usuarios.estado_de(usuario)
+        acciones = []
+        if estado in usuarios.PUEDE_SUSPENDER:
+            acciones.append({'texto': 'Suspender', 'url': self.url_accion(usuario, 'suspender')})
+        return acciones
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        usuario = self.get_object(request, unquote(object_id))
+        extra_context = {**(extra_context or {}),
+                         'acciones_usuario': self.acciones_disponibles(request, usuario) if usuario else []}
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def _cuenta_para(self, request, object_id, estados_validos, accion, requisito):
+        """(usuario, None) si la acción corresponde al estado actual; si no, (None, redirección con el error).
+
+        Se comprueba también aquí (y no solo en los botones) por si alguien entra directo por la URL.
+        """
+        if not self.puede_gestionar(request):
+            raise PermissionDenied
+        usuario = self.get_object(request, unquote(object_id))
+        if usuario is None:
+            messages.error(request, 'La cuenta no existe.')
+            return None, redirect(reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_changelist',
+                                          current_app=self.admin_site.name))
+        if usuarios.estado_de(usuario) not in estados_validos:
+            messages.error(request, usuarios.mensaje_rechazo(usuario, accion, requisito))
+            return None, redirect(self.url_detalle(usuario))
+        return usuario, None
+
+    def _pagina(self, request, usuario, form, titulo, boton, **extra):
+        contexto = {
+            **self.admin_site.each_context(request),
+            'opts': self.opts, 'title': titulo, 'usuario': usuario, 'form': form, 'boton': boton,
+            'estado': usuarios.texto_estado(usuario), 'url_detalle': self.url_detalle(usuario),
+            **extra,
+        }
+        return TemplateResponse(request, 'admin/boticas/usuario/accion.html', contexto)
+
+    def _ejecutar(self, request, usuario, accion, *args):
+        """Corre la acción; si el estado cambió mientras el formulario estaba abierto, avisa el error."""
+        try:
+            accion(usuario.pk, *args, request.user.get_username())
+        except usuarios.AccionNoPermitida as e:
+            messages.error(request, str(e))
+            return False
+        return True
+
+    def suspender_view(self, request, object_id):
+        """H91"""
+        usuario, respuesta = self._cuenta_para(request, object_id, usuarios.PUEDE_SUSPENDER,
+                                               'suspender', usuarios.REQUISITO_SUSPENDER)
+        if respuesta:
+            return respuesta
+        form = SuspenderForm(request.POST if request.method == 'POST' else None)
+        if form.is_valid():
+            hasta, motivo = form.cleaned_data['hasta'], form.cleaned_data['motivo']
+            if self._ejecutar(request, usuario, usuarios.suspender, hasta, motivo):
+                messages.success(request, f'Se suspendió la cuenta de {usuario.nombre} hasta el '
+                                          f'{hasta:%d/%m/%Y}.')
+            return redirect(self.url_detalle(usuario))
+        return self._pagina(request, usuario, form, f'Suspender la cuenta de {usuario.nombre}', 'Suspender cuenta')
 
 
 @admin.register(Producto)

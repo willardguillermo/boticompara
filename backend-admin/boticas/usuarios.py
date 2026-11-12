@@ -5,14 +5,31 @@ No hay columna estado; se calcula con activo y suspendido_hasta (database/v5_spr
     ACTIVO     = activo and (suspendido_hasta is null or suspendido_hasta <= now())
     SUSPENDIDO = activo and suspendido_hasta > now()
     BAJA       = not activo
+
+Cada acción es un UPDATE que lleva en su WHERE el estado que exige. Si otro administrador cambió
+la cuenta un instante antes, el UPDATE no toca ninguna fila y la acción se rechaza: no hace falta
+bloquear la fila ni puede quedar en el historial algo que no ocurrió.
 """
+from datetime import datetime, time, timedelta
+
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+
+from .models import Usuario, UsuarioAccion
 
 ACTIVO = 'ACTIVO'
 SUSPENDIDO = 'SUSPENDIDO'
 BAJA = 'BAJA'
 ESTADOS = ((ACTIVO, 'Activo'), (SUSPENDIDO, 'Suspendido'), (BAJA, 'Baja'))
+
+MAX_DIAS_SUSPENSION = 90
+MOTIVO_MIN = 10
+MOTIVO_MAX = 300
+
+
+class AccionNoPermitida(Exception):
+    """La acción no corresponde al estado actual de la cuenta."""
 
 
 def q_estado(estado, ahora=None):
@@ -42,3 +59,41 @@ def texto_estado(usuario, ahora=None):
     if estado == SUSPENDIDO:
         return f'Suspendido hasta {timezone.localtime(usuario.suspendido_hasta):%d/%m/%Y}'
     return dict(ESTADOS)[estado]
+
+
+def mensaje_rechazo(usuario, accion, requisito):
+    return f'No se puede {accion} la cuenta de {usuario.nombre}: su estado es «{texto_estado(usuario)}». {requisito}'
+
+
+def _rechazar(usuario_id, accion, requisito):
+    usuario = Usuario.objects.filter(pk=usuario_id).first()
+    if usuario is None:
+        raise AccionNoPermitida('La cuenta no existe.')
+    raise AccionNoPermitida(mensaje_rechazo(usuario, accion, requisito))
+
+
+# H91: suspensión
+PUEDE_SUSPENDER = (ACTIVO,)
+REQUISITO_SUSPENDER = 'Solo se suspende una cuenta activa.'
+
+
+def limites_suspension(hoy=None):
+    """Primer y último día que se pueden elegir en "hasta": mañana y hoy + 90 días (hora de Lima)."""
+    hoy = hoy or timezone.localdate()
+    return hoy + timedelta(days=1), hoy + timedelta(days=MAX_DIAS_SUSPENSION)
+
+
+def fin_del_dia(fecha):
+    """La suspensión dura todo el día elegido: termina a las 23:59:59 de ese día en Lima."""
+    return timezone.make_aware(datetime.combine(fecha, time(23, 59, 59)))
+
+
+def suspender(usuario_id, hasta, motivo, realizado_por):
+    """H91: solo una cuenta Activa. hasta es la fecha (date) del último día de la suspensión."""
+    with transaction.atomic():
+        filas = (Usuario.objects.filter(q_estado(ACTIVO), pk=usuario_id)
+                 .update(suspendido_hasta=fin_del_dia(hasta), motivo_estado=motivo))
+        if not filas:
+            _rechazar(usuario_id, 'suspender', REQUISITO_SUSPENDER)
+        UsuarioAccion.objects.create(usuario_id=usuario_id, accion=UsuarioAccion.Accion.SUSPENDER,
+                                     motivo=motivo, realizado_por=realizado_por)
