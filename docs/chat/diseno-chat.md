@@ -66,7 +66,7 @@ plazo anterior, uno solo para toda la pregunta, no alcanzaba: con dos llamadas l
 | La pregunta (`mensaje`) y el historial corto | Nombre, correo, teléfono y dirección del usuario |
 | El rol, solo como instrucciones y herramientas distintas | El id del usuario y el id de su botica |
 | Si hay ubicación disponible (sí o no) | `lat` y `lng` del usuario |
-| De cada resultado: nombre, principio activo, presentación, precio, stock, botica, distrito y distancia en km | Coordenadas de las boticas, RUC, licencia, datos del dueño |
+| De cada resultado: `productoId` (para pedir alternativas), nombre, principio activo, presentación, precio, stock, botica, distrito y distancia en km | Coordenadas de las boticas, RUC, licencia, datos del dueño |
 | | El token, la clave de Gemini y cualquier dato de otros usuarios |
 
 - El **id del usuario y su botica salen del JWT** en el servidor. Las herramientas del dueño no

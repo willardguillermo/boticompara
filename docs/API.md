@@ -711,8 +711,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 | `buscar_en_mi_catalogo` | `DUENO_BOTICA` | Buscar un producto en su propio catálogo (precio y stock) | `texto` | `CatalogoService.listar(usuarioId, texto, false)` (`GET /boticas/mia/productos?q=`) |
 | `buscar_medicamento` | `DUENO_BOTICA` | Buscar en el catálogo maestro (DIGEMID) | `texto` (mínimo 2 caracteres) | `MedicamentoService.buscar` (`GET /medicamentos?q=`) |
 
-- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (nombre, presentación, precio, stock, botica, distrito y distancia en km). Nunca coordenadas ni datos de personas.
-- Por pregunta hay como máximo 2 rondas de llamadas a herramientas (en una ronda el modelo puede pedir una o varias a la vez). Si después de la segunda pide más, el servidor le exige responder con lo que ya tiene. Así una pregunta usa como máximo 3 llamadas a Gemini: 2 rondas de herramientas más la respuesta.
+- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (`productoId`, nombre, principio activo, presentación, precio, stock, botica, distrito y distancia en km). El `productoId` va porque el modelo lo necesita para pedir `buscar_alternativas`; es un dato del producto, no de una persona. Nunca coordenadas ni datos de personas.
+- Por pregunta hay como máximo 2 rondas de llamadas a herramientas (en una ronda el modelo puede pedir una o varias a la vez; el servidor ejecuta como máximo 3 por ronda y a las demás les responde con un error). Si después de la segunda pide más, el servidor le exige responder con lo que ya tiene. Así una pregunta usa como máximo 3 llamadas a Gemini: 2 rondas de herramientas más la respuesta.
 - Si el dueño aún no registró su botica, sus herramientas devuelven "sin botica registrada" y el asistente lo explica: no es un error.
 - Las búsquedas del asistente **no** se registran en los reportes de búsquedas (H62) ni en el de comparaciones (H42): el texto lo escribe el modelo, no el usuario.
 
