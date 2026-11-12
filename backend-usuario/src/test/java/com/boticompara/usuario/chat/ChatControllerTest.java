@@ -79,7 +79,8 @@ class ChatControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.respuesta").value("Hola, ¿qué medicamento buscas?"))
                 .andExpect(jsonPath("$.productos").isArray())
-                .andExpect(jsonPath("$.productos").isEmpty());
+                .andExpect(jsonPath("$.productos").isEmpty())
+                .andExpect(jsonPath("$.respaldo").value(false));
     }
 
     @Test

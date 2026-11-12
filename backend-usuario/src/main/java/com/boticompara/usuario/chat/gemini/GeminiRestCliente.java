@@ -74,6 +74,9 @@ public class GeminiRestCliente implements GeminiCliente {
             HttpResponse<String> resp = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (resp.statusCode() != 200) {
                 log.warn("Gemini respondió HTTP {} ({})", resp.statusCode(), estadoDelError(resp.body()));
+                if (resp.statusCode() == 500 || resp.statusCode() == 503) {
+                    throw GeminiException.falloTemporal("Gemini respondió HTTP " + resp.statusCode());
+                }
                 throw GeminiException.noDisponible("Gemini respondió HTTP " + resp.statusCode());
             }
             return respuesta(json.readTree(resp.body()));

@@ -208,6 +208,7 @@ class ChatServiceTest {
 
         assertEquals("Hola, ¿qué medicamento buscas?", r.respuesta());
         assertTrue(r.productos().isEmpty());
+        assertFalse(r.respaldo());
         assertEquals(1, gemini.pedidos.size());
         assertEquals(List.of(new Turno.Usuario("Hola")), gemini.pedidos.get(0).turnos());
         assertTrue(gemini.pedidos.get(0).permitirHerramientas());
@@ -239,6 +240,7 @@ class ChatServiceTest {
         ChatResponse r = service.responder(CARLOS, new ChatRequest("paracetamol barato", null, LAT, LNG));
 
         assertEquals("El más barato está en FarmaVida, a 2 soles con 20.", r.respuesta());
+        assertFalse(r.respaldo());
         assertEquals(List.of(new ChatProducto(9L, "Paracetamol 9", "Paracetamol", "Tableta 500 mg x 10",
                 new BigDecimal("2.20"), 90, null, 2L, "FarmaVida", "Lurigancho-Chosica", new BigDecimal("1.25"))),
                 r.productos());
@@ -274,7 +276,7 @@ class ChatServiceTest {
 
     @Test
     void siEnLaTerceraLlamadaElModeloInsisteConHerramientas_503SinEjecutarlas() {
-        laBusquedaDevuelve("a1", 1, 1);
+        laBusquedaDevuelve("a1", 1, 0);     // sin resultados: no hay productos para un respaldo
         gemini.guion.add(pide(buscar("c1", "a1")));
         gemini.guion.add(pide(buscar("c2", "a1")));
         gemini.guion.add(pide(buscar("c3", "a1")));
@@ -581,28 +583,192 @@ class ChatServiceTest {
     }
 
     @Test
-    void cadaLlamadaRecibeComoPlazoLoQueQuedaDeLos20Segundos() {
+    void cadaLlamadaEspera25SegundosOLoQueFalteDeLos50() {
         laBusquedaDevuelve("aa", 1, 1);
-        gemini.alLlamar = () -> reloj.avanzar(Duration.ofSeconds(6));
+        gemini.alLlamar = () -> reloj.avanzar(Duration.ofSeconds(15));
         gemini.guion.add(pide(buscar("c1", "aa")));
         gemini.guion.add(pide(buscar("c2", "aa")));
         gemini.guion.add(texto("Listo."));
 
         service.responder(CARLOS, pregunta("busca"));
 
-        assertEquals(List.of(Duration.ofSeconds(20), Duration.ofSeconds(14), Duration.ofSeconds(8)), gemini.plazos);
+        // Quedan 50, 35 y 20 segundos: las dos primeras llamadas esperan el máximo de 25
+        assertEquals(List.of(Duration.ofSeconds(25), Duration.ofSeconds(25), Duration.ofSeconds(20)), gemini.plazos);
     }
 
     @Test
-    void siSeAcabanLos20SegundosEntreRondas_504SinVolverALlamar() {
-        laBusquedaDevuelve("aa", 1, 1);
-        gemini.alLlamar = () -> reloj.avanzar(Duration.ofSeconds(20));
+    void siSeAcabanLos50SegundosYNoHayProductos_504SinVolverALlamar() {
+        laBusquedaDevuelve("aa", 1, 0);     // la herramienta no encontró nada
+        gemini.alLlamar = () -> reloj.avanzar(Duration.ofSeconds(50));
         gemini.guion.add(pide(buscar("c1", "aa")));
 
         ApiException e = error(CARLOS, pregunta("busca"));
 
         assertEquals(HttpStatus.GATEWAY_TIMEOUT, e.getStatus());
+        assertEquals("El asistente tardó demasiado en responder. Intenta de nuevo", e.getMessage());
         assertEquals(1, gemini.pedidos.size());
+    }
+
+    @Test
+    void siLaLlamadaFinalNoLlegaATiempoYNoHayProductos_504() {
+        laBusquedaDevuelve("aa", 1, 0);
+        gemini.guion.add(pide(buscar("c1", "aa")));
+        gemini.guion.add(GeminiException.tiempoAgotado("timeout"));
+
+        assertEquals(HttpStatus.GATEWAY_TIMEOUT, error(CARLOS, pregunta("busca")).getStatus());
+    }
+
+    // ---------- Reintento ante 500 o 503 de Google ----------
+
+    @Test
+    void anteUn503DeGoogle_reintentaUnaVezConElMismoPedido() {
+        gemini.guion.add(GeminiException.falloTemporal("HTTP 503"));
+        gemini.guion.add(texto("Hola"));
+
+        ChatResponse r = service.responder(CARLOS, pregunta("hola"));
+
+        assertEquals("Hola", r.respuesta());
+        assertFalse(r.respaldo());
+        assertEquals(2, gemini.pedidos.size());
+        assertEquals(gemini.pedidos.get(0), gemini.pedidos.get(1));
+    }
+
+    @Test
+    void soloSeReintentaUnaVez() {
+        gemini.guion.add(GeminiException.falloTemporal("HTTP 503"));
+        gemini.guion.add(GeminiException.falloTemporal("HTTP 500"));
+
+        ApiException e = error(CARLOS, pregunta("hola"));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
+        assertEquals("El asistente no está disponible en este momento. Intenta más tarde", e.getMessage());
+        assertEquals(2, gemini.pedidos.size());
+    }
+
+    @Test
+    void noSeReintentaSiYaNoQuedaTiempo() {
+        gemini.alLlamar = () -> reloj.avanzar(Duration.ofSeconds(50));
+        gemini.guion.add(GeminiException.falloTemporal("HTTP 503"));
+
+        ApiException e = error(CARLOS, pregunta("hola"));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
+        assertEquals(1, gemini.pedidos.size());
+    }
+
+    @Test
+    void elReintentoSoloEsperaLoQueFaltaDeLos50Segundos() {
+        gemini.alLlamar = () -> reloj.avanzar(Duration.ofSeconds(30));
+        gemini.guion.add(GeminiException.falloTemporal("HTTP 503"));
+        gemini.guion.add(texto("Hola"));
+
+        service.responder(CARLOS, pregunta("hola"));
+
+        assertEquals(List.of(Duration.ofSeconds(25), Duration.ofSeconds(20)), gemini.plazos);
+    }
+
+    @Test
+    void losDemasErroresDeGoogleNoSeReintentan() {
+        gemini.guion.add(GeminiException.noDisponible("HTTP 429 cuota"));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, error(CARLOS, pregunta("hola")).getStatus());
+        assertEquals(1, gemini.pedidos.size());
+    }
+
+    @Test
+    void unTimeoutNoSeReintenta() {
+        gemini.guion.add(GeminiException.tiempoAgotado("timeout"));
+
+        assertEquals(HttpStatus.GATEWAY_TIMEOUT, error(CARLOS, pregunta("hola")).getStatus());
+        assertEquals(1, gemini.pedidos.size());
+    }
+
+    // ---------- Respuesta de respaldo ----------
+
+    private static final String RESPALDO_3 =
+            "Encontré 3 opciones. La más barata es Paracetamol 1 a 2 soles con 20 en FarmaVida, Lurigancho-Chosica.";
+
+    @Test
+    void siFallaLaLlamadaFinalYHayProductos_respondeElRespaldoArmadoPorElServidor() {
+        laBusquedaDevuelve("paracetamol", 1, 3);
+        gemini.guion.add(pide(buscar("c1", "paracetamol")));
+        gemini.guion.add(GeminiException.noDisponible("HTTP 429 cuota"));
+
+        ChatResponse r = service.responder(CARLOS, pregunta("paracetamol barato"));
+
+        assertTrue(r.respaldo());
+        assertEquals(RESPALDO_3, r.respuesta());
+        assertEquals(List.of(1L, 2L, 3L), r.productos().stream().map(ChatProducto::productoId).toList());
+    }
+
+    @Test
+    void siLaLlamadaFinalNoLlegaATiempoYHayProductos_respaldo() {
+        laBusquedaDevuelve("paracetamol", 1, 3);
+        gemini.guion.add(pide(buscar("c1", "paracetamol")));
+        gemini.guion.add(GeminiException.tiempoAgotado("timeout"));
+
+        ChatResponse r = service.responder(CARLOS, pregunta("paracetamol barato"));
+
+        assertTrue(r.respaldo());
+        assertEquals(RESPALDO_3, r.respuesta());
+    }
+
+    @Test
+    void siSeAcabanLos50SegundosDespuesDeLasHerramientas_respaldoSinVolverALlamar() {
+        laBusquedaDevuelve("paracetamol", 1, 3);
+        gemini.alLlamar = () -> reloj.avanzar(Duration.ofSeconds(50));
+        gemini.guion.add(pide(buscar("c1", "paracetamol")));
+
+        ChatResponse r = service.responder(CARLOS, pregunta("paracetamol barato"));
+
+        assertTrue(r.respaldo());
+        assertEquals(3, r.productos().size());
+        assertEquals(1, gemini.pedidos.size());
+    }
+
+    @Test
+    void siElReintentoTambienFallaYHayProductos_respaldo() {
+        laBusquedaDevuelve("paracetamol", 1, 3);
+        gemini.guion.add(pide(buscar("c1", "paracetamol")));
+        gemini.guion.add(GeminiException.falloTemporal("HTTP 503"));
+        gemini.guion.add(GeminiException.falloTemporal("HTTP 503"));
+
+        ChatResponse r = service.responder(CARLOS, pregunta("paracetamol barato"));
+
+        assertTrue(r.respaldo());
+        assertEquals(3, gemini.pedidos.size());
+    }
+
+    @Test
+    void siElModeloTerminaSinTextoPeroHayProductos_respaldo() {
+        laBusquedaDevuelve("paracetamol", 1, 3);
+        gemini.guion.add(pide(buscar("c1", "paracetamol")));
+        gemini.guion.add(texto("  "));
+
+        assertTrue(service.responder(CARLOS, pregunta("paracetamol barato")).respaldo());
+    }
+
+    @Test
+    void elRespaldoLlevaComoMaximo10TarjetasYCuentaSoloEsas() {
+        laBusquedaDevuelve("aa", 1, 5);
+        laBusquedaDevuelve("bb", 6, 10);
+        laBusquedaDevuelve("cc", 11, 15);
+        gemini.guion.add(pide(buscar("c1", "aa"), buscar("c2", "bb"), buscar("c3", "cc")));
+        gemini.guion.add(GeminiException.noDisponible("cuota"));
+
+        ChatResponse r = service.responder(CARLOS, pregunta("busca todo"));
+
+        assertEquals(10, r.productos().size());
+        assertTrue(r.respuesta().startsWith("Encontré 10 opciones."));
+    }
+
+    @Test
+    void unaPreguntaDeSaludSinProductosNuncaRecibeRespaldo() {
+        gemini.guion.add(GeminiException.noDisponible("cuota"));
+
+        ApiException e = error(CARLOS, pregunta("¿cuántas pastillas tomo?"));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
     }
 
     @Test

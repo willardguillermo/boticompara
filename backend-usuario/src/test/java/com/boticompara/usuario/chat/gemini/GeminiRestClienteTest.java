@@ -214,15 +214,22 @@ class GeminiRestClienteTest {
         GeminiException e = falla(cliente(CLAVE), PLAZO);
 
         assertFalse(e.esTiempoAgotado());
+        // La cuota agotada no se arregla reintentando
+        assertFalse(e.esReintentable());
         assertFalse(e.getMessage().contains(CLAVE));
     }
 
     @Test
-    void error503_noDisponible() {
-        status = 503;
-        cuerpo = "no es json";
+    void error503O500_esUnFalloTemporalQueSePuedeReintentar() {
+        for (int codigo : new int[]{503, 500}) {
+            status = codigo;
+            cuerpo = "no es json";
 
-        assertFalse(falla(cliente(CLAVE), PLAZO).esTiempoAgotado());
+            GeminiException e = falla(cliente(CLAVE), PLAZO);
+
+            assertTrue(e.esReintentable(), "HTTP " + codigo);
+            assertFalse(e.esTiempoAgotado(), "HTTP " + codigo);
+        }
     }
 
     @Test
@@ -230,7 +237,10 @@ class GeminiRestClienteTest {
         status = 403;
         cuerpo = "{\"error\":{\"status\":\"PERMISSION_DENIED\"}}";
 
-        assertFalse(falla(cliente(CLAVE), PLAZO).esTiempoAgotado());
+        GeminiException e = falla(cliente(CLAVE), PLAZO);
+
+        assertFalse(e.esTiempoAgotado());
+        assertFalse(e.esReintentable());
     }
 
     @Test
@@ -251,7 +261,10 @@ class GeminiRestClienteTest {
     void siGeminiTardaMasQueElPlazo_tiempoAgotado() {
         demoraMs = 1500;
 
-        assertTrue(falla(cliente(CLAVE), Duration.ofMillis(200)).esTiempoAgotado());
+        GeminiException e = falla(cliente(CLAVE), Duration.ofMillis(200));
+
+        assertTrue(e.esTiempoAgotado());
+        assertFalse(e.esReintentable());
     }
 
     @Test

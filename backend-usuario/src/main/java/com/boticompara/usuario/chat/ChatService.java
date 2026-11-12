@@ -26,7 +26,9 @@ import java.util.Map;
 
 /**
  * H68: POST /chat. Valida el pedido, cuenta la pregunta en el límite del usuario y conversa con Gemini:
- * como máximo 2 rondas de herramientas más la respuesta (3 llamadas), todo dentro de 20 segundos.
+ * como máximo 2 rondas de herramientas más la respuesta (3 llamadas). Cada llamada tiene 25 segundos y la
+ * pregunta completa 50. Ante un 500 o 503 de Google se reintenta una vez, si queda tiempo. Si Gemini falla o
+ * no llega a tiempo cuando las herramientas ya encontraron productos, el servidor arma un texto de respaldo.
  * No guarda nada entre un pedido y otro, y no depende de UsuarioRepository: nunca carga nombre ni correo.
  * A Gemini solo le llega el GeminiPedido; el id del usuario y la ubicación van en el ContextoChat, que solo
  * reciben las herramientas.
@@ -41,7 +43,8 @@ public class ChatService {
     static final int MAX_RONDAS = 2;
     static final int MAX_HERRAMIENTAS_POR_RONDA = 3;
     static final int MAX_PRODUCTOS = 10;
-    static final Duration PLAZO = Duration.ofSeconds(20);
+    static final Duration PLAZO_LLAMADA = Duration.ofSeconds(25);
+    static final Duration PLAZO_TOTAL = Duration.ofSeconds(50);
 
     static final String NO_DISPONIBLE = "El asistente no está disponible en este momento. Intenta más tarde";
     static final String TARDO_DEMASIADO = "El asistente tardó demasiado en responder. Intenta de nuevo";
@@ -80,22 +83,22 @@ public class ChatService {
         turnos.add(new Turno.Usuario(mensaje));
         String sistema = instrucciones.para(yo.rol(), contexto.conUbicacion());
         List<DeclaracionHerramienta> declaraciones = herramientas.declaraciones(yo.rol());
-        Instant limite = reloj.instant().plus(PLAZO);
+        Instant inicio = reloj.instant();
+        Instant limite = inicio.plus(PLAZO_TOTAL);
         Map<Long, ChatProducto> productos = new LinkedHashMap<>();
         List<String> usadas = new ArrayList<>();
         try {
             for (int ronda = 0; ; ronda++) {
                 // Después de la segunda ronda de herramientas, el modelo está obligado a responder con texto
                 boolean permitirHerramientas = ronda < MAX_RONDAS;
-                GeminiRespuesta respuesta = gemini.generar(
-                        new GeminiPedido(sistema, List.copyOf(turnos), declaraciones, permitirHerramientas),
-                        restante(limite));
+                GeminiRespuesta respuesta = llamar(
+                        new GeminiPedido(sistema, List.copyOf(turnos), declaraciones, permitirHerramientas), limite);
                 if (respuesta.llamadas().isEmpty() || !permitirHerramientas) {
                     ChatResponse resultado = finalizar(respuesta, productos);
                     // Para vigilar la cuota y los tiempos. Sin el id del usuario ni el texto de la pregunta
-                    log.info("Chat {}: {} llamada(s) a Gemini, herramientas {}, {} tarjeta(s), {} ms", yo.rol(),
+                    log.info("Chat {}: {} ronda(s) con Gemini, herramientas {}, {} tarjeta(s), {} ms", yo.rol(),
                             ronda + 1, usadas, resultado.productos().size(),
-                            Duration.between(limite.minus(PLAZO), reloj.instant()).toMillis());
+                            Duration.between(inicio, reloj.instant()).toMillis());
                     return resultado;
                 }
                 respuesta.llamadas().forEach(llamada -> usadas.add(llamada.nombre()));
@@ -103,6 +106,14 @@ public class ChatService {
                 turnos.add(new Turno.Resultados(ejecutar(contexto, respuesta.llamadas(), productos)));
             }
         } catch (GeminiException e) {
+            if (!productos.isEmpty()) {
+                // Lo caro ya se hizo: hay productos. Falló solo la redacción, así que la hace el servidor
+                List<ChatProducto> tarjetas = productos.values().stream().limit(MAX_PRODUCTOS).toList();
+                log.warn("Chat {}: respuesta de respaldo con {} tarjeta(s), herramientas {}, {} ms ({})", yo.rol(),
+                        tarjetas.size(), usadas, Duration.between(inicio, reloj.instant()).toMillis(),
+                        e.esTiempoAgotado() ? "sin tiempo" : "Gemini no disponible");
+                return new ChatResponse(TextoRespaldo.de(tarjetas), tarjetas, true);
+            }
             // La causa (clave, cuota, modelo) queda solo en el log del cliente de Gemini
             if (e.esTiempoAgotado()) {
                 throw new ApiException(HttpStatus.GATEWAY_TIMEOUT, TARDO_DEMASIADO);
@@ -111,13 +122,26 @@ public class ChatService {
         }
     }
 
-    /** Tiempo que queda de los 20 segundos: es el plazo de la siguiente llamada a Gemini. */
-    private Duration restante(Instant limite) {
+    /** Una llamada a Gemini, con un único reintento si Google responde 500 o 503 y todavía queda tiempo. */
+    private GeminiRespuesta llamar(GeminiPedido pedido, Instant limite) {
+        try {
+            return gemini.generar(pedido, plazo(limite));
+        } catch (GeminiException e) {
+            if (!e.esReintentable() || !reloj.instant().isBefore(limite)) {
+                throw e;
+            }
+            log.warn("Gemini falló con un error temporal: se reintenta una vez");
+            return gemini.generar(pedido, plazo(limite));
+        }
+    }
+
+    /** Plazo de la siguiente llamada: 25 segundos o lo que falte de los 50 de la pregunta, lo que sea menor. */
+    private Duration plazo(Instant limite) {
         Duration queda = Duration.between(reloj.instant(), limite);
         if (queda.isZero() || queda.isNegative()) {
-            throw GeminiException.tiempoAgotado("Se acabaron los 20 segundos del pedido");
+            throw GeminiException.tiempoAgotado("Se acabaron los 50 segundos de la pregunta");
         }
-        return queda;
+        return queda.compareTo(PLAZO_LLAMADA) < 0 ? queda : PLAZO_LLAMADA;
     }
 
     /** Ejecuta las herramientas de una ronda (máximo 3) y junta sus tarjetas, sin repetidos. */
@@ -144,7 +168,7 @@ public class ChatService {
             log.warn("Gemini terminó sin texto ({} herramientas pendientes)", respuesta.llamadas().size());
             throw GeminiException.noDisponible("Respuesta sin texto");
         }
-        return new ChatResponse(texto, productos.values().stream().limit(MAX_PRODUCTOS).toList());
+        return new ChatResponse(texto, productos.values().stream().limit(MAX_PRODUCTOS).toList(), false);
     }
 
     private static String validarMensaje(String mensaje) {

@@ -11,7 +11,8 @@ public interface GeminiCliente {
     /**
      * Una llamada al modelo. plazo es el tiempo máximo de esta llamada.
      *
-     * @throws GeminiException si Gemini no está disponible o no responde dentro del plazo
+     * @throws GeminiException si Gemini no está disponible o no responde dentro del plazo. No reintenta:
+     *                         eso lo decide ChatService, que conoce el plazo total de la pregunta
      */
     GeminiRespuesta generar(GeminiPedido pedido, Duration plazo);
 }
