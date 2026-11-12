@@ -26,9 +26,13 @@ import java.util.Map;
 public class LimitadorChat {
 
     static final ZoneId LIMA = ZoneId.of("America/Lima");
-    static final String MENSAJE_MINUTO = "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar";
-    static final String MENSAJE_DIA = "Llegaste al límite de preguntas de hoy. Vuelve mañana";
-    static final String MENSAJE_GLOBAL = "El asistente alcanzó su límite de hoy. Intenta mañana.";
+    /** Todos terminan con los números de ayuda: aunque el asistente no responda, nadie se queda sin ellos. */
+    static final String MENSAJE_MINUTO = FiltroCrisis.conNumerosDeAyuda(
+            "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar");
+    static final String MENSAJE_DIA = FiltroCrisis.conNumerosDeAyuda(
+            "Llegaste al límite de preguntas de hoy. Vuelve mañana");
+    static final String MENSAJE_GLOBAL = FiltroCrisis.conNumerosDeAyuda(
+            "El asistente alcanzó su límite de hoy. Intenta mañana.");
     private static final Duration MINUTO = Duration.ofMinutes(1);
 
     private final int porMinuto;

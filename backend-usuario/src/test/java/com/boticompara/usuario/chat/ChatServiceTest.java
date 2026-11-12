@@ -65,6 +65,10 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ChatServiceTest {
 
+    /** Todos los mensajes de error del chat terminan con los números de ayuda. */
+    private static final String NUMEROS = "Si es una emergencia, llama al SAMU 106. "
+            + "Si piensas en hacerte daño, llama a la Línea 113, opción 5.";
+
     private static final ObjectMapper JSON = new ObjectMapper();
     /** Valores inconfundibles para comprobar que no salen hacia Gemini. */
     private static final long ID_USUARIO = 987654321L;
@@ -210,6 +214,7 @@ class ChatServiceTest {
         assertEquals("Hola, ¿qué medicamento buscas?", r.respuesta());
         assertTrue(r.productos().isEmpty());
         assertFalse(r.respaldo());
+        assertFalse(r.ayuda());
         assertEquals(1, gemini.pedidos.size());
         assertEquals(List.of(new Turno.Usuario("Hola")), gemini.pedidos.get(0).turnos());
         assertTrue(gemini.pedidos.get(0).permitirHerramientas());
@@ -374,6 +379,83 @@ class ChatServiceTest {
         verify(alternativas, never()).alternativas(any(), any());
     }
 
+    // ---------- Filtro de crisis ----------
+
+    @Test
+    void unaFraseDeAutolesion_respondeElServidorSinLlamarAGeminiNiALasHerramientas() {
+        ChatResponse r = service.responder(CARLOS, pregunta("Últimamente pienso en HACERME DAÑO"));
+
+        assertEquals("Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o "
+                + "a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas "
+                + "capacitadas dispuestas a escucharte y ayudarte en este momento.", r.respuesta());
+        assertTrue(r.ayuda());
+        assertFalse(r.respaldo());
+        assertTrue(r.productos().isEmpty());
+        assertTrue(gemini.pedidos.isEmpty());
+        verifyNoInteractions(busqueda, alternativas);
+    }
+
+    @Test
+    void unaEmergenciaFisica_respondeElServidorConElSamuSinLlamarAGemini() {
+        ChatResponse r = service.responder(ROSA, pregunta("Me duele el pecho y no puedo respirar"));
+
+        assertEquals("Llama al SAMU al 106 de inmediato. BotiCompara solo compara precios de medicamentos y no puede "
+                + "atender una emergencia: ahora lo más importante es tu salud.", r.respuesta());
+        assertTrue(r.ayuda());
+        assertTrue(r.productos().isEmpty());
+        assertTrue(gemini.pedidos.isEmpty());
+    }
+
+    @Test
+    void unDolorDeCabezaNoActivaElFiltro_respondeGemini() {
+        gemini.guion.add(texto("No puedo recomendarte medicamentos."));
+        gemini.guion.add(texto("No puedo recomendarte medicamentos."));
+
+        ChatResponse r = service.responder(CARLOS, pregunta("Me duele la cabeza, ¿qué tomo?"));
+        service.responder(CARLOS, pregunta("¿Qué hay para el dolor de cabeza?"));
+
+        assertFalse(r.ayuda());
+        assertEquals(2, gemini.pedidos.size());
+    }
+
+    @Test
+    void elFiltroVaDespuesDeLosLimites_yLaPreguntaCuentaEnEllos() {
+        service = servicio(new LimitadorChat(1, 30, 10000, reloj));
+        assertTrue(service.responder(CARLOS, pregunta("quiero morir")).ayuda());
+
+        // La segunda pasa su límite: recibe el 429, que también trae los números de ayuda
+        LimiteChatException e = assertThrows(LimiteChatException.class,
+                () -> service.responder(CARLOS, pregunta("quiero morir")));
+
+        assertTrue(e.getMessage().endsWith(NUMEROS));
+        assertTrue(gemini.pedidos.isEmpty());
+    }
+
+    @Test
+    void elFiltroSoloRevisaElMensajeNoElHistorial() {
+        gemini.guion.add(texto("Hola"));
+
+        ChatResponse r = service.responder(CARLOS, new ChatRequest("¿y el paracetamol?",
+                List.of(new MensajeHistorial("usuario", "no puedo respirar")), null, null));
+
+        assertFalse(r.ayuda());
+        assertEquals(1, gemini.pedidos.size());
+    }
+
+    @Test
+    void los503YEl504TerminanConLosNumerosDeAyuda() {
+        gemini.guion.add(GeminiException.noDisponible("cuota"));
+        gemini.guion.add(GeminiException.tiempoAgotado("timeout"));
+
+        String noDisponible = error(CARLOS, pregunta("hola")).getMessage();
+        String tardo = error(CARLOS, pregunta("hola")).getMessage();
+
+        assertEquals("El asistente no está disponible en este momento. Intenta más tarde. Si es una emergencia, "
+                + "llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5.", noDisponible);
+        assertEquals("El asistente tardó demasiado en responder. Intenta de nuevo. Si es una emergencia, "
+                + "llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5.", tardo);
+    }
+
     // ---------- Historial ----------
 
     @Test
@@ -535,7 +617,7 @@ class ChatServiceTest {
         ApiException e = error(new UsuarioAutenticado(7L, "COMPRADOR"), pregunta("hola"));
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
-        assertEquals("El asistente alcanzó su límite de hoy. Intenta mañana.", e.getMessage());
+        assertEquals("El asistente alcanzó su límite de hoy. Intenta mañana. " + NUMEROS, e.getMessage());
         assertEquals(2, gemini.pedidos.size());
     }
 
@@ -553,10 +635,10 @@ class ChatServiceTest {
     void unaPreguntaQueTerminaEn503SiCuentaEnElTopeGlobal() {
         service = servicio(new LimitadorChat(100, 1000, 1, reloj));
         gemini.guion.add(GeminiException.noDisponible("cuota"));
-        assertEquals("El asistente no está disponible en este momento. Intenta más tarde",
+        assertEquals("El asistente no está disponible en este momento. Intenta más tarde. " + NUMEROS,
                 error(CARLOS, pregunta("hola")).getMessage());
 
-        assertEquals("El asistente alcanzó su límite de hoy. Intenta mañana.",
+        assertEquals("El asistente alcanzó su límite de hoy. Intenta mañana. " + NUMEROS,
                 error(ROSA, pregunta("hola")).getMessage());
         assertEquals(1, gemini.pedidos.size());
     }
@@ -570,7 +652,7 @@ class ChatServiceTest {
         ApiException e = error(CARLOS, pregunta("hola"));
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
-        assertEquals("El asistente no está disponible en este momento. Intenta más tarde", e.getMessage());
+        assertEquals("El asistente no está disponible en este momento. Intenta más tarde. " + NUMEROS, e.getMessage());
     }
 
     @Test
@@ -580,7 +662,7 @@ class ChatServiceTest {
         ApiException e = error(CARLOS, pregunta("hola"));
 
         assertEquals(HttpStatus.GATEWAY_TIMEOUT, e.getStatus());
-        assertEquals("El asistente tardó demasiado en responder. Intenta de nuevo", e.getMessage());
+        assertEquals("El asistente tardó demasiado en responder. Intenta de nuevo. " + NUMEROS, e.getMessage());
     }
 
     @Test
@@ -606,7 +688,7 @@ class ChatServiceTest {
         ApiException e = error(CARLOS, pregunta("busca"));
 
         assertEquals(HttpStatus.GATEWAY_TIMEOUT, e.getStatus());
-        assertEquals("El asistente tardó demasiado en responder. Intenta de nuevo", e.getMessage());
+        assertEquals("El asistente tardó demasiado en responder. Intenta de nuevo. " + NUMEROS, e.getMessage());
         assertEquals(1, gemini.pedidos.size());
     }
 
@@ -642,7 +724,7 @@ class ChatServiceTest {
         ApiException e = error(CARLOS, pregunta("hola"));
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
-        assertEquals("El asistente no está disponible en este momento. Intenta más tarde", e.getMessage());
+        assertEquals("El asistente no está disponible en este momento. Intenta más tarde. " + NUMEROS, e.getMessage());
         assertEquals(2, gemini.pedidos.size());
     }
 

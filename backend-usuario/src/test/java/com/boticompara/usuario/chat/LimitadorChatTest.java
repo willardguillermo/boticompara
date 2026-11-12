@@ -17,6 +17,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /** H68: límite por usuario con un reloj que el test adelanta a mano. */
 class LimitadorChatTest {
 
+    /** Todos los mensajes de error del chat terminan con los números de ayuda. */
+    private static final String NUMEROS = "Si es una emergencia, llama al SAMU 106. "
+            + "Si piensas en hacerte daño, llama a la Línea 113, opción 5.";
+
     /** Reloj de prueba: empieza el 12/11/2026 a las 10:00 de Lima (15:00 UTC). */
     private static final class Reloj extends Clock {
         private Instant ahora = Instant.parse("2026-11-12T15:00:00Z");
@@ -62,7 +66,7 @@ class LimitadorChatTest {
 
         LimiteChatException e = rechazo(limitador, 4L);
 
-        assertEquals("Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar", e.getMessage());
+        assertEquals("Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar. " + NUMEROS, e.getMessage());
         // La primera fue hace 15 s: se libera un lugar en 45 s
         assertEquals(45, e.getReintentarEnSegundos());
     }
@@ -110,7 +114,7 @@ class LimitadorChatTest {
         // Son las 10:10 de Lima: faltan 13 h 50 min para las 00:00
         LimiteChatException e = rechazo(limitador, 4L);
 
-        assertEquals("Llegaste al límite de preguntas de hoy. Vuelve mañana", e.getMessage());
+        assertEquals("Llegaste al límite de preguntas de hoy. Vuelve mañana. " + NUMEROS, e.getMessage());
         assertEquals(13 * 3600 + 50 * 60, e.getReintentarEnSegundos());
     }
 
@@ -140,7 +144,7 @@ class LimitadorChatTest {
     private ApiException topeGlobal(LimitadorChat limitador, long usuario) {
         ApiException e = assertThrows(ApiException.class, () -> limitador.registrar(usuario));
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
-        assertEquals("El asistente alcanzó su límite de hoy. Intenta mañana.", e.getMessage());
+        assertEquals("El asistente alcanzó su límite de hoy. Intenta mañana. " + NUMEROS, e.getMessage());
         return e;
     }
 

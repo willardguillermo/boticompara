@@ -43,6 +43,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class ChatControllerTest {
 
+    /** Todos los mensajes de error del chat terminan con los números de ayuda. */
+    private static final String NUMEROS = "Si es una emergencia, llama al SAMU 106. "
+            + "Si piensas en hacerte daño, llama a la Línea 113, opción 5.";
+
     private final BusquedaService busqueda = mock(BusquedaService.class);
     private final RegistroBusquedaService registroBusquedas = mock(RegistroBusquedaService.class);
     private GeminiCliente gemini = (pedido, plazo) ->
@@ -80,7 +84,8 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.respuesta").value("Hola, ¿qué medicamento buscas?"))
                 .andExpect(jsonPath("$.productos").isArray())
                 .andExpect(jsonPath("$.productos").isEmpty())
-                .andExpect(jsonPath("$.respaldo").value(false));
+                .andExpect(jsonPath("$.respaldo").value(false))
+                .andExpect(jsonPath("$.ayuda").value(false));
     }
 
     @Test
@@ -110,7 +115,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.status").value(429))
                 .andExpect(jsonPath("$.error").value("Too Many Requests"))
                 .andExpect(jsonPath("$.mensaje")
-                        .value("Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar"))
+                        .value("Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar. " + NUMEROS))
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
@@ -133,7 +138,7 @@ class ChatControllerTest {
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(header().doesNotExist("Retry-After"))
                 .andExpect(jsonPath("$.status").value(503))
-                .andExpect(jsonPath("$.mensaje").value("El asistente alcanzó su límite de hoy. Intenta mañana."));
+                .andExpect(jsonPath("$.mensaje").value("El asistente alcanzó su límite de hoy. Intenta mañana. " + NUMEROS));
         assertEquals(3, llamadas.get());
     }
 
@@ -150,13 +155,27 @@ class ChatControllerTest {
         preguntar("{\"mensaje\":\"paracetamol\"}")
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.mensaje")
-                        .value("El asistente no está disponible en este momento. Intenta más tarde"));
+                        .value("El asistente no está disponible en este momento. Intenta más tarde. " + NUMEROS));
 
         mvc.perform(get("/productos/buscar").param("q", "paracetamol").param("tipo", "principio"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].productoId").value(9))
                 .andExpect(jsonPath("$[0].precio").value(2.20));
         verify(registroBusquedas).registrar("paracetamol", "principio", 1, 4L);
+    }
+
+    @Test
+    void unaFraseDeRiesgo_200ConAyudaSinLlamarAGemini() throws Exception {
+        gemini = (pedido, plazo) -> {
+            throw new AssertionError("El filtro de crisis no debe llamar a Gemini");
+        };
+
+        preguntar("{\"mensaje\":\"Últimamente pienso en hacerme daño\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.respuesta").value(FiltroCrisis.TEXTO_AUTOLESION))
+                .andExpect(jsonPath("$.productos").isEmpty())
+                .andExpect(jsonPath("$.respaldo").value(false))
+                .andExpect(jsonPath("$.ayuda").value(true));
     }
 
     @Test
@@ -167,7 +186,7 @@ class ChatControllerTest {
 
         preguntar("{\"mensaje\":\"hola\"}")
                 .andExpect(status().isGatewayTimeout())
-                .andExpect(jsonPath("$.mensaje").value("El asistente tardó demasiado en responder. Intenta de nuevo"));
+                .andExpect(jsonPath("$.mensaje").value("El asistente tardó demasiado en responder. Intenta de nuevo. " + NUMEROS));
     }
 
     /** Aunque la búsqueda lanzara la excepción del chat, ChatErrores no la atiende: sigue en el manejador general. */

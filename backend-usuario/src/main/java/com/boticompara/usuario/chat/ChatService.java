@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
  * como máximo 2 rondas de herramientas más la respuesta (3 llamadas). Cada llamada tiene 25 segundos y la
  * pregunta completa 50. Ante un 500 o 503 de Google se reintenta una vez, si queda tiempo. Si Gemini falla o
  * no llega a tiempo cuando las herramientas ya encontraron productos, el servidor arma un texto de respaldo.
+ * Antes de Gemini pasa el filtro de crisis (FiltroCrisis), que responde solo si el mensaje trae una frase de riesgo.
  * No guarda nada entre un pedido y otro, y no depende de UsuarioRepository: nunca carga nombre ni correo.
  * A Gemini solo le llega el GeminiPedido; el id del usuario y la ubicación van en el ContextoChat, que solo
  * reciben las herramientas.
@@ -49,8 +51,11 @@ public class ChatService {
     static final Duration PLAZO_LLAMADA = Duration.ofSeconds(25);
     static final Duration PLAZO_TOTAL = Duration.ofSeconds(50);
 
-    static final String NO_DISPONIBLE = "El asistente no está disponible en este momento. Intenta más tarde";
-    static final String TARDO_DEMASIADO = "El asistente tardó demasiado en responder. Intenta de nuevo";
+    /** Los dos terminan con los números de ayuda, por si quien pregunta está en una emergencia. */
+    static final String NO_DISPONIBLE = FiltroCrisis.conNumerosDeAyuda(
+            "El asistente no está disponible en este momento. Intenta más tarde");
+    static final String TARDO_DEMASIADO = FiltroCrisis.conNumerosDeAyuda(
+            "El asistente tardó demasiado en responder. Intenta de nuevo");
 
     private final GeminiCliente gemini;
     private final RegistroHerramientas herramientas;
@@ -81,6 +86,14 @@ public class ChatService {
 
         // 2. Límite por usuario (429). Desde aquí la pregunta cuenta, aunque termine en 503 o 504
         limitador.registrar(yo.id());
+
+        // 3. Filtro de crisis: responde el servidor al instante, sin Gemini (ni cuota ni latencia)
+        Optional<FiltroCrisis.Grupo> crisis = FiltroCrisis.detectar(mensaje);
+        if (crisis.isPresent()) {
+            // Solo el grupo: ni el texto de la pregunta ni el id del usuario van al log
+            log.info("Chat {}: respondió el filtro de crisis ({}), sin llamar a Gemini", yo.rol(), crisis.get());
+            return new ChatResponse(crisis.get().texto(), List.of(), false, true);
+        }
 
         ContextoChat contexto = new ContextoChat(yo.id(), yo.rol(), pedido.lat(), pedido.lng());
         turnos.add(new Turno.Usuario(mensaje));
@@ -119,7 +132,7 @@ public class ChatService {
                         e.esTiempoAgotado() ? "sin tiempo" : "Gemini no disponible");
                 Set<String> herramientasDeLasTarjetas = tarjetas.stream()
                         .map(t -> origen.get(t.productoId())).collect(Collectors.toSet());
-                return new ChatResponse(TextoRespaldo.de(tarjetas, herramientasDeLasTarjetas), tarjetas, true);
+                return new ChatResponse(TextoRespaldo.de(tarjetas, herramientasDeLasTarjetas), tarjetas, true, false);
             }
             // La causa (clave, cuota, modelo) queda solo en el log del cliente de Gemini
             if (e.esTiempoAgotado()) {
@@ -177,7 +190,7 @@ public class ChatService {
             log.warn("Gemini terminó sin texto ({} herramientas pendientes)", respuesta.llamadas().size());
             throw GeminiException.noDisponible("Respuesta sin texto");
         }
-        return new ChatResponse(texto, productos.values().stream().limit(MAX_PRODUCTOS).toList(), false);
+        return new ChatResponse(texto, productos.values().stream().limit(MAX_PRODUCTOS).toList(), false, false);
     }
 
     private static String validarMensaje(String mensaje) {
