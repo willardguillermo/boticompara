@@ -82,6 +82,7 @@ public class ChatService {
         List<DeclaracionHerramienta> declaraciones = herramientas.declaraciones(yo.rol());
         Instant limite = reloj.instant().plus(PLAZO);
         Map<Long, ChatProducto> productos = new LinkedHashMap<>();
+        List<String> usadas = new ArrayList<>();
         try {
             for (int ronda = 0; ; ronda++) {
                 // Después de la segunda ronda de herramientas, el modelo está obligado a responder con texto
@@ -90,8 +91,14 @@ public class ChatService {
                         new GeminiPedido(sistema, List.copyOf(turnos), declaraciones, permitirHerramientas),
                         restante(limite));
                 if (respuesta.llamadas().isEmpty() || !permitirHerramientas) {
-                    return finalizar(respuesta, productos);
+                    ChatResponse resultado = finalizar(respuesta, productos);
+                    // Para vigilar la cuota y los tiempos. Sin el id del usuario ni el texto de la pregunta
+                    log.info("Chat {}: {} llamada(s) a Gemini, herramientas {}, {} tarjeta(s), {} ms", yo.rol(),
+                            ronda + 1, usadas, resultado.productos().size(),
+                            Duration.between(limite.minus(PLAZO), reloj.instant()).toMillis());
+                    return resultado;
                 }
+                respuesta.llamadas().forEach(llamada -> usadas.add(llamada.nombre()));
                 turnos.add(new Turno.Modelo(respuesta.contenido()));
                 turnos.add(new Turno.Resultados(ejecutar(contexto, respuesta.llamadas(), productos)));
             }
