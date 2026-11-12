@@ -114,3 +114,20 @@ def reactivar(usuario_id, motivo, realizado_por):
             _rechazar(usuario_id, 'reactivar', REQUISITO_REACTIVAR)
         UsuarioAccion.objects.create(usuario_id=usuario_id, accion=UsuarioAccion.Accion.REACTIVAR,
                                      motivo=motivo, realizado_por=realizado_por)
+
+
+# H93: baja definitiva
+PUEDE_DAR_BAJA = (ACTIVO, SUSPENDIDO)
+REQUISITO_DAR_BAJA = 'La cuenta ya fue dada de baja y no se puede revertir.'
+
+
+def dar_baja(usuario_id, motivo, realizado_por):
+    """H93: cuenta activa o suspendida. Un solo UPDATE que también quita la suspensión, para cumplir
+    el check chk_usuario_baja_sin_suspension (activo or suspendido_hasta is null)."""
+    with transaction.atomic():
+        filas = (Usuario.objects.filter(pk=usuario_id, activo=True)
+                 .update(activo=False, suspendido_hasta=None, motivo_estado=motivo))
+        if not filas:
+            _rechazar(usuario_id, 'dar de baja', REQUISITO_DAR_BAJA)
+        UsuarioAccion.objects.create(usuario_id=usuario_id, accion=UsuarioAccion.Accion.DAR_BAJA,
+                                     motivo=motivo, realizado_por=realizado_por)

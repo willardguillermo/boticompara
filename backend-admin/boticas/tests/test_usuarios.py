@@ -8,6 +8,7 @@ from datetime import timedelta
 from itertools import count
 
 from django.contrib.auth.models import Permission, User
+from django.db import IntegrityError, transaction
 from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -327,6 +328,95 @@ class ReactivarTests(ConAdmin):
                 self.assertFalse(UsuarioAccion.objects.filter(usuario=usuario).exists())
 
 
+class DarBajaTests(ConAdmin):
+    """H93"""
+    MOTIVO = 'Suplantó la identidad de una botica'
+
+    def confirmar(self, usuario, motivo=MOTIVO):
+        return self.client.post(url_accion(usuario, 'dar_baja'), {'motivo': motivo, 'confirmado': 'si'}, follow=True)
+
+    def test_primer_envio_solo_pide_confirmacion(self):
+        usuario = crear_usuario()
+
+        formulario = self.client.get(url_accion(usuario, 'dar_baja'))
+        respuesta = self.client.post(url_accion(usuario, 'dar_baja'), {'motivo': self.MOTIVO})
+
+        self.assertContains(formulario, 'definitiva y no se puede revertir')
+        self.assertContains(respuesta, 'definitiva y no se puede revertir')
+        self.assertContains(respuesta, 'Sí, dar de baja definitivamente')
+        self.assertContains(respuesta, 'name="confirmado" value="si"')
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.activo)
+        self.assertFalse(UsuarioAccion.objects.exists())
+
+    def test_activo_se_da_de_baja_al_confirmar(self):
+        usuario = crear_usuario()
+
+        respuesta = self.confirmar(usuario)
+
+        usuario.refresh_from_db()
+        self.assertEqual(usuarios.estado_de(usuario), usuarios.BAJA)
+        self.assertEqual(usuario.motivo_estado, self.MOTIVO)
+        self.assertRedirects(respuesta, detalle(usuario))
+        self.assertIn(f'Se dio de baja la cuenta de {usuario.nombre}. Esta acción es definitiva.',
+                      self.mensajes(respuesta))
+        accion = UsuarioAccion.objects.get(usuario=usuario)
+        self.assertEqual((accion.accion, accion.motivo, accion.realizado_por),
+                         (UsuarioAccion.Accion.DAR_BAJA, self.MOTIVO, 'guillermo'))
+
+    def test_suspendido_se_da_de_baja_cumpliendo_el_check(self):
+        usuario = crear_usuario(usuarios.SUSPENDIDO)
+
+        self.confirmar(usuario)
+
+        usuario.refresh_from_db()
+        self.assertFalse(usuario.activo)
+        self.assertIsNone(usuario.suspendido_hasta)
+        self.assertEqual(usuario.motivo_estado, self.MOTIVO)
+        self.assertEqual(UsuarioAccion.objects.get(usuario=usuario).accion, UsuarioAccion.Accion.DAR_BAJA)
+
+    def test_el_check_impide_una_baja_que_deje_la_suspension(self):
+        """Por esto la baja borra suspendido_hasta en el mismo UPDATE."""
+        usuario = crear_usuario(usuarios.SUSPENDIDO)
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Usuario.objects.filter(pk=usuario.pk).update(activo=False)
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.activo)
+
+    def test_motivo_obligatorio_de_10_a_300(self):
+        usuario = crear_usuario()
+        for motivo, error in (('', 'Escribe el motivo.'), ('corto', 'al menos 10 caracteres'),
+                              ('x' * 301, 'como máximo 300')):
+            with self.subTest(motivo=motivo[:12]):
+                respuesta = self.client.post(url_accion(usuario, 'dar_baja'), {'motivo': motivo, 'confirmado': 'si'})
+                self.assertContains(respuesta, error)
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.activo)
+        self.assertFalse(UsuarioAccion.objects.exists())
+
+    def test_baja_se_rechaza_tambien_por_url(self):
+        usuario = crear_usuario(usuarios.BAJA)
+
+        for respuesta in (self.client.get(url_accion(usuario, 'dar_baja'), follow=True), self.confirmar(usuario)):
+            self.assertRedirects(respuesta, detalle(usuario))
+            self.assertTrue(any(m.startswith(f'No se puede dar de baja la cuenta de {usuario.nombre}')
+                                for m in self.mensajes(respuesta)))
+        usuario.refresh_from_db()
+        self.assertEqual(usuario.motivo_estado, 'Cuenta fraudulenta confirmada')
+        self.assertFalse(UsuarioAccion.objects.exists())
+
+    def test_cuenta_de_baja_no_se_suspende_ni_reactiva(self):
+        usuario = crear_usuario()
+        self.confirmar(usuario)
+
+        for accion in ('suspender', 'reactivar'):
+            with self.subTest(accion):
+                respuesta = self.client.get(url_accion(usuario, accion), follow=True)
+                self.assertRedirects(respuesta, detalle(usuario))
+        self.assertEqual(UsuarioAccion.objects.filter(usuario=usuario).count(), 1)
+
+
 class BotonesDelDetalleTests(ConAdmin):
     """H91-H93: cada estado muestra solo las acciones que le corresponden."""
 
@@ -335,11 +425,11 @@ class BotonesDelDetalleTests(ConAdmin):
         return {accion for accion in ('suspender', 'reactivar', 'dar-baja')
                 if f'{LISTA}{usuario.pk}/{accion}/' in contenido}
 
-    def test_activo_puede_suspenderse(self):
-        self.assertEqual(self.botones(crear_usuario()), {'suspender'})
+    def test_activo_puede_suspenderse_o_darse_de_baja(self):
+        self.assertEqual(self.botones(crear_usuario()), {'suspender', 'dar-baja'})
 
-    def test_suspendido_puede_reactivarse(self):
-        self.assertEqual(self.botones(crear_usuario(usuarios.SUSPENDIDO)), {'reactivar'})
+    def test_suspendido_puede_reactivarse_o_darse_de_baja(self):
+        self.assertEqual(self.botones(crear_usuario(usuarios.SUSPENDIDO)), {'reactivar', 'dar-baja'})
 
     def test_baja_no_tiene_botones(self):
         self.assertEqual(self.botones(crear_usuario(usuarios.BAJA)), set())

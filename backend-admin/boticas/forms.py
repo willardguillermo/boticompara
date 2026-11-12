@@ -83,3 +83,9 @@ class ReactivarForm(forms.Form):
     """H92: el motivo es opcional; si se escribe, de 10 a 300 caracteres."""
     motivo = campo_motivo(False, f'Opcional. Si lo escribes, de {usuarios.MOTIVO_MIN} a '
                                  f'{usuarios.MOTIVO_MAX} caracteres. Queda en el historial de la cuenta.')
+
+
+class DarBajaForm(forms.Form):
+    """H93: el motivo es obligatorio. La confirmación es un segundo envío con confirmado=si."""
+    motivo = campo_motivo(True, f'De {usuarios.MOTIVO_MIN} a {usuarios.MOTIVO_MAX} caracteres. '
+                                'Queda en el historial de la cuenta.')

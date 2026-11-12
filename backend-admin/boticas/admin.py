@@ -10,7 +10,7 @@ from django.utils.html import format_html
 from django.utils.text import Truncator
 
 from . import historial, usuarios
-from .forms import BoticaRevisionForm, ReactivarForm, SuspenderForm
+from .forms import BoticaRevisionForm, DarBajaForm, ReactivarForm, SuspenderForm
 from .models import Botica, BoticaRevision, Producto, Usuario
 from .notificaciones import notificar_revision
 from .storage import StorageError, url_firmada_licencia
@@ -83,6 +83,7 @@ class UsuarioAdmin(SoloLecturaAdmin):
         return [
             path('<path:object_id>/suspender/', vista(self.suspender_view), name=f'{nombre}_suspender'),
             path('<path:object_id>/reactivar/', vista(self.reactivar_view), name=f'{nombre}_reactivar'),
+            path('<path:object_id>/dar-baja/', vista(self.dar_baja_view), name=f'{nombre}_dar_baja'),
             *super().get_urls(),
         ]
 
@@ -108,6 +109,8 @@ class UsuarioAdmin(SoloLecturaAdmin):
             acciones.append({'texto': 'Suspender', 'url': self.url_accion(usuario, 'suspender')})
         if estado in usuarios.PUEDE_REACTIVAR:
             acciones.append({'texto': 'Reactivar', 'url': self.url_accion(usuario, 'reactivar')})
+        if estado in usuarios.PUEDE_DAR_BAJA:
+            acciones.append({'texto': 'Dar de baja', 'url': self.url_accion(usuario, 'dar_baja'), 'peligrosa': True})
         return acciones
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
@@ -178,6 +181,28 @@ class UsuarioAdmin(SoloLecturaAdmin):
                 messages.success(request, f'Se reactivó la cuenta de {usuario.nombre}.')
             return redirect(self.url_detalle(usuario))
         return self._pagina(request, usuario, form, f'Reactivar la cuenta de {usuario.nombre}', 'Reactivar cuenta')
+
+    ADVERTENCIA_BAJA = ('La baja es definitiva y no se puede revertir: la cuenta no podrá volver a entrar a '
+                        'BotiCompara y no existe ninguna acción para reactivarla. Si es dueño de una botica, '
+                        'sus productos dejan de aparecer en las búsquedas.')
+
+    def dar_baja_view(self, request, object_id):
+        """H93: primero el motivo, luego una página de confirmación; solo el segundo envío da de baja."""
+        usuario, respuesta = self._cuenta_para(request, object_id, usuarios.PUEDE_DAR_BAJA,
+                                               'dar de baja', usuarios.REQUISITO_DAR_BAJA)
+        if respuesta:
+            return respuesta
+        form = DarBajaForm(request.POST if request.method == 'POST' else None)
+        if form.is_valid():
+            if request.POST.get('confirmado') != 'si':
+                return self._pagina(request, usuario, form, f'¿Dar de baja la cuenta de {usuario.nombre}?',
+                                    'Sí, dar de baja definitivamente', confirmacion=True, peligrosa=True,
+                                    advertencia=self.ADVERTENCIA_BAJA)
+            if self._ejecutar(request, usuario, usuarios.dar_baja, form.cleaned_data['motivo']):
+                messages.success(request, f'Se dio de baja la cuenta de {usuario.nombre}. Esta acción es definitiva.')
+            return redirect(self.url_detalle(usuario))
+        return self._pagina(request, usuario, form, f'Dar de baja la cuenta de {usuario.nombre}', 'Continuar',
+                            advertencia=self.ADVERTENCIA_BAJA)
 
 
 @admin.register(Producto)
