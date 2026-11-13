@@ -77,6 +77,22 @@ class IndicadoresTests(ConTablas):
 
         self.assertEqual(indicadores(*rango_por_defecto())['duenos_activos'], 1)
 
+    def test_suspendidos_no_cuentan_como_activos(self):
+        ahora = timezone.now()
+        crear_usuario()
+        suspendido = crear_usuario()
+        vencido = crear_usuario(Usuario.Rol.DUENO_BOTICA)
+        dueno_suspendido = crear_usuario(Usuario.Rol.DUENO_BOTICA)
+        Usuario.objects.filter(pk__in=[suspendido.pk, dueno_suspendido.pk]).update(
+            suspendido_hasta=ahora + timedelta(days=3), motivo_estado='Suspensión de prueba')
+        # Una suspensión que ya venció vuelve a contar como activa
+        Usuario.objects.filter(pk=vencido.pk).update(
+            suspendido_hasta=ahora - timedelta(hours=1), motivo_estado='Suspensión vencida')
+
+        datos = indicadores(*rango_por_defecto())
+
+        self.assertEqual((datos['compradores_activos'], datos['duenos_activos']), (1, 1))
+
     def test_boticas_por_estado_con_cero_si_no_hay(self):
         crear_botica(Botica.Estado.PENDIENTE)
         crear_botica(Botica.Estado.PENDIENTE)

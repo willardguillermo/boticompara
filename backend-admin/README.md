@@ -1,6 +1,6 @@
 # backend-admin
 
-Panel de administración de BotiCompara: revisión de boticas pendientes (aprobar o rechazar con motivo) y consulta de usuarios y productos.
+Panel de administración de BotiCompara: revisión de boticas pendientes (aprobar o rechazar con motivo), gestión de usuarios (suspender, reactivar y dar de baja) y consulta de productos.
 
 - **Responsable:** Guillermo
 - **Tecnología:** Django 5.2 (Python 3.12+), Django Admin, psycopg 3, python-dotenv
@@ -12,7 +12,7 @@ Panel de administración de BotiCompara: revisión de boticas pendientes (aproba
 | Sección | Permite |
 |---|---|
 | **Boticas** | Listar con filtros por estado y distrito, con columna **Licencia** (✓/✗); buscar por nombre, RUC o correo del dueño; acción en lote **"Aprobar boticas seleccionadas"**; rechazar desde el formulario (estado `RECHAZADO` + motivo obligatorio). En la ficha, **"Evidencia para la aprobación"**: enlace **"Ver licencia"** (URL firmada de Supabase Storage que vence en 5 minutos) y ubicación con enlace y mapa de OpenStreetMap. Los datos de la botica y sus productos se ven en solo lectura. No se pueden crear ni borrar boticas. Al aprobar o rechazar se envía un **correo al dueño** (solo si el estado cambió); si el envío falla, la revisión igual se guarda y se muestra un aviso. |
-| **Usuarios** | Solo lectura. Nunca se muestra `password_hash`. |
+| **Usuarios** | Lista con estado calculado, filtros por rol y estado, búsqueda por nombre o correo; suspender, reactivar y dar de baja (ver H90-H94). Nadie edita los datos personales ni borra cuentas. Nunca se muestran `password_hash` ni `google_uid`. |
 | **Productos** | Solo lectura, con filtros por botica y estado. |
 
 Los modelos `Usuario`, `Botica` y `Producto` usan `managed = False`: Django **no crea ni altera** esas
@@ -50,6 +50,40 @@ botica se ve también su **Historial de revisiones**.
 Al bajar esta versión, correr una vez `python manage.py migrate`: solo registra el modelo y sus
 permisos (para que un administrador que no es superusuario pueda ver el historial); **no crea la
 tabla**, que ya existe en Supabase.
+
+## Gestión de usuarios (H90-H94)
+
+No hay columna `estado`: se calcula con `activo` y `suspendido_hasta` ([`database/v5_sprint4.sql`](../database/v5_sprint4.sql)).
+
+| Estado | Regla | Se muestra |
+|---|---|---|
+| Activo | `activo` y (`suspendido_hasta` vacío o ya pasado) | Activo |
+| Suspendido | `activo` y `suspendido_hasta` > ahora | Suspendido hasta dd/mm/aaaa |
+| Baja | `not activo` | Baja |
+
+- **Lista (H90):** nombre, correo, rol, estado y fecha de registro; filtros por rol y por estado, búsqueda
+  por nombre o correo. El detalle es de solo lectura.
+- **Suspender (H91):** botón en el detalle, solo si la cuenta está Activa. Pide **hasta** (de mañana a 90
+  días; la suspensión dura hasta las 23:59:59 de ese día en Lima) y **motivo** (10 a 300 caracteres).
+  La suspensión vence sola.
+- **Reactivar (H92):** solo si está Suspendida; motivo opcional. Borra `suspendido_hasta` y `motivo_estado`.
+- **Dar de baja (H93):** si está Activa o Suspendida; motivo obligatorio y una página de confirmación.
+  **Es definitiva**: no hay acción para revertirla. Un solo `UPDATE` pone `activo = false`,
+  `suspendido_hasta = null` y el motivo (así se cumple el check `activo or suspendido_hasta is null`).
+  Una cuenta dada de baja no muestra botones.
+- **Historial (H94):** cada acción crea una fila en `usuario_accion` con el usuario de Django que la hizo,
+  en la misma transacción. Se ve en el detalle del usuario (de la más reciente a la más antigua) y en
+  **Boticas → Historial de acciones sobre usuarios**, con filtros por acción y por rango de fechas.
+  Todo es de solo lectura.
+
+Cada acción es un `UPDATE` que lleva en su `WHERE` el estado que exige: si la cuenta cambió mientras el
+formulario estaba abierto (otro administrador, o la suspensión venció), se rechaza con un mensaje y no
+queda historial. Lo mismo si alguien entra directo por la URL a una acción que no corresponde. Para
+suspender, reactivar o dar de baja hace falta el permiso **Can change usuario** (los superusuarios ya lo
+tienen); con solo **Can view usuario** se ve todo sin botones.
+
+Al bajar esta versión, correr `python manage.py migrate`: registra `UsuarioAccion`, `Reserva` y `Resena`
+(managed = False) sin crear tablas.
 
 ## Medicamentos más buscados (H62)
 

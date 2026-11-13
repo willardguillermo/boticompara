@@ -1,20 +1,13 @@
 {% extends "admin/base_site.html" %}
-{% load i18n admin_urls %}
+{% load i18n static admin_urls %}
+{% comment %}
+H46: carga masiva del catálogo DIGEMID.
+Solo usa el marcado y las clases nativas del admin (forms.css): se ve igual en modo claro y oscuro.
+{% endcomment %}
 
-{% block extrastyle %}
-  {{ block.super }}
-  <style>
-    .digemid-tarjetas { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 20px; }
-    .digemid-tarjeta { flex: 1 1 160px; padding: 14px 16px; border: 1px solid var(--hairline-color);
-                       border-left-width: 6px; border-radius: 4px; background: var(--darkened-bg); }
-    .digemid-tarjeta .numero { display: block; font-size: 2rem; font-weight: bold; line-height: 1.2; }
-    .digemid-tarjeta.creados { border-left-color: #2e7d32; }
-    .digemid-tarjeta.actualizados { border-left-color: #417690; }
-    .digemid-tarjeta.errores { border-left-color: #ba2121; }
-    .digemid-simulacion { padding: 10px 14px; margin: 0 0 16px; border-radius: 4px;
-                          background: var(--message-warning-bg); font-weight: bold; }
-  </style>
-{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/forms.css" %}">{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
@@ -28,21 +21,30 @@
 {% block content %}
 <div id="content-main">
   {% if resultado %}
-    <h2>Resultado</h2>
     {% if resultado.simulacion %}
-      <p class="digemid-simulacion">SIMULACIÓN: no se guardó nada. Desmarca «Solo simular» para guardar.</p>
+      <ul class="messagelist"><li class="warning">SIMULACIÓN: no se guardó nada. Desmarca «Solo simular» para guardar.</li></ul>
     {% endif %}
-    <p>Filas leídas del archivo: {{ resultado.filas_leidas }}</p>
-    <div class="digemid-tarjetas">
-      <div class="digemid-tarjeta creados"><span class="numero">{{ resultado.creados }}</span>Creados</div>
-      <div class="digemid-tarjeta actualizados"><span class="numero">{{ resultado.actualizados }}</span>Actualizados</div>
-      <div class="digemid-tarjeta errores"><span class="numero">{{ resultado.errores|length }}</span>Filas con error</div>
-    </div>
+
+    <fieldset class="module aligned">
+      <h2 class="fieldset-heading">Resultado</h2>
+      <div class="form-row">
+        <div><div class="flex-container"><label>Filas leídas:</label><div class="readonly">{{ resultado.filas_leidas }}</div></div></div>
+      </div>
+      <div class="form-row">
+        <div><div class="flex-container"><label>Creados:</label><div class="readonly"><strong>{{ resultado.creados }}</strong></div></div></div>
+      </div>
+      <div class="form-row">
+        <div><div class="flex-container"><label>Actualizados:</label><div class="readonly"><strong>{{ resultado.actualizados }}</strong></div></div></div>
+      </div>
+      <div class="form-row{% if resultado.errores %} errors{% endif %}">
+        <div><div class="flex-container"><label>Filas con error:</label><div class="readonly"><strong>{{ resultado.errores|length }}</strong></div></div></div>
+      </div>
+    </fieldset>
 
     {% if resultado.principios_creados %}
       <div class="module">
         <h2>Principios activos nuevos ({{ resultado.principios_creados|length }})</h2>
-        <ul style="margin: 10px 0 10px 20px;">
+        <ul>
           {% for nombre in resultado.principios_creados %}<li>{{ nombre }}</li>{% endfor %}
         </ul>
       </div>
@@ -50,7 +52,7 @@
 
     {% if resultado.errores %}
       <div class="module">
-        <table style="width: 100%;">
+        <table>
           <caption>Filas con error (no se importaron)</caption>
           <thead>
             <tr><th scope="col">Fila</th><th scope="col">Reg Sanitario</th><th scope="col">Motivo</th></tr>
@@ -64,34 +66,51 @@
       </div>
     {% endif %}
 
-    <p><a class="button" href="{% url opts|admin_urlname:'changelist' %}">Ver medicamentos</a></p>
+    <div class="submit-row">
+      <a href="{% url opts|admin_urlname:'changelist' %}" class="closelink">Ver medicamentos</a>
+    </div>
     <h2>Importar otro archivo</h2>
   {% endif %}
 
   <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
-    {% if form.non_field_errors %}{{ form.non_field_errors }}{% endif %}
-    <fieldset class="module aligned">
-      {% for campo in form %}
-        <div class="form-row{% if campo.errors %} errors{% endif %}">
-          {{ campo.errors }}
-          <div class="flex-container{% if campo.field.widget.input_type == 'checkbox' %} checkbox-row{% endif %}">
-            {% if campo.field.widget.input_type == 'checkbox' %}
-              {{ campo }}{{ campo.label_tag }}
-            {% else %}
-              {{ campo.label_tag }}{{ campo }}
-            {% endif %}
-          </div>
-          {% if campo.help_text %}<div class="help">{{ campo.help_text }}</div>{% endif %}
+    <div>
+      {% if form.errors %}
+        <p class="errornote">{% if form.errors|length == 1 %}Corrige el error de abajo.{% else %}Corrige los errores de abajo.{% endif %}</p>
+        {{ form.non_field_errors }}
+      {% endif %}
+      <fieldset class="module aligned">
+        <div class="description">
+          Clave: el <strong>registro sanitario</strong>. Si ya existe en el catálogo se actualiza el medicamento;
+          si no, se crea sin categoría. Las filas con error no detienen la carga.
         </div>
-      {% endfor %}
-    </fieldset>
-    <p>
-      Clave: el <strong>registro sanitario</strong>. Si ya existe en el catálogo se actualiza el medicamento;
-      si no, se crea sin categoría. Las filas con error no detienen la carga.
-    </p>
-    <div class="submit-row">
-      <input type="submit" class="default" value="Importar">
+        {% for campo in form %}
+          {% with es_checkbox=campo.field.widget.input_type %}
+          <div class="form-row{% if campo.errors %} errors{% endif %} field-{{ campo.name }}">
+            {{ campo.errors }}
+            <div>
+              {% if es_checkbox == 'checkbox' %}
+                <div class="flex-container checkbox-row">
+                  {{ campo }}<label for="{{ campo.id_for_label }}" class="vCheckboxLabel">{{ campo.label }}</label>
+                </div>
+              {% else %}
+                <div class="flex-container">
+                  <label for="{{ campo.id_for_label }}"{% if campo.field.required %} class="required"{% endif %}>{{ campo.label }}:</label>
+                  {{ campo }}
+                </div>
+              {% endif %}
+              {% if campo.help_text %}
+                <div class="help" id="{{ campo.auto_id }}_helptext"><div>{{ campo.help_text }}</div></div>
+              {% endif %}
+            </div>
+          </div>
+          {% endwith %}
+        {% endfor %}
+      </fieldset>
+      <div class="submit-row">
+        <input type="submit" class="default" value="Importar">
+        <a href="{% url opts|admin_urlname:'changelist' %}" class="closelink">Cancelar</a>
+      </div>
     </div>
   </form>
 </div>

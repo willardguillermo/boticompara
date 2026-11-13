@@ -1,13 +1,17 @@
 from django.contrib import admin, messages
+from django.contrib.admin.utils import unquote
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.urls import reverse
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.text import Truncator
 
-from . import historial
-from .forms import BoticaRevisionForm
-from .models import Botica, BoticaRevision, Producto, Usuario
+from . import historial, usuarios
+from .forms import BoticaRevisionForm, DarBajaForm, ReactivarForm, SuspenderForm
+from .models import Botica, BoticaRevision, Producto, Usuario, UsuarioAccion
 from .notificaciones import notificar_revision
 from .storage import StorageError, url_firmada_licencia
 
@@ -29,13 +33,238 @@ class SoloLecturaAdmin(admin.ModelAdmin):
         return False
 
 
+# H94: naranja para la suspensión, verde para la reactivación y rojo para la baja
+COLORES_ACCION = {
+    UsuarioAccion.Accion.SUSPENDER: '#ef6c00',
+    UsuarioAccion.Accion.REACTIVAR: '#2e7d32',
+    UsuarioAccion.Accion.DAR_BAJA: '#ba2121',
+}
+
+
+class ColumnasAccion:
+    """H94: columnas del historial que comparten el listado general y el detalle del usuario."""
+
+    @admin.display(description='fecha', ordering='fecha')
+    def fecha_accion(self, obj):
+        return f'{timezone.localtime(obj.fecha):%d/%m/%Y %H:%M}'
+
+    @admin.display(description='acción', ordering='accion')
+    def accion_texto(self, obj):
+        return format_html(
+            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
+            ' white-space: nowrap;">{}</span>',
+            COLORES_ACCION.get(obj.accion, '#757575'), obj.get_accion_display(),
+        )
+
+    @admin.display(description='motivo')
+    def motivo_accion(self, obj):
+        return obj.motivo or '—'
+
+    @admin.display(description='realizado por', ordering='realizado_por')
+    def realizado_por_texto(self, obj):
+        return obj.realizado_por
+
+
+class UsuarioAccionInline(ColumnasAccion, admin.TabularInline):
+    """H94: historial en el detalle del usuario, de la más reciente a la más antigua, de solo lectura."""
+    model = UsuarioAccion
+    fields = ('fecha_accion', 'accion_texto', 'motivo_accion', 'realizado_por_texto')
+    readonly_fields = fields
+    ordering = ('-fecha', '-id')
+    extra = 0
+    can_delete = False
+    verbose_name = 'acción'
+    verbose_name_plural = 'historial de acciones'
+    # Sin la línea con el texto del objeto arriba de cada fila: repetía lo que ya muestran las columnas
+    template = 'admin/boticas/historial_inline.html'
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class EstadoUsuarioFilter(admin.SimpleListFilter):
+    """H90: no hay columna estado; se calcula con activo y suspendido_hasta (boticas/usuarios.py)."""
+    title = 'estado'
+    parameter_name = 'estado'
+
+    def lookups(self, request, model_admin):
+        return usuarios.ESTADOS
+
+    def queryset(self, request, queryset):
+        if self.value() in dict(usuarios.ESTADOS):
+            return queryset.filter(usuarios.q_estado(self.value()))
+        return queryset
+
+
 @admin.register(Usuario)
 class UsuarioAdmin(SoloLecturaAdmin):
-    list_display = ('nombre', 'correo', 'rol', 'telefono', 'correo_verificado', 'activo', 'creado_en')
-    list_filter = ('rol', 'activo', 'correo_verificado')
+    """H90: los datos personales los maneja el propio usuario; aquí nadie los edita ni borra cuentas."""
+    list_display = ('nombre', 'correo', 'rol', 'estado', 'fecha_registro')
+    list_filter = ('rol', EstadoUsuarioFilter)
     search_fields = ('nombre', 'correo')
-    # Nunca mostrar el hash de la contraseña
-    exclude = ('password_hash',)
+    search_help_text = 'Busca por nombre o correo.'
+    # Nunca se muestran el hash de la contraseña ni el identificador de Google
+    fields = ('nombre', 'correo', 'rol', 'telefono', 'direccion', 'correo_verificado',
+              'estado', 'motivo', 'fecha_registro', 'actualizado')
+    readonly_fields = fields
+    inlines = [UsuarioAccionInline]  # H94
+
+    @admin.display(description='estado')
+    def estado(self, obj):
+        return usuarios.texto_estado(obj)
+
+    @admin.display(description='motivo del estado')
+    def motivo(self, obj):
+        # Una suspensión vencida deja su motivo en la BD, pero la cuenta ya está activa
+        if usuarios.estado_de(obj) == usuarios.ACTIVO:
+            return '—'
+        return obj.motivo_estado or '—'
+
+    # Hora de Lima (TIME_ZONE), no la UTC que guarda la BD; mismo formato que la lista y el historial
+    @admin.display(description='fecha de registro', ordering='creado_en')
+    def fecha_registro(self, obj):
+        return f'{timezone.localtime(obj.creado_en):%d/%m/%Y %H:%M}'
+
+    @admin.display(description='actualizado en', ordering='actualizado_en')
+    def actualizado(self, obj):
+        return f'{timezone.localtime(obj.actualizado_en):%d/%m/%Y %H:%M}'
+
+    # ---- H91-H93: acciones sobre la cuenta, cada una con su página ----
+
+    def get_urls(self):
+        # Antes que las del admin: su ruta "<id>/" atraparía estas URLs
+        vista = self.admin_site.admin_view
+        nombre = f'{self.opts.app_label}_{self.opts.model_name}'
+        return [
+            path('<path:object_id>/suspender/', vista(self.suspender_view), name=f'{nombre}_suspender'),
+            path('<path:object_id>/reactivar/', vista(self.reactivar_view), name=f'{nombre}_reactivar'),
+            path('<path:object_id>/dar-baja/', vista(self.dar_baja_view), name=f'{nombre}_dar_baja'),
+            *super().get_urls(),
+        ]
+
+    def puede_gestionar(self, request):
+        """Editar datos está prohibido para todos; suspender o dar de baja exige el permiso de cambio."""
+        return request.user.has_perm(f'{self.opts.app_label}.change_{self.opts.model_name}')
+
+    def url_accion(self, usuario, accion):
+        return reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_{accion}', args=[usuario.pk],
+                       current_app=self.admin_site.name)
+
+    def url_detalle(self, usuario):
+        return reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_change', args=[usuario.pk],
+                       current_app=self.admin_site.name)
+
+    def acciones_disponibles(self, request, usuario):
+        """Botones del detalle según el estado. Una cuenta dada de baja no tiene ninguno."""
+        if not self.puede_gestionar(request):
+            return []
+        estado = usuarios.estado_de(usuario)
+        acciones = []
+        if estado in usuarios.PUEDE_SUSPENDER:
+            acciones.append({'texto': 'Suspender', 'url': self.url_accion(usuario, 'suspender')})
+        if estado in usuarios.PUEDE_REACTIVAR:
+            acciones.append({'texto': 'Reactivar', 'url': self.url_accion(usuario, 'reactivar')})
+        if estado in usuarios.PUEDE_DAR_BAJA:
+            acciones.append({'texto': 'Dar de baja', 'url': self.url_accion(usuario, 'dar_baja'), 'peligrosa': True})
+        return acciones
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        usuario = self.get_object(request, unquote(object_id))
+        # El título nativo de una ficha de solo lectura es "Vista usuario"; el subtítulo ya trae nombre y correo
+        extra_context = {**(extra_context or {}), 'title': 'Usuario',
+                         'acciones_usuario': self.acciones_disponibles(request, usuario) if usuario else []}
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def _cuenta_para(self, request, object_id, estados_validos, accion, requisito):
+        """(usuario, None) si la acción corresponde al estado actual; si no, (None, redirección con el error).
+
+        Se comprueba también aquí (y no solo en los botones) por si alguien entra directo por la URL.
+        """
+        if not self.puede_gestionar(request):
+            raise PermissionDenied
+        usuario = self.get_object(request, unquote(object_id))
+        if usuario is None:
+            messages.error(request, 'La cuenta no existe.')
+            return None, redirect(reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_changelist',
+                                          current_app=self.admin_site.name))
+        if usuarios.estado_de(usuario) not in estados_validos:
+            messages.error(request, usuarios.mensaje_rechazo(usuario, accion, requisito))
+            return None, redirect(self.url_detalle(usuario))
+        return usuario, None
+
+    def _pagina(self, request, usuario, form, titulo, boton, **extra):
+        contexto = {
+            **self.admin_site.each_context(request),
+            'opts': self.opts, 'title': titulo, 'usuario': usuario, 'form': form, 'boton': boton,
+            'estado': usuarios.texto_estado(usuario), 'url_detalle': self.url_detalle(usuario),
+            **extra,
+        }
+        return TemplateResponse(request, 'admin/boticas/usuario/accion.html', contexto)
+
+    def _ejecutar(self, request, usuario, accion, *args):
+        """Corre la acción; si el estado cambió mientras el formulario estaba abierto, avisa el error."""
+        try:
+            accion(usuario.pk, *args, request.user.get_username())
+        except usuarios.AccionNoPermitida as e:
+            messages.error(request, str(e))
+            return False
+        return True
+
+    def suspender_view(self, request, object_id):
+        """H91"""
+        usuario, respuesta = self._cuenta_para(request, object_id, usuarios.PUEDE_SUSPENDER,
+                                               'suspender', usuarios.REQUISITO_SUSPENDER)
+        if respuesta:
+            return respuesta
+        form = SuspenderForm(request.POST if request.method == 'POST' else None)
+        if form.is_valid():
+            hasta, motivo = form.cleaned_data['hasta'], form.cleaned_data['motivo']
+            if self._ejecutar(request, usuario, usuarios.suspender, hasta, motivo):
+                messages.success(request, f'Se suspendió la cuenta de {usuario.nombre} hasta el '
+                                          f'{hasta:%d/%m/%Y}.')
+            return redirect(self.url_detalle(usuario))
+        return self._pagina(request, usuario, form, f'Suspender la cuenta de {usuario.nombre}', 'Suspender cuenta')
+
+    def reactivar_view(self, request, object_id):
+        """H92: quita la suspensión antes de que venza."""
+        usuario, respuesta = self._cuenta_para(request, object_id, usuarios.PUEDE_REACTIVAR,
+                                               'reactivar', usuarios.REQUISITO_REACTIVAR)
+        if respuesta:
+            return respuesta
+        form = ReactivarForm(request.POST if request.method == 'POST' else None)
+        if form.is_valid():
+            if self._ejecutar(request, usuario, usuarios.reactivar, form.cleaned_data['motivo']):
+                messages.success(request, f'Se reactivó la cuenta de {usuario.nombre}.')
+            return redirect(self.url_detalle(usuario))
+        return self._pagina(request, usuario, form, f'Reactivar la cuenta de {usuario.nombre}', 'Reactivar cuenta')
+
+    ADVERTENCIA_BAJA = ('La baja es definitiva y no se puede revertir: la cuenta no podrá volver a entrar a '
+                        'BotiCompara y no existe ninguna acción para reactivarla. Si es dueño de una botica, '
+                        'sus productos dejan de aparecer en las búsquedas.')
+
+    def dar_baja_view(self, request, object_id):
+        """H93: primero el motivo, luego una página de confirmación; solo el segundo envío da de baja."""
+        usuario, respuesta = self._cuenta_para(request, object_id, usuarios.PUEDE_DAR_BAJA,
+                                               'dar de baja', usuarios.REQUISITO_DAR_BAJA)
+        if respuesta:
+            return respuesta
+        form = DarBajaForm(request.POST if request.method == 'POST' else None)
+        if form.is_valid():
+            if request.POST.get('confirmado') != 'si':
+                return self._pagina(request, usuario, form, f'¿Dar de baja la cuenta de {usuario.nombre}?',
+                                    'Sí, dar de baja definitivamente', confirmacion=True, peligrosa=True,
+                                    advertencia=self.ADVERTENCIA_BAJA)
+            if self._ejecutar(request, usuario, usuarios.dar_baja, form.cleaned_data['motivo']):
+                messages.success(request, f'Se dio de baja la cuenta de {usuario.nombre}. Esta acción es definitiva.')
+            return redirect(self.url_detalle(usuario))
+        return self._pagina(request, usuario, form, f'Dar de baja la cuenta de {usuario.nombre}', 'Continuar',
+                            advertencia=self.ADVERTENCIA_BAJA)
 
 
 @admin.register(Producto)
@@ -135,10 +364,21 @@ class RangoFechasFilter(admin.ListFilter):
         return queryset
 
 
-@admin.register(BoticaRevision)
-class BoticaRevisionAdmin(ColumnasRevision, SoloLecturaAdmin):
-    """H47: historial de aprobaciones y rechazos, de solo lectura."""
+class ConRangoFechas:
+    """Lista con los campos Desde/Hasta arriba (RangoFechasFilter va en list_filter)."""
     change_list_template = 'admin/boticas/boticarevision/change_list.html'
+
+    def changelist_view(self, request, extra_context=None):
+        # Valores que se muestran en los campos Desde/Hasta de arriba de la lista
+        extra_context = {**(extra_context or {}),
+                         'rango_desde': request.GET.get('desde', ''),
+                         'rango_hasta': request.GET.get('hasta', '')}
+        return super().changelist_view(request, extra_context)
+
+
+@admin.register(BoticaRevision)
+class BoticaRevisionAdmin(ConRangoFechas, ColumnasRevision, SoloLecturaAdmin):
+    """H47: historial de aprobaciones y rechazos, de solo lectura."""
     list_display = ('fecha_revision', 'botica_enlace', 'ruc', 'estado_revision', 'revisado_por_texto',
                     'motivo_corto')
     list_display_links = ('fecha_revision',)
@@ -159,12 +399,6 @@ class BoticaRevisionAdmin(ColumnasRevision, SoloLecturaAdmin):
     def ruc(self, obj):
         return obj.botica.ruc
 
-    def changelist_view(self, request, extra_context=None):
-        # Valores que se muestran en los campos Desde/Hasta de arriba de la lista
-        extra_context = {**(extra_context or {}),
-                         'rango_desde': request.GET.get('desde', ''),
-                         'rango_hasta': request.GET.get('hasta', '')}
-        return super().changelist_view(request, extra_context)
 
 
 class RevisionInline(ColumnasRevision, admin.TabularInline):
@@ -176,6 +410,8 @@ class RevisionInline(ColumnasRevision, admin.TabularInline):
     can_delete = False
     verbose_name = 'revisión'
     verbose_name_plural = 'historial de revisiones'
+    # Sin la línea con el texto del objeto arriba de cada fila, igual que en el usuario (H94)
+    template = 'admin/boticas/historial_inline.html'
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -304,3 +540,36 @@ class BoticaAdmin(admin.ModelAdmin):
             )
             # Después del commit: si algo falla al guardar, no se avisa de un cambio que no ocurrió
             transaction.on_commit(lambda: self._notificar(request, obj))
+
+
+class RangoFechasAccionFilter(RangoFechasFilter):
+    title = 'fecha de la acción'
+
+
+@admin.register(UsuarioAccion)
+class UsuarioAccionAdmin(ConRangoFechas, ColumnasAccion, SoloLecturaAdmin):
+    """H94: todas las suspensiones, reactivaciones y bajas, de solo lectura."""
+    list_display = ('fecha_accion', 'usuario_enlace', 'correo', 'accion_texto', 'motivo_corto',
+                    'realizado_por_texto')
+    list_display_links = ('fecha_accion',)
+    list_filter = ('accion', RangoFechasAccionFilter)
+    search_fields = ('usuario__nombre', 'usuario__correo', 'realizado_por')
+    search_help_text = 'Busca por nombre o correo del usuario, o por el administrador que hizo la acción.'
+    list_select_related = ('usuario',)
+    fields = ('fecha_accion', 'usuario_enlace', 'correo', 'accion_texto', 'motivo_accion', 'realizado_por_texto')
+    readonly_fields = fields
+
+    @admin.display(description='usuario', ordering='usuario__nombre')
+    def usuario_enlace(self, obj):
+        return format_html('<a href="{}">{}</a>',
+                           reverse('admin:boticas_usuario_change', args=[obj.usuario_id],
+                                   current_app=self.admin_site.name),
+                           obj.usuario.nombre)
+
+    @admin.display(description='correo', ordering='usuario__correo')
+    def correo(self, obj):
+        return obj.usuario.correo
+
+    @admin.display(description='motivo')
+    def motivo_corto(self, obj):
+        return Truncator(obj.motivo).chars(80) if obj.motivo else '—'

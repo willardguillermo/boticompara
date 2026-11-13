@@ -7,6 +7,7 @@ comparaciones dependen del periodo; el resto de indicadores son el total actual.
 from django.db.models import Count, F, Q
 
 from boticas.models import Botica, Producto, Usuario
+from boticas.usuarios import ACTIVO, q_estado
 from catalogo.models import ConsultaComparacion, Medicamento
 
 from .consultas import en_rango
@@ -18,7 +19,8 @@ TOP_DEL_PANEL = 5
 
 def indicadores(desde, hasta):
     """Números de las tarjetas del panel. desde/hasta en None: sin límite por ese lado."""
-    usuarios = Usuario.objects.filter(activo=True).aggregate(
+    # H90: activo = ni dado de baja ni suspendido (una suspensión vencida ya cuenta como activa)
+    usuarios = Usuario.objects.filter(q_estado(ACTIVO)).aggregate(
         compradores=Count('id', filter=Q(rol=Usuario.Rol.COMPRADOR)),
         duenos=Count('id', filter=Q(rol=Usuario.Rol.DUENO_BOTICA)),
     )
