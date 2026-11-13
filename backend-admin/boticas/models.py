@@ -166,7 +166,8 @@ class BoticaRevision(models.Model):
         verbose_name_plural = 'historial de revisiones'
 
     def __str__(self):
-        return f'{self.botica} - {self.get_estado_display()} ({self.fecha:%d/%m/%Y %H:%M})'
+        # Hora de Lima (TIME_ZONE), no la UTC que guarda la BD
+        return f'{self.botica} - {self.get_estado_display()} ({timezone.localtime(self.fecha):%d/%m/%Y %H:%M})'
 
 
 class UsuarioAccion(models.Model):

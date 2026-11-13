@@ -1,6 +1,7 @@
 {% comment %}
-H94: copia de admin/edit_inline/tabular.html (Django 5.2) sin la línea con el texto del objeto
-(str de UsuarioAccion) que el admin pone arriba de cada fila: las columnas ya muestran lo mismo.
+H47 y H94: copia de admin/edit_inline/tabular.html (Django 5.2) sin la línea con el texto del objeto
+que el admin pone arriba de cada fila: las columnas ya muestran lo mismo. La usan los historiales en línea
+de la botica (RevisionInline) y del usuario (UsuarioAccionInline).
 {% endcomment %}
 {% load i18n admin_urls static admin_modify %}
 <div class="js-inline-admin-formset inline-group" id="{{ inline_admin_formset.formset.prefix }}-group"

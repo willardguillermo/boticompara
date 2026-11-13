@@ -76,7 +76,7 @@ class UsuarioAccionInline(ColumnasAccion, admin.TabularInline):
     verbose_name = 'acción'
     verbose_name_plural = 'historial de acciones'
     # Sin la línea con el texto del objeto arriba de cada fila: repetía lo que ya muestran las columnas
-    template = 'admin/boticas/usuario/historial_inline.html'
+    template = 'admin/boticas/historial_inline.html'
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -410,6 +410,8 @@ class RevisionInline(ColumnasRevision, admin.TabularInline):
     can_delete = False
     verbose_name = 'revisión'
     verbose_name_plural = 'historial de revisiones'
+    # Sin la línea con el texto del objeto arriba de cada fila, igual que en el usuario (H94)
+    template = 'admin/boticas/historial_inline.html'
 
     def has_add_permission(self, request, obj=None):
         return False
