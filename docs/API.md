@@ -293,6 +293,9 @@ Respuesta: 201 con el producto creado. Validaciones: `precio > 0`, `stock >= 0`,
 ### `PUT /productos/{id}` 🔒 — H9
 Mismo cuerpo que el POST. Si no se envía `medicamentoId`, se conserva el enlace actual (H31); para quitarlo se usa `DELETE /productos/{id}/medicamento` (enviar `null` no lo borra). Respuesta: 200 con el producto actualizado. 404 si no es de su botica.
 
+**Stock comprometido (H79, H80):** el `stock` nuevo no puede quedar por debajo de las **unidades comprometidas** del producto (suma de `cantidad` de sus reservas `CONFIRMADA` y `LISTA`, ver sección 10) → 409 "Tienes {n} unidades comprometidas en pedidos confirmados o listos para recoger; el stock no puede ser menor" y el producto no cambia. Ejemplo: un pedido `CONFIRMADA` de 2 y otro `LISTA` de 3 → comprometidas 5; se puede guardar stock 5 o más, pero no 4. Las reservas `PENDIENTE` no cuentan: el dueño todavía no las aceptó. Se calcula con la fila del producto bloqueada (`select ... from producto where id = :id for update`), igual que al confirmar un pedido, para que una edición y una confirmación a la vez no se crucen.
+Errores: 400 (validaciones del `POST`), 401, 403, 404, 409 (stock menor que las unidades comprometidas).
+
 ### `DELETE /productos/{id}` 🔒 — H10
 Baja lógica (`activo = false`): deja de aparecer en listados y búsquedas. Respuesta: 204 sin cuerpo.
 
@@ -322,6 +325,7 @@ Las columnas `stockMinimo` y `medicamentoId` son opcionales. Las columnas se rec
 - Si la botica ya tiene un producto activo con el mismo `nombreComercial` y `presentacion` (sin distinguir mayúsculas), se **actualizan** su precio y su stock (y `stockMinimo` si la fila lo trae). Si no existe, se **crea**.
 - Si el mismo producto aparece dos veces en el archivo, la segunda aparición se informa como error.
 - Las filas válidas se guardan aunque otras tengan errores.
+- **Stock comprometido (H79, H80):** al actualizar un producto existente, el `stock` de la fila no puede quedar por debajo de sus unidades comprometidas (reservas `CONFIRMADA` y `LISTA`, igual que en `PUT /productos/{id}`). Si pasa, esa fila se informa como error con el mismo mensaje ("Tienes {n} unidades comprometidas en pedidos confirmados o listos para recoger; el stock no puede ser menor"), el producto no cambia y las demás filas se siguen procesando.
 - `medicamentoId` enlaza el producto con un medicamento del catálogo maestro (H31), igual que en `POST /productos`.
 - Si `medicamentoId` no es un número entero, el medicamento no existe o está oculto, esa fila se informa como error (con el mismo mensaje que da `POST /productos`) y las demás se siguen procesando.
 - Si `medicamentoId` está vacío o el archivo no trae la columna, se conserva el enlace actual del producto: la carga masiva no quita enlaces (para eso se usa `DELETE /productos/{id}/medicamento`).
@@ -335,7 +339,8 @@ Las columnas `stockMinimo` y `medicamentoId` son opcionales. Las columnas se rec
   "errores": [
     { "fila": 7, "mensaje": "El precio debe ser mayor a 0." },
     { "fila": 9, "mensaje": "Producto duplicado en el archivo (ya aparece en la fila 2)." },
-    { "fila": 11, "mensaje": "El medicamento no existe en el catálogo" }
+    { "fila": 11, "mensaje": "El medicamento no existe en el catálogo" },
+    { "fila": 14, "mensaje": "Tienes 5 unidades comprometidas en pedidos confirmados o listos para recoger; el stock no puede ser menor" }
   ]
 }
 ```
@@ -878,6 +883,12 @@ Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `COMPRADOR`
 
 Las reservas vistas desde la botica. Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). La botica sale del token: es la botica cuyo `usuario_id` es el del token. Solo se ven y cambian reservas de productos de **esa** botica (`reserva.producto_id → producto.botica_id`). Si el dueño todavía no registró botica → 404 "Todavía no registraste tu botica" (como `GET /boticas/mia`).
 
+**Unidades comprometidas** de un producto = la suma de `cantidad` de sus reservas `CONFIRMADA` y `LISTA`. Son las que el dueño ya aceptó: **el dueño no puede comprometer stock que no tiene**, porque aceptar un pedido sin stock sería engañar al comprador. Por eso:
+- Solo se puede confirmar un pedido que el stock alcanza a cubrir (ver `PATCH /pedidos/{id}/estado`).
+- El stock de un producto nunca puede quedar por debajo de sus unidades comprometidas, ni al editarlo (`PUT /productos/{id}`) ni en la carga masiva (sección 4).
+
+Se calcula con `select coalesce(sum(cantidad), 0) from reserva where producto_id = :id and estado in ('CONFIRMADA', 'LISTA')`.
+
 **Formato de un pedido:**
 ```json
 {
@@ -891,6 +902,7 @@ Las reservas vistas desde la botica. Todos los endpoints piden token de `DUENO_B
   "precioUnitario": 2.20,
   "total": 4.40,
   "stockActual": 90,
+  "disponible": 85,
   "compradorNombre": "Carlos R.",
   "motivoRechazo": null,
   "venceEn": "2026-11-13T15:30:00.123456Z",
@@ -900,6 +912,7 @@ Las reservas vistas desde la botica. Todos los endpoints piden token de `DUENO_B
 ```
 - Del comprador **solo** se muestra `compradorNombre`, con la misma regla que `autor` en las reseñas (sección 11): **nombre de pila más la inicial del apellido** (`"Carlos Ramírez"` → `"Carlos R."`). Nunca su correo, teléfono ni dirección. Si el comprador eliminó su cuenta, sale `"Usuario eliminado"` (el nombre anonimizado de H19).
 - `stockActual`: el stock de hoy del producto, para que el dueño sepa si puede atender antes de confirmar.
+- `disponible`: **solo en `PENDIENTE`**; en los demás estados es `null`. Es `producto.stock` − la suma de `cantidad` de las **otras** reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) del producto, **sin contar este pedido**. Es el mismo número que se valida al confirmar: si `disponible < cantidad`, confirmar dará 409, y la web lo usa para avisar al dueño antes de que lo intente (y sugerirle rechazarlo con un motivo). En el ejemplo: stock 90 y otras reservas activas por 5 → `disponible` 85. Puede ser negativo si el dueño bajó el stock por debajo de reservas aún `PENDIENTE`.
 - `precioUnitario`, `total` y `motivoRechazo`: igual que en la sección 9.
 
 ### `GET /pedidos?estado=PENDIENTE` 🔒 — H77, H81
@@ -910,7 +923,7 @@ Pedidos de la botica, del más reciente al más antiguo (por `creadoEn`), máxim
   { "id": 15, "codigo": "BC-7K2QXM", "estado": "PENDIENTE", "productoId": 9,
     "nombreComercial": "Paracetamol Genérico", "presentacion": "Tableta 500 mg x 10",
     "cantidad": 2, "precioUnitario": 2.20, "total": 4.40, "stockActual": 90,
-    "compradorNombre": "Carlos R.", "motivoRechazo": null,
+    "disponible": 85, "compradorNombre": "Carlos R.", "motivoRechazo": null,
     "venceEn": "2026-11-13T15:30:00.123456Z", "creadoEn": "2026-11-12T15:30:00.123456Z",
     "actualizadoEn": "2026-11-12T15:30:00.123456Z" }
 ]
@@ -933,17 +946,18 @@ Respuesta: 200 con el pedido actualizado.
 
 | Desde | Hacia | Qué más pasa |
 |---|---|---|
-| `PENDIENTE` | `CONFIRMADA` | Se vuelve a validar el stock (ver abajo); `venceEn` no cambia |
-| `CONFIRMADA` | `LISTA` | `vence_en = ahora + 48 h` (plazo para recoger) y `recordatorio_enviado = false` |
+| `PENDIENTE` | `CONFIRMADA` | Se valida lo disponible (ver abajo); `venceEn` no cambia. Desde aquí sus unidades quedan comprometidas |
+| `CONFIRMADA` | `LISTA` | `vence_en = ahora + 48 h` (plazo para recoger) y `recordatorio_enviado = false`. No se valida stock: ya está garantizado |
 | `LISTA` | `ENTREGADA` | Se descuenta `cantidad` del stock del producto, en la misma transacción |
 
 - Cualquier otro cambio (saltarse un paso, volver atrás, salir de un estado final, o enviar `RECHAZADA`, `CANCELADA`, `VENCIDA` o `PENDIENTE`) → 409 "No se puede pasar de {actual} a {nuevo}". Para rechazar se usa `PATCH /pedidos/{id}/rechazar`.
-- **Descuento de stock:** `update producto set stock = stock - :cantidad where id = :id and stock >= :cantidad`. Si no actualiza ninguna fila → 409 "Stock insuficiente: quedan {stock} unidades" y el pedido sigue en `LISTA`. Así dos entregas a la vez no dejan el stock en negativo. El producto se descuenta aunque esté dado de baja (la venta ocurrió). Si queda en 0, deja de verse en la búsqueda.
-- **Validación al confirmar:** el stock debe cubrir este pedido y las demás reservas activas del producto: `producto.stock` − (suma de `cantidad` de las **otras** reservas `PENDIENTE`, `CONFIRMADA` y `LISTA` del producto) ≥ `cantidad`. Si no → 409 "No alcanza el stock para confirmar: hay {disponible} unidades disponibles y el pedido es de {cantidad}" y el pedido sigue en `PENDIENTE`. Puede pasar si el dueño bajó el stock en su catálogo después de que se creó la reserva. Ejemplo: stock 3, otra reserva `CONFIRMADA` de 2 y este pedido de 2 → disponible 3 − 2 = 1, menor que 2 → 409.
+- **Validación al confirmar (`PENDIENTE` → `CONFIRMADA`):** **el dueño no puede aceptar un pedido que no puede cumplir.** Con la fila del producto bloqueada (`select ... from producto where id = :id for update`), se calcula lo disponible igual que el campo `disponible`: `producto.stock` − (suma de `cantidad` de las **otras** reservas `PENDIENTE`, `CONFIRMADA` y `LISTA` del producto). Debe ser ≥ `cantidad`. Si no → 409 "No hay stock suficiente para aceptar este pedido: disponible {n}, pedido {m}. Recházalo con un motivo." y el pedido sigue en `PENDIENTE`; el dueño debe rechazarlo con `PATCH /pedidos/{id}/rechazar`. Puede pasar si el dueño bajó el stock en su catálogo después de que se creó la reserva. Ejemplo: stock 3, otra reserva `CONFIRMADA` de 2 y este pedido de 2 → disponible 3 − 2 = 1, menor que 2 → 409 "No hay stock suficiente para aceptar este pedido: disponible 1, pedido 2. Recházalo con un motivo."
+- **`LISTA` y `ENTREGADA` ya tienen el stock garantizado:** al confirmar, el pedido quedó cubierto, y desde entonces el stock no puede bajar de las unidades comprometidas (sección 4). Por eso al pasar a `LISTA` no se valida stock.
+- **Descuento de stock al entregar (respaldo):** `update producto set stock = stock - :cantidad where id = :id and stock >= :cantidad`. Con la regla anterior siempre debería actualizar la fila; la condición `stock >= :cantidad` queda **solo como respaldo** por si algo inconsistente pasara (por ejemplo, un cambio hecho directo en la base). Si no actualiza ninguna fila → 409 "Stock insuficiente: quedan {stock} unidades" y el pedido sigue en `LISTA`. El producto se descuenta aunque esté dado de baja (la venta ocurrió). Si queda en 0, deja de verse en la búsqueda.
 - Si `venceEn` ya pasó → 409 "La reserva ya venció".
 - Correo al comprador **solo** al pasar a `LISTA`. Al pasar a `CONFIRMADA` o `ENTREGADA` no se envía correo: el estado se ve en la app (ver "Correos").
 
-Errores: 400 (falta `estado` o no es uno de los 7 estados), 401, 403, 404 (no tiene botica o el pedido no es suyo), 409 (cambio no permitido, stock insuficiente al confirmar o al entregar, o reserva vencida).
+Errores: 400 (falta `estado` o no es uno de los 7 estados), 401, 403, 404 (no tiene botica o el pedido no es suyo), 409 (cambio no permitido, stock insuficiente al confirmar, inconsistencia de stock al entregar, o reserva vencida).
 
 ### `PATCH /pedidos/{id}/rechazar` 🔒 — H80
 ```json
@@ -989,14 +1003,15 @@ Una reserva que llega a recogerse usa los 3 (nueva, lista y recordatorio); una r
 
 ### Decisiones a confirmar con Alexander (sección 10)
 1. **Plazo de 48 h** para recoger, contado desde que pasa a `LISTA`.
-2. **El stock se descuenta al pasar a `ENTREGADA`** (no al crear ni al confirmar), con un `update` condicionado para no quedar en negativo; si no alcanza, 409.
-3. **Validación al confirmar:** al pasar a `CONFIRMADA`, stock − otras reservas activas debe alcanzar para el pedido; si no, 409 y sigue en `PENDIENTE`.
+2. **El stock se descuenta al pasar a `ENTREGADA`** (no al crear ni al confirmar), con un `update` condicionado que queda como respaldo; si no alcanza, 409.
+3. **Validación al confirmar:** al pasar a `CONFIRMADA`, stock − otras reservas activas debe alcanzar para el pedido; si no, 409 y sigue en `PENDIENTE` (el dueño lo rechaza con un motivo).
 4. **Sin saltos:** no se puede ir de `PENDIENTE` o `CONFIRMADA` directo a `ENTREGADA`.
 5. **Rechazo solo desde `PENDIENTE` o `CONFIRMADA`**, no desde `LISTA`.
 6. **Proceso cada 5 minutos** para vencer y recordar; el recordatorio se marca como enviado aunque falle el correo.
 7. **Correos: máximo 3 por reserva** (nueva al dueño, `LISTA` o `RECHAZADA` al comprador, y el recordatorio). Ninguno en `CONFIRMADA`, `ENTREGADA`, `CANCELADA` ni `VENCIDA`. Si un correo falla, la reserva o el cambio de estado siguen igual (solo log). Alcanza para unas 33 reservas al día, sin contar verificación, recuperación y alertas de precio.
 8. **`compradorNombre`** con nombre de pila más la inicial del apellido (`"Carlos R."`), igual que `autor` en las reseñas.
 9. **`stockActual`** en el pedido y **máximo 100** pedidos en la lista, sin paginación.
+10. **Stock comprometido (13/11/2026, H79, H80):** el dueño no puede comprometer stock que no tiene; aceptar un pedido sin stock sería engañar al comprador. Unidades comprometidas = suma de `cantidad` de las reservas `CONFIRMADA` y `LISTA`. Solo se confirma si lo disponible alcanza (si no, 409 y se rechaza con motivo); `PUT /productos/{id}` y la carga masiva no dejan el stock por debajo de lo comprometido (409, o error de esa fila en la carga masiva). El pedido trae `disponible` (solo en `PENDIENTE`) para avisar antes de confirmar. Con esto `LISTA` y `ENTREGADA` tienen el stock garantizado y la validación al entregar queda solo como respaldo.
 
 ---
 
