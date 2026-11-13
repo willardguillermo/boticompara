@@ -15,7 +15,7 @@ Todas las aplicaciones comparten **una sola base PostgreSQL en Supabase**.
 | `database/` | `schema.sql`, `seed.sql`, `rls_todas_las_tablas.sql` | PostgreSQL (Supabase) | Guillermo (único que la modifica) |
 | `backend-admin/` | Panel para aprobar/rechazar boticas (`/admin`, puerto 8000) | Django 5.2, modelos `managed = False` | Guillermo |
 | `web-usuario/` | Panel del dueño de botica (puerto 5173) | React 19 + Vite + React Router | Guillermo |
-| `backend-usuario/` | API REST `/api` (puerto 8080), JWT, `ddl-auto=validate` | Spring Boot (Maven) | Alexander |
+| `backend-usuario/` | API REST `/api` (puerto 8080), JWT, `ddl-auto=validate` | Spring Boot (Maven) | Alexander, salvo el paquete `chat/` (asistente `POST /chat`, H68), que es de Guillermo |
 | `movil/` y `app-movil/` | App del comprador (`app-movil/` llegará con el PR de Mijael, con el código Kotlin) | Kotlin + Jetpack Compose | Mijael |
 | `docs/` | Contrato de la API (`API.md`) y colección Postman | Markdown | Guillermo |
 
@@ -29,8 +29,12 @@ Todas las aplicaciones comparten **una sola base PostgreSQL en Supabase**.
 
 ## Reglas
 
-- **Yo soy Guillermo: trabajo SOLO en `database/`, `backend-admin/` y `web-usuario/`.**
-  No modificar `backend-usuario/` (Alexander) ni `movil/` ni `app-movil/` (Mijael).
+- **Yo soy Guillermo: trabajo SOLO en `database/`, `backend-admin/`, `web-usuario/` y el paquete
+  `chat/` de `backend-usuario/`** (`src/main/java/com/boticompara/usuario/chat/`, sus pruebas en
+  `src/test/java/.../chat/` y `src/main/resources/chat/`).
+  No modificar el resto de `backend-usuario/` (Alexander) ni `movil/` ni `app-movil/` (Mijael).
+  Si el chat necesita un cambio fuera de `chat/` (otro servicio, `application.properties`, el README),
+  debe ser mínimo, con pruebas, y lo revisa Alexander en el PR.
 - Ninguna tabla se crea o modifica fuera de `database/schema.sql`.
 - El contrato de la API es `docs/API.md`; la web debe seguirlo **exactamente** (rutas, campos en
   camelCase, códigos y formato de error). Si un endpoint cambia, primero se actualiza `API.md`.
