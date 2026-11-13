@@ -43,9 +43,10 @@ public class AuthService {
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest r) {
         Usuario u = usuarios.findByCorreoIgnoreCase(r.correo().trim())
-                .filter(Usuario::isActivo)
+                .filter(x -> x.isActivo() && !x.estaSuspendido())
                 .orElseThrow(() -> ApiException.unauthorized("Correo o contraseña incorrectos"));
-        if (!encoder.matches(r.password(), u.getPasswordHash())) {
+        // H91: cuenta solo de Google (sin contraseña) no entra por login con contraseña
+        if (u.getPasswordHash() == null || !encoder.matches(r.password(), u.getPasswordHash())) {
             throw ApiException.unauthorized("Correo o contraseña incorrectos");
         }
         return new LoginResponse(jwt.generar(u), "Bearer", UsuarioResponse.from(u));
