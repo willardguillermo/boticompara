@@ -297,6 +297,20 @@ class EstrellasFilter(admin.SimpleListFilter):
         return queryset
 
 
+class PalabrasARevisarFilter(admin.SimpleListFilter):
+    """Solo encuentra las reseñas con palabras de settings.PALABRAS_A_REVISAR; no oculta nada."""
+    title = 'palabras a revisar'
+    parameter_name = 'revisar'
+
+    def lookups(self, request, model_admin):
+        return [('si', 'Con palabras a revisar')]
+
+    def queryset(self, request, queryset):
+        if self.value() == 'si':
+            return queryset.filter(pk__in=resenas.ids_con_palabras(queryset))
+        return queryset
+
+
 COLORES_ESTADO_RESENA = {False: '#2e7d32', True: '#757575'}
 
 
@@ -306,12 +320,12 @@ class ResenaAdmin(SoloLecturaAdmin):
     list_display = ('fecha', 'botica', 'autor', 'estrellas_texto', 'comentario_corto', 'respondida',
                     'estado')
     list_display_links = ('fecha',)
-    list_filter = (EstadoResenaFilter, EstrellasFilter, 'botica',
+    list_filter = (EstadoResenaFilter, PalabrasARevisarFilter, EstrellasFilter, 'botica',
                    ('creado_en', admin.DateFieldListFilter))
     search_fields = ('comentario', 'botica__nombre_comercial')
     search_help_text = 'Busca en el comentario o el nombre de la botica.'
     list_select_related = ('botica', 'usuario')
-    fields = ('botica', 'autor', 'estrellas_texto', 'comentario', 'respuesta', 'respondida_en_texto',
+    fields = ('botica', 'autor', 'estrellas_texto', 'comentario', 'palabras', 'respuesta', 'respondida_en_texto',
               'estado', 'motivo_ocultamiento', 'fecha', 'actualizado')
     readonly_fields = fields
 
@@ -353,6 +367,10 @@ class ResenaAdmin(SoloLecturaAdmin):
             ' white-space: nowrap;">{}</span>',
             COLORES_ESTADO_RESENA[obj.oculta], resenas.texto_estado(obj),
         )
+
+    @admin.display(description='palabras a revisar')
+    def palabras(self, obj):
+        return ', '.join(resenas.palabras_encontradas(obj.comentario)) or '—'
 
 @admin.register(Producto)
 class ProductoAdmin(SoloLecturaAdmin):
