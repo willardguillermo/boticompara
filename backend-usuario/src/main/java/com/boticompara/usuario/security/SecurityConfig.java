@@ -47,6 +47,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/productos/{id}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/productos/{id}/alternativas").permitAll()
                 .requestMatchers("/boticas/**", "/productos/**").hasRole("DUENO_BOTICA")
+                .requestMatchers("/reservas/**").hasRole("COMPRADOR")
                 .anyRequest().authenticated())
             .addFilterBefore(new JwtAuthFilter(jwtService, usuarios), UsernamePasswordAuthenticationFilter.class);
         return http.build();
