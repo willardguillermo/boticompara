@@ -75,6 +75,8 @@ class UsuarioAccionInline(ColumnasAccion, admin.TabularInline):
     can_delete = False
     verbose_name = 'acción'
     verbose_name_plural = 'historial de acciones'
+    # Sin la línea con el texto del objeto arriba de cada fila: repetía lo que ya muestran las columnas
+    template = 'admin/boticas/usuario/historial_inline.html'
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -109,7 +111,7 @@ class UsuarioAdmin(SoloLecturaAdmin):
     search_help_text = 'Busca por nombre o correo.'
     # Nunca se muestran el hash de la contraseña ni el identificador de Google
     fields = ('nombre', 'correo', 'rol', 'telefono', 'direccion', 'correo_verificado',
-              'estado', 'motivo', 'fecha_registro', 'actualizado_en')
+              'estado', 'motivo', 'fecha_registro', 'actualizado')
     readonly_fields = fields
     inlines = [UsuarioAccionInline]  # H94
 
@@ -124,9 +126,14 @@ class UsuarioAdmin(SoloLecturaAdmin):
             return '—'
         return obj.motivo_estado or '—'
 
+    # Hora de Lima (TIME_ZONE), no la UTC que guarda la BD; mismo formato que la lista y el historial
     @admin.display(description='fecha de registro', ordering='creado_en')
     def fecha_registro(self, obj):
         return f'{timezone.localtime(obj.creado_en):%d/%m/%Y %H:%M}'
+
+    @admin.display(description='actualizado en', ordering='actualizado_en')
+    def actualizado(self, obj):
+        return f'{timezone.localtime(obj.actualizado_en):%d/%m/%Y %H:%M}'
 
     # ---- H91-H93: acciones sobre la cuenta, cada una con su página ----
 
@@ -169,7 +176,8 @@ class UsuarioAdmin(SoloLecturaAdmin):
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
         usuario = self.get_object(request, unquote(object_id))
-        extra_context = {**(extra_context or {}),
+        # El título nativo de una ficha de solo lectura es "Vista usuario"; el subtítulo ya trae nombre y correo
+        extra_context = {**(extra_context or {}), 'title': 'Usuario',
                          'acciones_usuario': self.acciones_disponibles(request, usuario) if usuario else []}
         return super().change_view(request, object_id, form_url, extra_context)
 

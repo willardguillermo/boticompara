@@ -7,6 +7,7 @@ Las columnas actualizado_en las mantiene el trigger set_actualizado_en() de la B
 """
 from django.db import models
 from django.db.models.functions import Now
+from django.utils import timezone
 
 
 class Usuario(models.Model):
@@ -19,8 +20,8 @@ class Usuario(models.Model):
     correo = models.CharField(max_length=150, unique=True)
     # null si la cuenta solo entra con Google (H67). Nunca se muestra en el admin
     password_hash = models.CharField(max_length=255, null=True, blank=True)
-    telefono = models.CharField(max_length=20, null=True, blank=True)
-    direccion = models.CharField(max_length=255, null=True, blank=True)
+    telefono = models.CharField('teléfono', max_length=20, null=True, blank=True)
+    direccion = models.CharField('dirección', max_length=255, null=True, blank=True)
     rol = models.CharField(max_length=20, choices=Rol.choices)
     correo_verificado = models.BooleanField(default=False)
     activo = models.BooleanField(default=True)
@@ -203,7 +204,8 @@ class UsuarioAccion(models.Model):
         ]
 
     def __str__(self):
-        return f'{self.usuario} - {self.get_accion_display()} ({self.fecha:%d/%m/%Y %H:%M})'
+        # Hora de Lima (TIME_ZONE), no la UTC que guarda la BD
+        return f'{self.usuario} - {self.get_accion_display()} ({timezone.localtime(self.fecha):%d/%m/%Y %H:%M})'
 
 
 class Reserva(models.Model):

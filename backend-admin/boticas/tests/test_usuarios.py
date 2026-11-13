@@ -4,7 +4,8 @@ H90-H94: gestión de usuarios por el administrador.
 Las tablas son managed = False: ConTablas las crea en el SQLite de pruebas con los CHECK copiados
 de database/schema.sql (Meta.constraints de los modelos).
 """
-from datetime import timedelta
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from itertools import count
 
 from django.contrib.auth.models import Permission, User
@@ -509,3 +510,40 @@ class HistorialTests(ConAdmin):
         self.assertNotContains(self.client.get(cambio), 'name="_save"')
         accion.refresh_from_db()
         self.assertEqual(accion.motivo, 'Motivo de prueba')
+
+
+class FichaDelUsuarioTests(ConAdmin):
+    """H90 y H94: fechas en hora de Lima, etiquetas, título y botones de la ficha."""
+    # 02:35 en UTC son las 21:35 del día anterior en Lima (UTC-5)
+    UTC = datetime(2026, 10, 6, 2, 35, tzinfo=dt_timezone.utc)
+
+    def test_fechas_en_hora_de_lima(self):
+        usuario = crear_usuario()
+        Usuario.objects.filter(pk=usuario.pk).update(creado_en=self.UTC, actualizado_en=self.UTC + timedelta(hours=1))
+        contenido = self.client.get(detalle(usuario)).content.decode()
+        self.assertIn('05/10/2026 21:35', contenido)
+        self.assertIn('05/10/2026 22:35', contenido)
+        self.assertNotIn('de octubre de 2026', contenido)
+
+    def test_str_de_la_accion_en_hora_de_lima(self):
+        accion = UsuarioAccion(usuario=crear_usuario(nombre='Carlos'), accion=UsuarioAccion.Accion.REACTIVAR,
+                               fecha=self.UTC)
+        self.assertTrue(str(accion).endswith('Reactivación (05/10/2026 21:35)'))
+
+    def test_historial_sin_el_texto_del_objeto(self):
+        usuario = crear_usuario(nombre='Carlos')
+        accion = UsuarioAccion.objects.create(usuario=usuario, accion=UsuarioAccion.Accion.REACTIVAR,
+                                              realizado_por='guillermo', fecha=self.UTC)
+        respuesta = self.client.get(detalle(usuario))
+        self.assertContains(respuesta, 'Reactivación')
+        self.assertNotContains(respuesta, str(accion))
+
+    def test_etiquetas_titulo_y_sin_historico(self):
+        usuario = crear_usuario(nombre='Carlos')
+        respuesta = self.client.get(detalle(usuario))
+        self.assertContains(respuesta, 'Teléfono')
+        self.assertContains(respuesta, 'Dirección')
+        self.assertContains(respuesta, '<h1>Usuario</h1>', html=True)
+        self.assertNotContains(respuesta, 'Vista usuario')
+        self.assertNotContains(respuesta, reverse('admin:boticas_usuario_history', args=[usuario.pk]))
+        self.assertContains(respuesta, url_accion(usuario, 'suspender'))
