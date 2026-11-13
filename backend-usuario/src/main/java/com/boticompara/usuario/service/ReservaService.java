@@ -108,6 +108,34 @@ public class ReservaService {
                 })
                 .toList();
     }
+    /** H75: el comprador cancela su reserva si todavía está activa y no venció. */
+    @Transactional
+    public ReservaResponse cancelar(Long usuarioId, Long id) {
+        Reserva r = reservas.findByIdAndUsuarioId(id, usuarioId)
+                .orElseThrow(() -> ApiException.notFound("La reserva no existe"));
+        if (!r.getEstado().estaActiva()) {
+            throw ApiException.conflict("No se puede cancelar una reserva " + r.getEstado());
+        }
+        if (!r.getVenceEn().isAfter(Instant.now())) {
+            throw ApiException.conflict("La reserva ya venció");
+        }
+        r.setEstado(EstadoReserva.CANCELADA);
+        return respuesta(reservas.save(r));
+    }
+
+    /** H76: detalle de una reserva propia. */
+    @Transactional(readOnly = true)
+    public ReservaResponse detalle(Long usuarioId, Long id) {
+        return respuesta(reservas.findByIdAndUsuarioId(id, usuarioId)
+                .orElseThrow(() -> ApiException.notFound("La reserva no existe")));
+    }
+
+    /** Arma la respuesta leyendo producto y botica de sus tablas, no de la vista. */
+    private ReservaResponse respuesta(Reserva r) {
+        Producto p = productos.findById(r.getProductoId()).orElse(null);
+        Botica b = p == null ? null : boticas.findById(p.getBoticaId()).orElse(null);
+        return ReservaResponse.from(r, p, b);
+    }
 
     /** H72: BC- + 6 caracteres del alfabeto, sin repetir (hasta 3 intentos). */
     private String nuevoCodigo() {

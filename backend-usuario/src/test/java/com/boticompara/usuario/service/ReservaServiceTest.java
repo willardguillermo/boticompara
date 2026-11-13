@@ -208,4 +208,75 @@ class ReservaServiceTest {
         verify(reservas).findTop100ByUsuarioIdAndEstadoOrderByCreadoEnDesc(USUARIO, EstadoReserva.LISTA);
         verify(reservas, times(0)).findTop100ByUsuarioIdOrderByCreadoEnDesc(USUARIO);
     }
+
+    private Reserva reservaDe(EstadoReserva estado, Instant venceEn) {
+        Reserva r = new Reserva();
+        r.setId(15L);
+        r.setCodigo("BC-7K2QXM");
+        r.setUsuarioId(USUARIO);
+        r.setProductoId(PRODUCTO);
+        r.setCantidad(2);
+        r.setPrecioUnitario(new BigDecimal("2.20"));
+        r.setEstado(estado);
+        r.setVenceEn(venceEn);
+        return r;
+    }
+
+    @Test
+    void cancelarUnaReservaPendienteLaPasaACancelada() {
+        when(reservas.findByIdAndUsuarioId(15L, USUARIO))
+                .thenReturn(Optional.of(reservaDe(EstadoReserva.PENDIENTE, Instant.now().plus(1, ChronoUnit.DAYS))));
+        when(reservas.save(any(Reserva.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(productos.findById(PRODUCTO)).thenReturn(Optional.of(producto(3)));
+        when(boticas.findById(BOTICA)).thenReturn(Optional.of(botica()));
+
+        ReservaResponse resp = service.cancelar(USUARIO, 15L);
+
+        assertEquals(EstadoReserva.CANCELADA, resp.estado());
+    }
+
+    @Test
+    void cancelarUnaReservaEntregadaDa409() {
+        when(reservas.findByIdAndUsuarioId(15L, USUARIO))
+                .thenReturn(Optional.of(reservaDe(EstadoReserva.ENTREGADA, Instant.now().plus(1, ChronoUnit.DAYS))));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.cancelar(USUARIO, 15L));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("No se puede cancelar una reserva ENTREGADA", ex.getMessage());
+        verify(reservas, times(0)).save(any(Reserva.class));
+    }
+
+    @Test
+    void cancelarUnaReservaYaVencidaDa409() {
+        when(reservas.findByIdAndUsuarioId(15L, USUARIO))
+                .thenReturn(Optional.of(reservaDe(EstadoReserva.PENDIENTE, Instant.now().minus(1, ChronoUnit.MINUTES))));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.cancelar(USUARIO, 15L));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("La reserva ya venció", ex.getMessage());
+    }
+
+    @Test
+    void cancelarUnaReservaAjenaEs404() {
+        when(reservas.findByIdAndUsuarioId(15L, USUARIO)).thenReturn(Optional.empty());
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.cancelar(USUARIO, 15L));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
+    @Test
+    void detalleDeUnaReservaPropiaLaDevuelve() {
+        when(reservas.findByIdAndUsuarioId(15L, USUARIO))
+                .thenReturn(Optional.of(reservaDe(EstadoReserva.PENDIENTE, Instant.now().plus(1, ChronoUnit.DAYS))));
+        when(productos.findById(PRODUCTO)).thenReturn(Optional.of(producto(3)));
+        when(boticas.findById(BOTICA)).thenReturn(Optional.of(botica()));
+
+        ReservaResponse resp = service.detalle(USUARIO, 15L);
+
+        assertEquals("BC-7K2QXM", resp.codigo());
+        assertEquals("FarmaVida", resp.boticaNombre());
+    }
 }

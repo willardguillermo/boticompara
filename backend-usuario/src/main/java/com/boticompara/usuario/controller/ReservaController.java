@@ -7,6 +7,8 @@ import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.security.UsuarioAutenticado;
 import com.boticompara.usuario.service.ReservaService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -40,6 +42,18 @@ public class ReservaController {
     public List<ReservaResponse> mias(@AuthenticationPrincipal UsuarioAutenticado yo,
                                       @RequestParam(required = false) String estado) {
         return reservas.misReservas(yo.id(), parsearEstado(estado));
+    }
+
+    @PatchMapping("/{id}/cancelar")
+    public ReservaResponse cancelar(@AuthenticationPrincipal UsuarioAutenticado yo,
+                                    @PathVariable Long id) {
+        return reservas.cancelar(yo.id(), id);
+    }
+
+    @GetMapping("/{id}")
+    public ReservaResponse detalle(@AuthenticationPrincipal UsuarioAutenticado yo,
+                                   @PathVariable Long id) {
+        return reservas.detalle(yo.id(), id);
     }
 
     private EstadoReserva parsearEstado(String texto) {
