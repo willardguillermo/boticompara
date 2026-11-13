@@ -186,3 +186,17 @@ Cuerpo completo de la respuesta 6:
 En el log del backend de esta prueba no hay ninguna línea del cliente de Gemini: no se hizo ninguna llamada. Los
 mensajes de error con los números de ayuda no se provocaron a mano; están cubiertos por las pruebas automáticas
 (`ChatServiceTest`, `ChatControllerTest`, `LimitadorChatTest`).
+
+## Pruebas automáticas finales (13/11/2026)
+
+Con todo el chat terminado se volvió a correr `./mvnw test` en `backend-usuario/`, sin `.env` (las pruebas no usan
+la base de datos ni Gemini), sobre el commit `ba13f60` (`ba13f60f16b12fb83f9781b4f46aa2ebb6044991`) de la rama
+`feature/chat-gemini`:
+
+```
+[INFO] Tests run: 482, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+Los totales de arriba (433 y 471) son los que había antes de cada prueba manual; el total final es **482 pruebas,
+0 fallos**.
