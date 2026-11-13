@@ -15,10 +15,10 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     boolean existsByCodigo(String codigo);
 
     /** H76: historial del comprador, de la más reciente a la más antigua. */
-    List<Reserva> findByUsuarioIdOrderByCreadoEnDesc(Long usuarioId);
+    /** H76: historial del comprador, de la más reciente a la más antigua, máximo 100. */
+    List<Reserva> findTop100ByUsuarioIdOrderByCreadoEnDesc(Long usuarioId);
 
-    List<Reserva> findByUsuarioIdAndEstadoOrderByCreadoEnDesc(Long usuarioId, EstadoReserva estado);
-
+    List<Reserva> findTop100ByUsuarioIdAndEstadoOrderByCreadoEnDesc(Long usuarioId, EstadoReserva estado);
     /** H75, H76: solo las del propio comprador. Si es de otro, no existe. */
     Optional<Reserva> findByIdAndUsuarioId(Long id, Long usuarioId);
 
