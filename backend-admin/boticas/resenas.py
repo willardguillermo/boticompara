@@ -1,17 +1,30 @@
 """
-H89: moderación de reseñas por el administrador.
+H89: moderación de reseñas por el administrador (ocultar y mostrar de nuevo).
 
 Las reseñas las escribe el comprador desde la app (Spring Boot). Aquí nadie edita el texto ni las
-estrellas ni borra reseñas.
+estrellas ni borra reseñas: solo se cambian oculta y motivo_ocultamiento, que van juntas por el
+check chk_resena_motivo_ocultamiento (not oculta or motivo_ocultamiento is not null).
+
+Igual que en las acciones sobre usuarios (boticas/usuarios.py), cada acción es un UPDATE que lleva
+en su WHERE el estado que exige: si otro administrador ya la ocultó o mostró, no toca ninguna fila
+y la acción se rechaza.
 """
 import re
 import unicodedata
 
 from django.conf import settings
+from django.contrib.admin.models import CHANGE, LogEntry
+from django.db import transaction
+
+from .models import Resena
 
 VISIBLE = 'VISIBLE'
 OCULTA = 'OCULTA'
 ESTADOS = ((VISIBLE, 'Visible'), (OCULTA, 'Oculta'))
+
+
+class AccionNoPermitida(Exception):
+    """La acción no corresponde al estado actual de la reseña."""
 
 
 def texto_estado(resena):
@@ -53,3 +66,45 @@ def ids_con_palabras(queryset):
         return []
     filas = queryset.exclude(comentario__isnull=True).values_list('id', 'comentario')
     return [pk for pk, comentario in filas if patron.search(normalizar(comentario))]
+
+
+# ---- Acciones ----
+
+def _registrar(resena_id, usuario_admin, mensaje):
+    """Deja la acción en el historial del admin de Django (LogEntry), con quién la hizo."""
+    resena = Resena.objects.select_related('botica').get(pk=resena_id)
+    LogEntry.objects.log_actions(
+        user_id=usuario_admin.pk, queryset=[resena], action_flag=CHANGE, change_message=mensaje,
+        single_object=True,
+    )
+
+
+def _rechazar(resena_id, requisito):
+    resena = Resena.objects.filter(pk=resena_id).first()
+    if resena is None:
+        raise AccionNoPermitida('La reseña no existe.')
+    raise AccionNoPermitida(f'No se puede hacer esto: la reseña está «{texto_estado(resena)}». {requisito}')
+
+
+REQUISITO_OCULTAR = 'Solo se oculta una reseña visible.'
+REQUISITO_MOSTRAR = 'Solo se vuelve a mostrar una reseña oculta.'
+
+
+def ocultar(resena_id, motivo, usuario_admin):
+    """Un solo UPDATE con oculta = false en el WHERE: oculta y motivo quedan juntos."""
+    with transaction.atomic():
+        filas = (Resena.objects.filter(pk=resena_id, oculta=False)
+                 .update(oculta=True, motivo_ocultamiento=motivo))
+        if not filas:
+            _rechazar(resena_id, REQUISITO_OCULTAR)
+        _registrar(resena_id, usuario_admin, f'Ocultó la reseña. Motivo: {motivo}')
+
+
+def mostrar(resena_id, usuario_admin):
+    """Vuelve a mostrarla y borra el motivo (queda en el historial del admin)."""
+    with transaction.atomic():
+        filas = (Resena.objects.filter(pk=resena_id, oculta=True)
+                 .update(oculta=False, motivo_ocultamiento=None))
+        if not filas:
+            _rechazar(resena_id, REQUISITO_MOSTRAR)
+        _registrar(resena_id, usuario_admin, 'Volvió a mostrar la reseña.')

@@ -10,7 +10,8 @@ from django.utils.html import format_html
 from django.utils.text import Truncator
 
 from . import historial, resenas, usuarios
-from .forms import BoticaRevisionForm, DarBajaForm, ReactivarForm, SuspenderForm
+from .forms import (BoticaRevisionForm, DarBajaForm, MostrarResenaForm, OcultarResenaForm, ReactivarForm,
+                    SuspenderForm)
 from .models import Botica, BoticaRevision, Producto, Resena, Usuario, UsuarioAccion
 from .notificaciones import notificar_revision
 from .storage import StorageError, url_firmada_licencia
@@ -316,7 +317,7 @@ COLORES_ESTADO_RESENA = {False: '#2e7d32', True: '#757575'}
 
 @admin.register(Resena)
 class ResenaAdmin(SoloLecturaAdmin):
-    """H89: el texto y las estrellas son del comprador; aquí nadie los edita ni borra reseñas."""
+    """H89: el texto y las estrellas son del comprador; aquí solo se ocultan o se vuelven a mostrar."""
     list_display = ('fecha', 'botica', 'autor', 'estrellas_texto', 'comentario_corto', 'respondida',
                     'estado')
     list_display_links = ('fecha',)
@@ -371,6 +372,101 @@ class ResenaAdmin(SoloLecturaAdmin):
     @admin.display(description='palabras a revisar')
     def palabras(self, obj):
         return ', '.join(resenas.palabras_encontradas(obj.comentario)) or '—'
+
+    # ---- Ocultar y mostrar, cada una con su página ----
+
+    def get_urls(self):
+        vista = self.admin_site.admin_view
+        nombre = f'{self.opts.app_label}_{self.opts.model_name}'
+        return [
+            path('<path:object_id>/ocultar/', vista(self.ocultar_view), name=f'{nombre}_ocultar'),
+            path('<path:object_id>/mostrar/', vista(self.mostrar_view), name=f'{nombre}_mostrar'),
+            *super().get_urls(),
+        ]
+
+    def puede_moderar(self, request):
+        """Editar está prohibido para todos; ocultar y mostrar exigen "Can change resena"."""
+        return request.user.has_perm(f'{self.opts.app_label}.change_{self.opts.model_name}')
+
+    def url_accion(self, resena, accion):
+        return reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_{accion}', args=[resena.pk],
+                       current_app=self.admin_site.name)
+
+    def url_detalle(self, resena):
+        return reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_change', args=[resena.pk],
+                       current_app=self.admin_site.name)
+
+    def acciones_disponibles(self, request, resena):
+        if not self.puede_moderar(request):
+            return []
+        if resena.oculta:
+            return [{'texto': 'Mostrar de nuevo', 'url': self.url_accion(resena, 'mostrar')}]
+        return [{'texto': 'Ocultar', 'url': self.url_accion(resena, 'ocultar'), 'peligrosa': True}]
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        resena = self.get_object(request, unquote(object_id))
+        extra_context = {**(extra_context or {}), 'title': 'Reseña',
+                         'acciones_resena': self.acciones_disponibles(request, resena) if resena else []}
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def _resena_para(self, request, object_id, oculta, requisito):
+        """(reseña, None) si la acción corresponde a su estado; si no, (None, redirección con el error)."""
+        if not self.puede_moderar(request):
+            raise PermissionDenied
+        resena = self.get_object(request, unquote(object_id))
+        if resena is None:
+            messages.error(request, 'La reseña no existe.')
+            return None, redirect(reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_changelist',
+                                          current_app=self.admin_site.name))
+        if resena.oculta != oculta:
+            messages.error(request, f'La reseña está «{resenas.texto_estado(resena)}». {requisito}')
+            return None, redirect(self.url_detalle(resena))
+        return resena, None
+
+    def _pagina(self, request, resena, form, titulo, boton, **extra):
+        contexto = {
+            **self.admin_site.each_context(request),
+            'opts': self.opts, 'title': titulo, 'resena': resena, 'form': form, 'boton': boton,
+            'autor': f'{resena.usuario.nombre} <{resena.usuario.correo}>',
+            'estrellas': '★' * resena.estrellas + '☆' * (5 - resena.estrellas),
+            'estado': resenas.texto_estado(resena), 'url_detalle': self.url_detalle(resena),
+            'palabras': ', '.join(resenas.palabras_encontradas(resena.comentario)),
+            **extra,
+        }
+        return TemplateResponse(request, 'admin/boticas/resena/accion.html', contexto)
+
+    def _ejecutar(self, request, accion, *args):
+        try:
+            accion(*args, request.user)
+        except resenas.AccionNoPermitida as e:
+            messages.error(request, str(e))
+            return False
+        return True
+
+    def ocultar_view(self, request, object_id):
+        resena, respuesta = self._resena_para(request, object_id, False, resenas.REQUISITO_OCULTAR)
+        if respuesta:
+            return respuesta
+        form = OcultarResenaForm(request.POST if request.method == 'POST' else None)
+        if form.is_valid():
+            if self._ejecutar(request, resenas.ocultar, resena.pk, form.cleaned_data['motivo']):
+                messages.success(request, f'Se ocultó la reseña de {resena.usuario.nombre} sobre '
+                                          f'{resena.botica.nombre_comercial}. Ya no aparece en la app.')
+            return redirect(self.url_detalle(resena))
+        return self._pagina(request, resena, form, 'Ocultar la reseña', 'Ocultar reseña', peligrosa=True)
+
+    def mostrar_view(self, request, object_id):
+        resena, respuesta = self._resena_para(request, object_id, True, resenas.REQUISITO_MOSTRAR)
+        if respuesta:
+            return respuesta
+        if request.method == 'POST':
+            if self._ejecutar(request, resenas.mostrar, resena.pk):
+                messages.success(request, f'La reseña de {resena.usuario.nombre} sobre '
+                                          f'{resena.botica.nombre_comercial} vuelve a aparecer en la app.')
+            return redirect(self.url_detalle(resena))
+        return self._pagina(request, resena, MostrarResenaForm(), '¿Mostrar de nuevo la reseña?',
+                            'Sí, mostrarla de nuevo', motivo_actual=resena.motivo_ocultamiento)
+
 
 @admin.register(Producto)
 class ProductoAdmin(SoloLecturaAdmin):
