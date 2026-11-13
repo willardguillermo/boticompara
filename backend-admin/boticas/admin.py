@@ -9,9 +9,9 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.text import Truncator
 
-from . import historial, usuarios
+from . import historial, resenas, usuarios
 from .forms import BoticaRevisionForm, DarBajaForm, ReactivarForm, SuspenderForm
-from .models import Botica, BoticaRevision, Producto, Usuario, UsuarioAccion
+from .models import Botica, BoticaRevision, Producto, Resena, Usuario, UsuarioAccion
 from .notificaciones import notificar_revision
 from .storage import StorageError, url_firmada_licencia
 
@@ -266,6 +266,93 @@ class UsuarioAdmin(SoloLecturaAdmin):
         return self._pagina(request, usuario, form, f'Dar de baja la cuenta de {usuario.nombre}', 'Continuar',
                             advertencia=self.ADVERTENCIA_BAJA)
 
+
+# ---- H89: moderación de reseñas ----
+
+class EstadoResenaFilter(admin.SimpleListFilter):
+    title = 'estado'
+    parameter_name = 'estado'
+
+    def lookups(self, request, model_admin):
+        return resenas.ESTADOS
+
+    def queryset(self, request, queryset):
+        if self.value() == resenas.VISIBLE:
+            return queryset.filter(oculta=False)
+        if self.value() == resenas.OCULTA:
+            return queryset.filter(oculta=True)
+        return queryset
+
+
+class EstrellasFilter(admin.SimpleListFilter):
+    title = 'estrellas'
+    parameter_name = 'estrellas'
+
+    def lookups(self, request, model_admin):
+        return [(str(n), '★' * n) for n in range(5, 0, -1)]
+
+    def queryset(self, request, queryset):
+        if self.value() in {str(n) for n in range(1, 6)}:
+            return queryset.filter(estrellas=int(self.value()))
+        return queryset
+
+
+COLORES_ESTADO_RESENA = {False: '#2e7d32', True: '#757575'}
+
+
+@admin.register(Resena)
+class ResenaAdmin(SoloLecturaAdmin):
+    """H89: el texto y las estrellas son del comprador; aquí nadie los edita ni borra reseñas."""
+    list_display = ('fecha', 'botica', 'autor', 'estrellas_texto', 'comentario_corto', 'respondida',
+                    'estado')
+    list_display_links = ('fecha',)
+    list_filter = (EstadoResenaFilter, EstrellasFilter, 'botica',
+                   ('creado_en', admin.DateFieldListFilter))
+    search_fields = ('comentario', 'botica__nombre_comercial')
+    search_help_text = 'Busca en el comentario o el nombre de la botica.'
+    list_select_related = ('botica', 'usuario')
+    fields = ('botica', 'autor', 'estrellas_texto', 'comentario', 'respuesta', 'respondida_en_texto',
+              'estado', 'motivo_ocultamiento', 'fecha', 'actualizado')
+    readonly_fields = fields
+
+    # Hora de Lima, como en el resto del admin
+    @admin.display(description='fecha', ordering='creado_en')
+    def fecha(self, obj):
+        return f'{timezone.localtime(obj.creado_en):%d/%m/%Y %H:%M}'
+
+    @admin.display(description='actualizado en', ordering='actualizado_en')
+    def actualizado(self, obj):
+        return f'{timezone.localtime(obj.actualizado_en):%d/%m/%Y %H:%M}'
+
+    @admin.display(description='respondida en')
+    def respondida_en_texto(self, obj):
+        return f'{timezone.localtime(obj.respondida_en):%d/%m/%Y %H:%M}' if obj.respondida_en else '—'
+
+    # El admin es interno: se ve el nombre completo y el correo (la app muestra "Carlos R.")
+    @admin.display(description='autor', ordering='usuario__nombre')
+    def autor(self, obj):
+        return format_html('{}<br><span class="quiet">{}</span>', obj.usuario.nombre, obj.usuario.correo)
+
+    @admin.display(description='estrellas', ordering='estrellas')
+    def estrellas_texto(self, obj):
+        return format_html('<span title="{} de 5" style="white-space: nowrap;">{}</span>',
+                           obj.estrellas, '★' * obj.estrellas + '☆' * (5 - obj.estrellas))
+
+    @admin.display(description='comentario')
+    def comentario_corto(self, obj):
+        return Truncator(obj.comentario).chars(80) if obj.comentario else '—'
+
+    @admin.display(description='respondida', boolean=True)
+    def respondida(self, obj):
+        return obj.respuesta is not None
+
+    @admin.display(description='estado', ordering='oculta')
+    def estado(self, obj):
+        return format_html(
+            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
+            ' white-space: nowrap;">{}</span>',
+            COLORES_ESTADO_RESENA[obj.oculta], resenas.texto_estado(obj),
+        )
 
 @admin.register(Producto)
 class ProductoAdmin(SoloLecturaAdmin):

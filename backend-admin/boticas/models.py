@@ -249,7 +249,7 @@ class Reserva(models.Model):
 
 
 class Resena(models.Model):
-    """H85-H89: reseña de una botica. La escribe Spring Boot; la moderación del admin llegará en H89."""
+    """H85-H89: reseña de una botica. La escribe Spring Boot; el admin solo la oculta o la vuelve a mostrar (H89)."""
 
     id = models.BigAutoField(primary_key=True)
     botica = models.ForeignKey(Botica, on_delete=models.DO_NOTHING, db_column='botica_id',
@@ -274,6 +274,16 @@ class Resena(models.Model):
         verbose_name_plural = 'reseñas'
         constraints = [
             models.UniqueConstraint(fields=['usuario', 'botica'], name='uq_resena_usuario_botica'),
+            # Copia de los CHECK de database/v5_sprint4.sql (solo para el SQLite de las pruebas)
+            models.CheckConstraint(condition=models.Q(estrellas__gte=1, estrellas__lte=5),
+                                   name='chk_resena_estrellas'),
+            models.CheckConstraint(
+                condition=(models.Q(respuesta__isnull=True, respondida_en__isnull=True)
+                           | models.Q(respuesta__isnull=False, respondida_en__isnull=False)),
+                name='chk_resena_respuesta'),
+            models.CheckConstraint(
+                condition=models.Q(oculta=False) | models.Q(motivo_ocultamiento__isnull=False),
+                name='chk_resena_motivo_ocultamiento'),
         ]
 
     def __str__(self):
