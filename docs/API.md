@@ -44,6 +44,40 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 
 ## 1. Autenticación
 
+### POST /auth/google (H67)
+
+Inicia sesión con Google o crea la cuenta si no existe. No requiere token.
+
+**Body**
+
+```json
+{
+   "idToken": "eyJhbGciOi..."
+}
+```
+
+**Reglas**
+
+- El token de Firebase se verifica en el servidor: emisor, audiencia, firma y `email_verified = true`. La audiencia es el proyecto configurado en `FIREBASE_PROJECT_ID` (`.env` y `.env.example`, por ejemplo `FIREBASE_PROJECT_ID=boticompara`).
+- Si el `google_uid` ya existe, se inicia sesión con esa cuenta.
+- Si no existe, se crea una cuenta solo con Google: `password_hash` nulo, rol `COMPRADOR` y `correo_verificado = true`, porque Google ya verificó el correo.
+- `nombre`: el claim `name` del token. Si no viene, la parte del correo antes de la `@`.
+- Si ya existe una cuenta con contraseña y ese mismo correo, **no** se vincula.
+- Cuenta dada de baja: 403 "Tu cuenta fue dada de baja", solo después de verificar el token de Google.
+- Cuenta suspendida: 403 con la fecha de fin. Como el token de Google ya verificó la identidad, el 403 se devuelve sin paso extra; es el equivalente a validar la contraseña en el login.
+
+**Respuesta 200:** igual que `POST /auth/login`.
+
+**Errores**
+
+| Código | Cuándo | Mensaje |
+|---|---|---|
+| 400 | `idToken` vacío | "Falta el token de Google" |
+| 401 | Token inválido, expirado, de otro emisor o audiencia, o correo sin verificar | "No pudimos verificar tu cuenta de Google" |
+| 403 | Cuenta suspendida | "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima) |
+| 403 | Cuenta dada de baja | "Tu cuenta fue dada de baja" |
+| 409 | Ya existe una cuenta con contraseña y ese correo | "Ya existe una cuenta con este correo. Inicia sesión con tu contraseña" |
+
 ### `POST /auth/registro` — H1, H15, H20
 Crea un comprador o un dueño de botica.
 
@@ -78,7 +112,12 @@ Errores: 400, 409 (correo ya registrado).
   "usuario": { "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev", "rol": "COMPRADOR" }
 }
 ```
-El token dura 24 h. Errores: 401.
+El token dura 24 h. Errores:
+
+- **401:** correo o contraseña incorrectos, o cuenta sin contraseña (creada con Google). Es el mismo mensaje en todos los casos, para no revelar qué correos existen.
+- **403:** cuenta dada de baja o suspendida, **solo si la contraseña es correcta**. Responde "Tu cuenta fue dada de baja" o "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima). Sin contraseña correcta no se revela el estado de la cuenta.
+
+Una sesión ya abierta sigue funcionando hasta que el token venza o la cuenta quede dada de baja o suspendida: en ese caso, cada petición responde 401 y la app debe cerrar sesión. Al volver a entrar, el login da el 403 correspondiente.
 
 ### `POST /auth/recuperar` — H17
 Inicia la recuperación de contraseña. **Siempre responde 200**, exista o no el correo, para no revelar qué correos están registrados.
