@@ -490,6 +490,227 @@ async function leerFilasProductos(archivo) {
   return { validas, errores }
 }
 
+// ---------- 8. Asistente simulado (H68, POST /chat) ----------
+// No hay modelo de IA: se reconoce la intención con palabras clave y se responde
+// con los datos reales de la simulación, con la misma forma que docs/API.md.
+// Para probar errores, escribe en el mensaje: error429, error503, error504 o error401.
+// Si el mensaje contiene "respaldo", la respuesta llega con "respaldo": true.
+// Si contiene una frase del filtro de crisis (por ejemplo "hacerme daño" o "me falta el aire"),
+// llega el texto de ayuda con "ayuda": true y sin tarjetas.
+const ESPERA_CHAT_MS = 2000
+const MAX_TARJETAS_HERRAMIENTA = 5 // cada herramienta devuelve como máximo 5 resultados
+const ROLES_HISTORIAL = new Set(['usuario', 'asistente'])
+
+// Textos de docs/API.md, sección 8, "Crisis y números de ayuda" (H68)
+const NUMEROS_AYUDA = 'Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5.'
+const TEXTO_AUTOLESION =
+  'Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento.'
+const TEXTO_EMERGENCIA =
+  'Llama al SAMU al 106 de inmediato. BotiCompara solo compara precios de medicamentos y no puede atender una emergencia: ahora lo más importante es tu salud.'
+// Frases del filtro de crisis, en minúsculas y sin tildes (se comparan con el mensaje normalizado)
+const FRASES_AUTOLESION = [
+  'hacerme dano', 'matarme', 'quiero matarme', 'suicid', 'quitarme la vida', 'no quiero vivir',
+  'no quiero seguir viviendo', 'quiero morir', 'me quiero morir', 'acabar con mi vida',
+  'cortarme las venas', 'hacerme cortes',
+]
+const FRASES_EMERGENCIA = [
+  'no puedo respirar', 'no puedo respirar bien', 'me falta el aire', 'dolor de pecho', 'dolor en el pecho',
+  'me duele el pecho', 'intoxicacion', 'envenenamiento', 'convulsion', 'desmayo',
+]
+
+const ERRORES_CHAT = {
+  error429: [429, `Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar. ${NUMEROS_AYUDA}`],
+  error503: [503, `El asistente no está disponible en este momento. Intenta más tarde. ${NUMEROS_AYUDA}`],
+  error504: [504, `El asistente tardó demasiado en responder. Intenta de nuevo. ${NUMEROS_AYUDA}`],
+  error401: [401, 'Tu sesión expiró. Inicia sesión nuevamente.'],
+}
+
+const TEXTO_FUERA_DE_ALCANCE =
+  'No puedo recomendarte medicamentos ni dosis. Consulta con el químico farmacéutico de tu botica o con tu médico. Si es una emergencia, llama al SAMU al 106. Si ya sabes qué medicamento necesitas, te ayudo a encontrar dónde está más barato.'
+const PIDE_CONSEJO = /\b(duele|dolor|fiebre|dosis|sintomas?|recetame|recomiendas?|que (me )?tomo|que puedo tomar)\b/
+const PALABRAS_GENERICAS = new Set(['generico', 'generica'])
+const PIDE_STOCK_BAJO = /\b(stock bajo|poco stock|reponer|por agotarse|se me acaba)\b/
+// buscar_en_mi_catalogo: el dueño pregunta por lo que tiene en su propia botica
+const PIDE_MI_CATALOGO = /\b(tengo|tenemos|mi catalogo|mis productos|mi botica)\b/
+
+/** Espera cancelable: si se aborta `signal`, rechaza con su motivo. */
+function esperarCancelable(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason)
+    const id = setTimeout(resolve, ms)
+    signal?.addEventListener('abort', () => {
+      clearTimeout(id)
+      reject(signal.reason)
+    }, { once: true })
+  })
+}
+
+/** 2.2 -> "2 soles con 20"; 58 -> "58 soles"; 1 -> "1 sol" (para leerse en voz alta) */
+function precioHablado(valor) {
+  const centimos = Math.round(Number(valor) * 100)
+  const soles = Math.floor(centimos / 100)
+  const resto = centimos % 100
+  if (soles === 0) return `${resto} céntimos`
+  const base = soles === 1 ? '1 sol' : `${soles} soles`
+  return resto ? `${base} con ${String(resto).padStart(2, '0')}` : base
+}
+
+/** "a, b y c" */
+const enumerar = (lista) =>
+  lista.length <= 1 ? lista.join('') : `${lista.slice(0, -1).join(', ')} y ${lista.at(-1)}`
+
+/** Distancia en línea recta (haversine), con 2 decimales, como GET /productos/buscar. */
+function distanciaKm(lat, lng, botica) {
+  if (lat == null || lng == null || botica.latitud == null || botica.longitud == null) return null
+  const rad = (grados) => (grados * Math.PI) / 180
+  const dLat = rad(botica.latitud - lat)
+  const dLng = rad(botica.longitud - lng)
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat)) * Math.cos(rad(botica.latitud)) * Math.sin(dLng / 2) ** 2
+  return Math.round(6371 * 2 * Math.asin(Math.sqrt(a)) * 100) / 100
+}
+
+/** Tarjeta de `productos`: stockMinimo solo en los productos propios del dueño. */
+function tarjetaChat(p, { propio = false, lat, lng } = {}) {
+  const botica = db.boticas.find((b) => b.id === p.boticaId)
+  return {
+    productoId: p.id,
+    nombreComercial: p.nombreComercial,
+    principioActivo: p.principioActivo,
+    presentacion: p.presentacion,
+    precio: p.precio,
+    stock: p.stock,
+    stockMinimo: propio ? p.stockMinimo : null,
+    boticaId: botica.id,
+    boticaNombre: botica.nombreComercial,
+    boticaDistrito: botica.distrito,
+    distanciaKm: distanciaKm(lat, lng, botica),
+  }
+}
+
+/** Lo que ve el comprador (v_producto_busqueda): activo, con stock, de botica aprobada, sin medicamento oculto. */
+function visibleEnBusqueda(p) {
+  const botica = db.boticas.find((b) => b.id === p.boticaId)
+  const medicamento = db.medicamentos.find((m) => m.id === p.medicamentoId)
+  return p.activo && p.stock > 0 && botica?.estado === 'APROBADO' && !medicamento?.oculto
+}
+
+/**
+ * Medicamento que se menciona en el mensaje: la palabra que coincidió
+ * ("panadol") y su principio activo ("Paracetamol"), o null.
+ */
+function medicamentoMencionado(mensaje) {
+  const palabras = normalizar(mensaje).split(/[^a-z0-9]+/)
+    .filter((p) => p.length >= 4 && !PALABRAS_GENERICAS.has(p))
+  for (const palabra of palabras) {
+    const producto = db.productos.find((p) =>
+      [p.nombreComercial, p.principioActivo].some((nombre) => normalizar(nombre).split(/\s+/).includes(palabra)))
+    if (producto) return { palabra, principio: producto.principioActivo }
+  }
+  return null
+}
+
+const principioMencionado = (mensaje) => medicamentoMencionado(mensaje)?.principio ?? null
+
+/** Herramienta buscar_en_mi_catalogo del dueño (como GET /boticas/mia/productos?q=). */
+function respuestaMiCatalogo(usuario, mensaje) {
+  const botica = db.boticas.find((b) => b.usuarioId === usuario.id)
+  if (!botica) {
+    return { respuesta: 'Todavía no registraste tu botica, así que no tengo un catálogo que revisar. Cuando la registres, podré decirte a cuánto tienes cada producto.', productos: [] }
+  }
+  const mencionado = medicamentoMencionado(mensaje)
+  if (!mencionado) {
+    return { respuesta: `¿Qué producto quieres revisar en el catálogo de ${botica.nombreComercial}? Por ejemplo, pregúntame a cuánto tienes la amoxicilina.`, productos: [] }
+  }
+  const { palabra } = mencionado
+  const propios = db.productos
+    .filter((p) => p.boticaId === botica.id && p.activo)
+    .filter((p) => normalizar(p.nombreComercial).includes(palabra) || normalizar(p.principioActivo).includes(palabra))
+    .sort((a, b) => a.nombreComercial.localeCompare(b.nombreComercial, 'es'))
+    .slice(0, MAX_TARJETAS_HERRAMIENTA)
+  if (propios.length === 0) {
+    return { respuesta: `No encontré ${palabra} en el catálogo de ${botica.nombreComercial}. Puedes agregarlo desde Catálogo.`, productos: [] }
+  }
+  const detalle = propios.map((p) =>
+    `${p.nombreComercial}, ${p.presentacion}, a ${precioHablado(p.precio)}, ${p.stock === 0 ? 'agotado' : `con ${p.stock} ${p.stock === 1 ? 'unidad' : 'unidades'}`}`)
+  return {
+    respuesta: `En ${botica.nombreComercial} tienes ${enumerar(detalle)}.`,
+    productos: propios.map((p) => tarjetaChat(p, { propio: true })),
+  }
+}
+
+/** Herramienta buscar_precios (tipo principio): de la más barata a la más cara, o por cercanía. */
+function buscarPreciosChat(principio, lat, lng) {
+  const tarjetas = db.productos
+    .filter((p) => visibleEnBusqueda(p) && normalizar(p.principioActivo) === normalizar(principio))
+    .map((p) => tarjetaChat(p, { lat, lng }))
+  const porPrecio = (a, b) => a.precio - b.precio
+  const conDistancia = lat != null && lng != null
+  tarjetas.sort(conDistancia
+    ? (a, b) => (a.distanciaKm ?? Infinity) - (b.distanciaKm ?? Infinity) || porPrecio(a, b)
+    : porPrecio)
+  return tarjetas.slice(0, MAX_TARJETAS_HERRAMIENTA)
+}
+
+function textoPrecios(principio, tarjetas) {
+  const masBarata = [...tarjetas].sort((a, b) => a.precio - b.precio)[0]
+  const distancia = masBarata.distanciaKm != null ? `, a ${masBarata.distanciaKm.toFixed(1)} kilómetros de ti` : ''
+  let texto = `Encontré ${tarjetas.length === 1 ? 'una opción' : `${tarjetas.length} opciones`} de ${principio.toLowerCase()} en boticas aprobadas. La más barata es ${masBarata.nombreComercial} en ${masBarata.boticaNombre}, ${masBarata.boticaDistrito}, a ${precioHablado(masBarata.precio)}${distancia}.`
+  const otraMarca = tarjetas.find((t) => t.nombreComercial !== masBarata.nombreComercial)
+  if (otraMarca) {
+    texto += ` Si prefieres ${otraMarca.nombreComercial}, está desde ${precioHablado(otraMarca.precio)} en ${otraMarca.boticaNombre}.`
+  }
+  return texto
+}
+
+/** Texto de respaldo: lo arma "el servidor" solo con datos de las tarjetas. */
+function textoRespaldo(tarjetas) {
+  const masBarata = [...tarjetas].sort((a, b) => a.precio - b.precio)[0]
+  return `Encontré ${tarjetas.length === 1 ? '1 opción' : `${tarjetas.length} opciones`}. La más barata es ${masBarata.nombreComercial} a ${precioHablado(masBarata.precio)} en ${masBarata.boticaNombre}, ${masBarata.boticaDistrito}.`
+}
+
+/** Herramienta ver_stock_bajo del dueño. */
+function respuestaStockBajo(usuario) {
+  const botica = db.boticas.find((b) => b.usuarioId === usuario.id)
+  if (!botica) {
+    return { respuesta: 'Todavía no registraste tu botica, así que no tengo un catálogo que revisar. Cuando la registres y la aprueben, podré decirte qué productos tienen stock bajo.', productos: [] }
+  }
+  const bajos = db.productos
+    .filter((p) => p.boticaId === botica.id && p.activo && p.stock <= p.stockMinimo)
+    .sort((a, b) => a.stock - b.stock)
+    .slice(0, MAX_TARJETAS_HERRAMIENTA)
+  if (bajos.length === 0) {
+    return { respuesta: `No tienes productos con stock bajo en ${botica.nombreComercial}. Todos están por encima de su stock mínimo.`, productos: [] }
+  }
+  const detalle = bajos.map((p) =>
+    `${p.nombreComercial}, ${p.stock === 0 ? 'agotado' : `con ${p.stock} ${p.stock === 1 ? 'unidad' : 'unidades'}`}`)
+  const cuantos = bajos.length === 1 ? '1 producto' : `${bajos.length} productos`
+  return {
+    respuesta: `Tienes ${cuantos} con stock bajo: ${enumerar(detalle)}. Te conviene ${bajos.length === 1 ? 'reponerlo' : 'reponerlos'} pronto.`,
+    productos: bajos.map((p) => tarjetaChat(p, { propio: true })),
+  }
+}
+
+function textoAyuda(usuario) {
+  const nombre = usuario.nombre.split(' ')[0]
+  return usuario.rol === 'DUENO_BOTICA'
+    ? `Hola, ${nombre}. Soy el asistente de BotiCompara. Puedo comparar el precio de un medicamento en las boticas aprobadas o decirte qué productos de tu botica tienen stock bajo. Por ejemplo, pregúntame qué productos tengo con stock bajo.`
+    : `Hola, ${nombre}. Soy el asistente de BotiCompara. Puedo ayudarte a encontrar dónde está más barato un medicamento en las boticas aprobadas. Por ejemplo, pregúntame dónde está más barato el paracetamol.`
+}
+
+/** Mismas validaciones que el backend (docs/API.md, POST /chat). */
+function validarPedidoChat({ mensaje, historial, lat, lng }) {
+  const limpio = texto(mensaje)
+  if (!limpio) throw crearError(400, 'Escribe tu pregunta')
+  if (limpio.length > 500) throw crearError(400, 'La pregunta no puede pasar de 500 caracteres')
+  if (historial != null) {
+    const valido = Array.isArray(historial) && historial.every((m) =>
+      ROLES_HISTORIAL.has(m?.rol) && texto(m?.texto).length > 0 && String(m.texto).length <= 1000)
+    if (!valido) throw crearError(400, 'El historial no es válido')
+  }
+  validarCoordenadas({ latitud: lat, longitud: lng })
+  return limpio
+}
+
 export const apiMock = {
   // ---------- 1. Autenticación ----------
   async login({ correo, password }) {
@@ -777,6 +998,50 @@ export const apiMock = {
       .slice(0, 20)
       .map(medicamentoDto)
   },
+
+  // ---------- 8. Asistente (H68) ----------
+  async enviarChat(pedido, { signal } = {}) {
+    const usuario = usuarioActual()
+    const mensaje = validarPedidoChat(pedido)
+    await esperarCancelable(ESPERA_CHAT_MS, signal)
+
+    const consulta = normalizar(mensaje)
+    const simulado = Object.keys(ERRORES_CHAT).find((clave) => consulta.includes(clave))
+    if (simulado) throw crearError(...ERRORES_CHAT[simulado])
+
+    // respaldo y ayuda valen false salvo que la respuesta diga lo contrario
+    return { respaldo: false, ayuda: false, ...responderChat(usuario, mensaje, pedido) }
+  },
+}
+
+/** Elige la respuesta simulada según la intención del mensaje. */
+function responderChat(usuario, mensaje, { lat, lng }) {
+  const consulta = normalizar(mensaje)
+  const esDueno = usuario.rol === 'DUENO_BOTICA'
+
+  // Filtro de crisis: va antes que todo lo demás, sin tarjetas. Si hay frases de los dos grupos, gana autolesión
+  if (FRASES_AUTOLESION.some((f) => consulta.includes(f))) return { respuesta: TEXTO_AUTOLESION, productos: [], ayuda: true }
+  if (FRASES_EMERGENCIA.some((f) => consulta.includes(f))) return { respuesta: TEXTO_EMERGENCIA, productos: [], ayuda: true }
+  if (consulta.includes('respaldo')) {
+    // Como si la llamada final a Gemini fallara después de que las herramientas encontraron productos
+    const mencionado = principioMencionado(mensaje)
+    const encontrados = mencionado ? buscarPreciosChat(mencionado, lat, lng) : []
+    const productos = encontrados.length ? encontrados : buscarPreciosChat('Paracetamol', lat, lng)
+    return { respuesta: textoRespaldo(productos), productos, respaldo: true }
+  }
+  if (PIDE_CONSEJO.test(consulta)) return { respuesta: TEXTO_FUERA_DE_ALCANCE, productos: [] }
+  if (esDueno && PIDE_STOCK_BAJO.test(consulta)) return respuestaStockBajo(usuario)
+  if (esDueno && PIDE_MI_CATALOGO.test(consulta)) return respuestaMiCatalogo(usuario, mensaje)
+
+  const principio = principioMencionado(mensaje)
+  if (principio) {
+    const productos = buscarPreciosChat(principio, lat, lng)
+    const respuesta = productos.length
+      ? textoPrecios(principio, productos)
+      : `No encontré ${principio.toLowerCase()} con stock en las boticas aprobadas. Prueba con otro nombre o con el principio activo.`
+    return { respuesta, productos }
+  }
+  return { respuesta: textoAyuda(usuario), productos: [] }
 }
 
 // Ayuda para pruebas en modo simulado: desde la consola del navegador se

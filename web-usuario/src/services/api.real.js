@@ -1,9 +1,14 @@
 // Implementación real: llama al backend Spring Boot (docs/API.md)
 import { API_URL } from '../config.js'
-import { ApiError } from './ApiError.js'
+import { ApiError, MENSAJE_INESPERADO } from './ApiError.js'
 import { obtenerToken } from './sesion.js'
 
-async function solicitar(metodo, ruta, cuerpo) {
+/**
+ * `signal` (opcional) permite cancelar el pedido con un AbortController.
+ * Si se cancela, se propaga el error original del navegador (AbortError o
+ * el motivo que se pasó a abort()), no un ApiError: quien canceló sabe por qué.
+ */
+async function solicitar(metodo, ruta, cuerpo, { signal } = {}) {
   // Con FormData el navegador arma el Content-Type multipart con su boundary
   const esFormData = cuerpo instanceof FormData
   const headers = { Accept: 'application/json' }
@@ -17,8 +22,10 @@ async function solicitar(metodo, ruta, cuerpo) {
       method: metodo,
       headers,
       body: cuerpo === undefined || esFormData ? cuerpo : JSON.stringify(cuerpo),
+      signal,
     })
-  } catch {
+  } catch (error) {
+    if (signal?.aborted) throw signal.reason ?? error
     throw new ApiError({
       status: 0,
       error: 'Network Error',
@@ -28,12 +35,14 @@ async function solicitar(metodo, ruta, cuerpo) {
 
   if (respuesta.status === 204) return null
   const datos = await respuesta.json().catch(() => null)
+  // Cancelado mientras se leía el cuerpo: json() falló, pero no es un cuerpo vacío
+  signal?.throwIfAborted()
 
   if (!respuesta.ok) {
     throw new ApiError({
       status: datos?.status ?? respuesta.status,
       error: datos?.error ?? respuesta.statusText,
-      mensaje: datos?.mensaje ?? 'Ocurrió un error inesperado. Inténtalo nuevamente.',
+      mensaje: datos?.mensaje ?? MENSAJE_INESPERADO,
       timestamp: datos?.timestamp,
     })
   }
@@ -77,6 +86,15 @@ export const apiReal = {
     return solicitar('POST', '/productos/carga-masiva', formulario)
   },
   buscarMedicamentos: (q) => solicitar('GET', `/medicamentos?q=${encodeURIComponent(q.trim())}`),
+
+  // 8. Asistente (H68). El plazo de 60 s lo pone quien llama, con `signal`.
+  enviarChat: ({ mensaje, historial, lat, lng }, { signal } = {}) =>
+    solicitar(
+      'POST',
+      '/chat',
+      { mensaje, historial, ...(lat != null && lng != null && { lat, lng }) },
+      { signal },
+    ),
 
   // 10. Pedidos del dueño
   listarPedidos: (estado) =>
