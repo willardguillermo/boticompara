@@ -47,6 +47,10 @@ const db = {
     { id: 2, nombre: 'Jorge Mendoza', correo: 'jorge@boticompara.nissidev.dev', password: PASSWORD_PRUEBA, telefono: '976543210', direccion: null, rol: 'DUENO_BOTICA' },
     { id: 3, nombre: 'Lucía Torres', correo: 'lucia@boticompara.nissidev.dev', password: PASSWORD_PRUEBA, telefono: '965432109', direccion: null, rol: 'DUENO_BOTICA' },
     { id: 4, nombre: 'Carlos Ramírez', correo: 'carlos@boticompara.nissidev.dev', password: PASSWORD_PRUEBA, telefono: '954321098', direccion: 'Av. Lima 123, Chosica', rol: 'COMPRADOR' },
+    // Compradores que solo existen en el modo simulado, para variar los pedidos (H77)
+    { id: 5, nombre: 'Ana María Flores', correo: 'ana@ejemplo.test', password: PASSWORD_PRUEBA, telefono: null, direccion: null, rol: 'COMPRADOR' },
+    // H19: cuenta eliminada (datos anonimizados)
+    { id: 6, nombre: 'Usuario eliminado', correo: 'eliminado-6@boticompara.invalid', password: null, telefono: null, direccion: null, rol: 'COMPRADOR', eliminado: true },
   ],
   boticas: [
     { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', latitud: -11.942500, longitud: -76.699000, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
@@ -75,6 +79,38 @@ const db = {
     medicamentoId: MEDICAMENTOS.find((m) => m.nombreComercial === nombreComercial)?.id ?? null,
   })),
 }
+
+// ---------- Reservas de prueba (secciones 9 y 10) ----------
+// Fechas relativas a cuando se abre la página, para que los plazos se vean reales.
+const MINUTO = 60 * 1000
+const HORA = 60 * MINUTO
+const haceMs = (ms) => new Date(Date.now() - ms).toISOString()
+const enMs = (ms) => new Date(Date.now() + ms).toISOString()
+
+/** [productoId, compradorId, cantidad, estado, creada hace, vence en (negativo = ya pasó), código, motivo] */
+db.reservas = [
+  // Botica Salud Total (rosa@): un pedido en cada uno de los 7 estados
+  [2, 4, 2, 'PENDIENTE', 25 * MINUTO, 23 * HORA + 35 * MINUTO, 'BC-7K2QXM'],
+  [5, 5, 3, 'PENDIENTE', 3 * HORA, 21 * HORA, 'BC-H4NP2T'],
+  [3, 4, 1, 'CONFIRMADA', 6 * HORA, 18 * HORA, 'BC-R8WZ3D'],
+  [7, 5, 2, 'LISTA', 20 * HORA, 40 * HORA, 'BC-M5VC9E'],
+  [1, 4, 1, 'ENTREGADA', 3 * 24 * HORA, -2 * 24 * HORA, 'BC-Q2LX7A'],
+  [6, 5, 2, 'RECHAZADA', 2 * 24 * HORA, -24 * HORA, 'BC-T6YB4K', 'No nos queda stock de esa presentación'],
+  [4, 6, 4, 'CANCELADA', 4 * 24 * HORA, -3 * 24 * HORA, 'BC-W3FJ8N'],
+  [2, 4, 1, 'VENCIDA', 5 * 24 * HORA, -4 * 24 * HORA, 'BC-Z9KD5P'],
+  // FarmaVida (jorge@). El de Ibuprofeno (stock 0) no alcanza: "Confirmar" sale desactivado.
+  [9, 4, 2, 'PENDIENTE', 50 * MINUTO, 23 * HORA + 10 * MINUTO, 'BC-C7HS2M'],
+  [11, 5, 1, 'CONFIRMADA', 5 * HORA, 19 * HORA, 'BC-J4RT6V'],
+  [14, 4, 2, 'PENDIENTE', 2 * HORA, 22 * HORA, 'BC-P3GU7R'],
+].map(([productoId, usuarioId, cantidad, estado, creada, vence, codigo, motivoRechazo = null], i) => {
+  const producto = db.productos.find((p) => p.id === productoId)
+  const creadoEn = haceMs(creada)
+  return {
+    id: i + 1, codigo, estado, productoId, usuarioId, cantidad, precioUnitario: producto.precio,
+    motivoRechazo, venceEn: enMs(vence), creadoEn,
+    actualizadoEn: estado === 'PENDIENTE' ? creadoEn : haceMs(Math.max(creada / 2, MINUTO)),
+  }
+})
 
 const siguienteId = (lista) => Math.max(0, ...lista.map((x) => x.id)) + 1
 const esperar = () => new Promise((r) => setTimeout(r, 250))
@@ -184,6 +220,85 @@ function productoPropio(id) {
   if (!producto) throw crearError(404, 'El producto no existe o no pertenece a tu botica.')
   return producto
 }
+
+// ---------- 10. Pedidos del dueño (mismas reglas que docs/API.md) ----------
+const ESTADOS_RESERVA = ['PENDIENTE', 'CONFIRMADA', 'LISTA', 'ENTREGADA', 'RECHAZADA', 'CANCELADA', 'VENCIDA']
+const ESTADOS_ACTIVOS = ['PENDIENTE', 'CONFIRMADA', 'LISTA']
+// Únicos cambios de PATCH /pedidos/{id}/estado
+const TRANSICIONES = { PENDIENTE: 'CONFIRMADA', CONFIRMADA: 'LISTA', LISTA: 'ENTREGADA' }
+const PLAZO_RECOGER_MS = 48 * HORA
+
+/** "Carlos Ramírez" -> "Carlos R."; una sola palabra sale tal cual; cuenta eliminada -> "Usuario eliminado". */
+function nombreCorto(usuario) {
+  if (!usuario || usuario.eliminado) return 'Usuario eliminado'
+  const [nombre, apellido] = usuario.nombre.trim().split(/\s+/)
+  return apellido ? `${nombre} ${apellido[0].toUpperCase()}.` : nombre
+}
+
+const redondear = (valor) => Math.round(valor * 100) / 100
+
+function pedidoDto(reserva) {
+  const producto = db.productos.find((p) => p.id === reserva.productoId)
+  const { id, codigo, estado, productoId, cantidad, precioUnitario, motivoRechazo, venceEn, creadoEn, actualizadoEn } = reserva
+  return {
+    id, codigo, estado, productoId,
+    nombreComercial: producto.nombreComercial, presentacion: producto.presentacion,
+    cantidad, precioUnitario, total: redondear(cantidad * precioUnitario), stockActual: producto.stock,
+    // Regla nueva: solo en PENDIENTE, stock menos las otras reservas activas (nunca negativo)
+    disponible: estado === 'PENDIENTE' ? Math.max(producto.stock - apartadasPorOtras(reserva), 0) : null,
+    compradorNombre: nombreCorto(db.usuarios.find((u) => u.id === reserva.usuarioId)),
+    motivoRechazo, venceEn, creadoEn, actualizadoEn,
+  }
+}
+
+const ahoraIso = () => new Date().toISOString()
+const yaVencio = (reserva) => new Date(reserva.venceEn).getTime() <= Date.now()
+
+/** H84: imita el proceso programado, que pasa a VENCIDA las activas con venceEn pasado. */
+function vencerReservas() {
+  for (const r of db.reservas) {
+    if (ESTADOS_ACTIVOS.includes(r.estado) && yaVencio(r)) Object.assign(r, { estado: 'VENCIDA', actualizadoEn: ahoraIso() })
+  }
+}
+
+const reservasDeBotica = (botica) =>
+  db.reservas.filter((r) => db.productos.find((p) => p.id === r.productoId)?.boticaId === botica.id)
+
+function pedidoPropio(id) {
+  const botica = boticaActual()
+  if (!/^\d+$/.test(String(id))) throw crearError(400, 'El id del pedido debe ser numérico.')
+  const reserva = reservasDeBotica(botica).find((r) => r.id === Number(id))
+  if (!reserva) throw crearError(404, 'El pedido no existe o no pertenece a tu botica.')
+  return reserva
+}
+
+function validarEstado(estado, obligatorio) {
+  if (!obligatorio && (estado === undefined || estado === null || estado === '')) return
+  if (!ESTADOS_RESERVA.includes(estado)) {
+    throw crearError(400, `El estado debe ser uno de: ${ESTADOS_RESERVA.join(', ')}.`)
+  }
+}
+
+/**
+ * Regla nueva: unidades comprometidas de un producto (reservas CONFIRMADA y LISTA).
+ * El dueño no puede bajar el stock por debajo de ellas.
+ */
+const unidadesComprometidas = (productoId) =>
+  db.reservas
+    .filter((r) => r.productoId === productoId && (r.estado === 'CONFIRMADA' || r.estado === 'LISTA'))
+    .reduce((suma, r) => suma + r.cantidad, 0)
+
+const mensajeComprometidas = (n) =>
+  `Tienes ${n === 1 ? '1 unidad comprometida' : `${n} unidades comprometidas`} en pedidos confirmados o listos para recoger; el stock no puede ser menor`
+
+const MENSAJE_BAJA_COMPROMETIDA =
+  'No puedes dar de baja un producto con pedidos confirmados o listos para recoger. Atiéndelos o recházalos primero.'
+
+/** Unidades apartadas por las otras reservas activas del mismo producto. */
+const apartadasPorOtras = (reserva) =>
+  db.reservas
+    .filter((r) => r.productoId === reserva.productoId && r.id !== reserva.id && ESTADOS_ACTIVOS.includes(r.estado))
+    .reduce((suma, r) => suma + r.cantidad, 0)
 
 // ---------- Validación de productos (mismos mensajes que el backend) ----------
 const ENTERO_MAXIMO = 2147483647
@@ -728,6 +843,9 @@ export const apiMock = {
     const producto = productoPropio(id)
     // Sin stockMinimo se conserva el valor actual
     const { stockMinimo = producto.stockMinimo, ...campos } = validarProducto(datos)
+    // Regla nueva: el stock no baja de las unidades de pedidos CONFIRMADA y LISTA
+    const comprometidas = unidadesComprometidas(producto.id)
+    if (campos.stock < comprometidas) throw crearError(409, mensajeComprometidas(comprometidas))
     // Sin medicamentoId se conserva el enlace actual (enviar null no lo borra); con enlace, regla D2
     const enlace = enlaceDelCuerpo(datos)
     Object.assign(producto, campos, { stockMinimo }, enlace ?? {})
@@ -746,7 +864,10 @@ export const apiMock = {
 
   async eliminarProducto(id) {
     await esperar()
-    productoPropio(id).activo = false // baja lógica
+    const producto = productoPropio(id)
+    // Regla nueva: no se da de baja con reservas CONFIRMADA o LISTA
+    if (unidadesComprometidas(producto.id) > 0) throw crearError(409, MENSAJE_BAJA_COMPROMETIDA)
+    producto.activo = false // baja lógica
     return null
   },
 
@@ -776,6 +897,12 @@ export const apiMock = {
       }
       let producto = existentes.get(claveProducto(fila.nombreComercial, fila.presentacion))
       if (producto) {
+        // Regla nueva, igual que al editar: la fila queda como error y las demás siguen
+        const comprometidas = unidadesComprometidas(producto.id)
+        if (fila.stock < comprometidas) {
+          errores.push({ fila: numeroFila, mensaje: mensajeComprometidas(comprometidas) })
+          continue
+        }
         Object.assign(producto, { precio: fila.precio, stock: fila.stock })
         if (stockMinimo !== undefined) producto.stockMinimo = stockMinimo
         actualizados++
@@ -792,6 +919,70 @@ export const apiMock = {
     }
     errores.sort((a, b) => a.fila - b.fila)
     return { creados, actualizados, errores }
+  },
+
+  // ---------- 10. Pedidos del dueño ----------
+  // H77, H81: del más reciente al más antiguo, máximo 100; estado opcional
+  async listarPedidos(estado) {
+    await esperar()
+    const botica = boticaActual()
+    validarEstado(estado, false)
+    vencerReservas()
+    return reservasDeBotica(botica)
+      .filter((r) => !estado || r.estado === estado)
+      .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))
+      .slice(0, 100)
+      .map(pedidoDto)
+  },
+
+  // H78
+  async obtenerPedido(id) {
+    await esperar()
+    vencerReservas()
+    return pedidoDto(pedidoPropio(id))
+  },
+
+  // H79: PENDIENTE -> CONFIRMADA -> LISTA -> ENTREGADA, sin saltos ni vuelta atrás
+  async cambiarEstadoPedido(id, estado) {
+    await esperar()
+    validarEstado(estado, true)
+    const reserva = pedidoPropio(id)
+    if (TRANSICIONES[reserva.estado] !== estado) {
+      throw crearError(409, `No se puede pasar de ${reserva.estado} a ${estado}`)
+    }
+    if (yaVencio(reserva)) throw crearError(409, 'La reserva ya venció')
+    const producto = db.productos.find((p) => p.id === reserva.productoId)
+
+    if (estado === 'CONFIRMADA') {
+      const disponible = Math.max(producto.stock - apartadasPorOtras(reserva), 0)
+      if (disponible < reserva.cantidad) {
+        throw crearError(409, `No hay stock suficiente para aceptar este pedido: disponible ${disponible}, pedido ${reserva.cantidad}. Recházalo con un motivo.`)
+      }
+    } else if (estado === 'LISTA') {
+      reserva.venceEn = enMs(PLAZO_RECOGER_MS)
+    } else if (estado === 'ENTREGADA') {
+      // Respaldo: con las unidades comprometidas ya no debería pasar (ningún dato de prueba lo dispara)
+      if (producto.stock < reserva.cantidad) throw crearError(409, `Stock insuficiente: quedan ${producto.stock} unidades`)
+      producto.stock -= reserva.cantidad
+    }
+    Object.assign(reserva, { estado, actualizadoEn: ahoraIso() })
+    return pedidoDto(reserva)
+  },
+
+  // H80: solo desde PENDIENTE o CONFIRMADA, con motivo de 10 a 300 caracteres
+  async rechazarPedido(id, motivo) {
+    await esperar()
+    const motivoLimpio = String(motivo ?? '').trim()
+    if (motivoLimpio.length < 10 || motivoLimpio.length > 300) {
+      throw crearError(400, 'El motivo debe tener entre 10 y 300 caracteres.')
+    }
+    const reserva = pedidoPropio(id)
+    if (!['PENDIENTE', 'CONFIRMADA'].includes(reserva.estado)) {
+      throw crearError(409, `No se puede rechazar un pedido ${reserva.estado}`)
+    }
+    if (yaVencio(reserva)) throw crearError(409, 'La reserva ya venció')
+    Object.assign(reserva, { estado: 'RECHAZADA', motivoRechazo: motivoLimpio, actualizadoEn: ahoraIso() })
+    return pedidoDto(reserva)
   },
 
   // H31: catálogo maestro (hasta 20, sin ocultos, por nombre comercial)
@@ -858,6 +1049,9 @@ function responderChat(usuario, mensaje, { lat, lng }) {
 //   boticomparaMock.aprobar(3)
 //   boticomparaMock.rechazar(3, 'La dirección no coincide con la ficha RUC')
 //   boticomparaMock.ocultarMedicamento(12)
+//   boticomparaMock.pedidos()                      (H77: pedidos de todas las boticas)
+//   boticomparaMock.vencerPedido(1)                (H79: venceEn pasa a ayer, para el 409 "La reserva ya venció")
+//   boticomparaMock.cancelarPedido(1)              (H79: el comprador lo cancela desde el móvil)
 export function registrarAyudaConsola() {
   const cambiarEstado = (id, estado, motivoRechazo = null) => {
     const botica = db.boticas.find((b) => b.id === Number(id))
@@ -876,6 +1070,21 @@ export function registrarAyudaConsola() {
       if (!medicamento) return `No existe el medicamento ${id}`
       medicamento.oculto = oculto
       return `${medicamento.nombreComercial}: ${oculto ? 'oculto' : 'visible'}`
+    },
+    pedidos: () => db.reservas.map((r) => ({ ...pedidoDto(r), boticaId: db.productos.find((p) => p.id === r.productoId).boticaId })),
+    // No cambia el estado: el proceso de H84 lo marca VENCIDA en la siguiente consulta
+    vencerPedido: (id) => {
+      const reserva = db.reservas.find((r) => r.id === Number(id))
+      if (!reserva) return `No existe el pedido ${id}`
+      reserva.venceEn = haceMs(24 * HORA)
+      return `${reserva.codigo}: venceEn en el pasado (sigue ${reserva.estado} hasta la próxima consulta)`
+    },
+    cancelarPedido: (id) => {
+      const reserva = db.reservas.find((r) => r.id === Number(id))
+      if (!reserva) return `No existe el pedido ${id}`
+      if (!ESTADOS_ACTIVOS.includes(reserva.estado)) return `No se puede cancelar una reserva ${reserva.estado}`
+      Object.assign(reserva, { estado: 'CANCELADA', actualizadoEn: ahoraIso() })
+      return `${reserva.codigo}: CANCELADA`
     },
   }
 }
