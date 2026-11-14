@@ -3,7 +3,7 @@
 - **Fechas:** 13/11/2026 (pantalla de pedidos) y 14/11/2026 (regla de stock comprometido)
 - **Responsable:** Guillermo
 - **Entorno:** `web-usuario/` local (`npm run dev`, puerto 5173) en **modo simulado** (`VITE_USE_MOCK=true` en el `.env` local). Las respuestas salen de `src/services/api.mock.js`, con la forma de la sección 10 de `docs/API.md` y los ajustes del contrato del PR #89.
-- **Cuentas:** `rosa@boticompara.nissidev.dev` (Botica Salud Total) y `jorge@boticompara.nissidev.dev` (FarmaVida), contraseña `Boti2026!`.
+- **Cuentas:** `rosa@boticompara.nissidev.dev` (Botica Salud Total), contraseña `Boti2026!`.
 - **Datos:** el mock trae un pedido de Botica Salud Total en cada uno de los 7 estados.
 
 > **Pendiente:** la prueba en modo real se hace cuando el backend tenga los endpoints de pedidos del dueño con la regla de stock comprometido (contrato del PR #89).
@@ -13,10 +13,10 @@
 | # | Historia | Caso | Resultado |
 |---|---|---|---|
 | 1 | H77 | Lista de pedidos de la botica en **Pedidos** del menú del panel | Correcto |
-| 2 | H81 | Filtro por estado guardado en la URL (`/panel/pedidos?estado=...`): se conserva al recargar y al volver atrás | Correcto |
+| 2 | H81 | Filtro por estado: queda en la URL (`/panel/pedidos?estado=...`) y se conserva al recargar con F5 | Correcto |
 | 3 | H78, H79 | Flujo completo de **BC-7K2QXM** (Paracetamol Genérico): detalle, `PENDIENTE` → `CONFIRMADA` → `LISTA` → `ENTREGADA` | Correcto |
 | 4 | H80 | Rechazo con motivo de **BC-H4NP2T** (Rosa): un motivo corto da error, se ve el contador de caracteres y Esc cierra solo el modal de rechazo | Correcto |
-| 5 | — | Esc en modales apilados: cierra solo el de arriba y el foco vuelve al modal de abajo | Correcto |
+| 5 | — | Esc en modales apilados: cierra solo el modal de arriba (rechazo) y deja abierto el detalle | Correcto |
 | 6 | — | Modal del catálogo (editar y eliminar producto) sigue funcionando con los cambios de `Modal.jsx` | Correcto |
 
 ## Día 2 · 14/11/2026: stock comprometido (H79, H80)
