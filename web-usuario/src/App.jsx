@@ -10,6 +10,7 @@ import CatalogoPage from './pages/CatalogoPage.jsx'
 import CorregirBoticaPage from './pages/CorregirBoticaPage.jsx'
 import EstadoPage from './pages/EstadoPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+import PedidosPage from './pages/PedidosPage.jsx'
 import RegistroBoticaPage from './pages/RegistroBoticaPage.jsx'
 import RegistroPage from './pages/RegistroPage.jsx'
 
@@ -36,6 +37,7 @@ export default function App() {
                 />
                 <Route path="estado" element={<ConBotica><EstadoPage /></ConBotica>} />
                 <Route path="catalogo" element={<ConBotica><CatalogoPage /></ConBotica>} />
+                <Route path="pedidos" element={<ConBotica><PedidosPage /></ConBotica>} />
                 <Route
                   path="catalogo/carga-masiva"
                   element={<ConBotica><SoloAprobada><CargaMasivaPage /></SoloAprobada></ConBotica>}
