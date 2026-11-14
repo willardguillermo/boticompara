@@ -82,6 +82,7 @@ class UsuarioServiceTest {
     @Test
     void eliminarAnonimizaLosDatosPersonalesYDesactivaLaCuenta() {
         Usuario u = usuario(true);
+        u.setGoogleUid("zz-uid-prueba");
         when(usuarios.findById(10L)).thenReturn(Optional.of(u));
         when(encoder.encode(anyString())).thenReturn("HASH_INUTIL");
 
@@ -94,6 +95,7 @@ class UsuarioServiceTest {
         assertFalse(u.isActivo());
         assertEquals("HASH_INUTIL", u.getPasswordHash());
         assertEquals("DUENO_BOTICA", u.getRol());
+        assertNull(u.getGoogleUid());
         verify(usuarios).save(u);
     }
 
