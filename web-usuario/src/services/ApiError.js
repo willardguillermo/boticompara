@@ -13,12 +13,18 @@ export class ApiError extends Error {
   }
 }
 
+/** Se usa cuando la respuesta de error no trae `mensaje` (por ejemplo, un 504 de un proxy sin JSON). */
+export const MENSAJE_INESPERADO = 'Ocurrió un error inesperado. Inténtalo nuevamente.'
+
 const TEXTOS_HTTP = {
   400: 'Bad Request',
   401: 'Unauthorized',
   403: 'Forbidden',
   404: 'Not Found',
   409: 'Conflict',
+  429: 'Too Many Requests',
+  503: 'Service Unavailable',
+  504: 'Gateway Timeout',
 }
 
 /** Crea un ApiError con el texto HTTP estándar para el código. */
