@@ -88,7 +88,8 @@ function SelectorMedicamento({ medicamento, enlazadoEnServidor, quitando, error,
     )
   }
 
-  // D20: la ayuda y el error van en elementos separados para que el lector de pantalla lea los dos
+  // D20: la ayuda y el error van en elementos separados para que el lector de pantalla lea los dos.
+  // aria-invalid y aria-describedby usan el mismo mensaje para no contradecirse.
   const mensajeError = error || errorBusqueda
   const describedBy = ['buscar-medicamento-ayuda', mensajeError && 'buscar-medicamento-error']
     .filter(Boolean)
@@ -105,7 +106,7 @@ function SelectorMedicamento({ medicamento, enlazadoEnServidor, quitando, error,
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           aria-describedby={describedBy}
-          aria-invalid={Boolean(error)}
+          aria-invalid={Boolean(mensajeError)}
         />
       </div>
       <span id="buscar-medicamento-ayuda" className="ayuda">
