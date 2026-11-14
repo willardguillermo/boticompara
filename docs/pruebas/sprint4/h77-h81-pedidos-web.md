@@ -18,11 +18,11 @@
 | 4 | H80 | Rechazo con motivo de **BC-H4NP2T** (Rosa): un motivo corto da error, se ve el contador de caracteres y Esc cierra solo el modal de rechazo | Correcto |
 | 5 | — | Esc en modales apilados: cierra solo el modal de arriba (rechazo) y deja abierto el detalle | Correcto |
 
-## Día 2 · 14/11/2026: stock comprometido (H79, H80)
+## Día 2 · 14/11/2026 (modal del catálogo y regla de stock comprometido)
 
 | # | Cuenta | Caso | Resultado esperado | Resultado |
 |---|---|---|---|---|
-| 6 | Rosa | Modal del catálogo (editar y eliminar producto) sigue funcionando con los cambios de `Modal.jsx` | — | Correcto |
+| 6 | Rosa | Modal del catálogo (editar y eliminar producto) sigue funcionando con los cambios de `Modal.jsx` | El modal de edición guarda los cambios y el de eliminación quita el producto del catálogo, sin errores. | Correcto |
 | 7 | Rosa | Pedido `PENDIENTE` de 2 Paracetamol Genérico sin stock suficiente | "Disponible: 1" en rojo, **Confirmar** desactivado con el aviso "No hay stock suficiente para aceptar este pedido" y **Rechazar** disponible | Correcto |
 | 8 | Rosa | Eliminar **Advil** (pedido `CONFIRMADA` de 1) | Modal "No se puede eliminar" con el mensaje del 409 y el botón **Ver pedidos**; el producto sigue en el catálogo | Correcto |
 | 9 | Rosa | Eliminar **Losartán Genérico** (pedido `LISTA` de 2) | Igual que el caso 8 | Correcto |
