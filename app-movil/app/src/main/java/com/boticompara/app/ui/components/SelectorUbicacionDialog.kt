@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column

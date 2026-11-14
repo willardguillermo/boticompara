@@ -2,8 +2,8 @@ package com.boticompara.app.data.repository
 
 import android.content.Context
 import com.boticompara.app.data.local.TokenManager
-import com.boticompara.app.data.remote.AlertaResponse
 import com.boticompara.app.data.remote.RetrofitClient
+import com.boticompara.app.data.remote.dto.AlertaResponse
 import kotlin.coroutines.cancellation.CancellationException
 
 // Resultado de consultar la lista de alertas (H59)

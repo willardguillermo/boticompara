@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.busqueda
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -25,7 +25,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.boticompara.app.data.remote.ProductoResponse
+import com.boticompara.app.data.remote.dto.ProductoResponse
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -37,14 +37,12 @@ import java.util.Locale
 
 private val CENTRO_LIMA = GeoPoint(-12.0464, -77.0300)
 
-// Un marcador por botica: se muestra el producto más barato de esa botica (H48)
 internal data class MarcadorBotica(
     val producto: ProductoResponse,
     val lat: Double,
     val lng: Double
 )
 
-// Solo las boticas con coordenadas tienen marcador; el resto no se dibuja
 internal fun agruparPorBotica(productos: List<ProductoResponse>): List<MarcadorBotica> =
     productos
         .filter { it.boticaLatitud != null && it.boticaLongitud != null }
@@ -54,7 +52,6 @@ internal fun agruparPorBotica(productos: List<ProductoResponse>): List<MarcadorB
             MarcadorBotica(masBarato, masBarato.boticaLatitud!!, masBarato.boticaLongitud!!)
         }
 
-// H48: mapa con un marcador por botica (nombre y precio); al tocarlo se abre el detalle (H28)
 @Composable
 fun MapaResultados(
     productos: List<ProductoResponse>,
@@ -72,7 +69,6 @@ fun MapaResultados(
     }
 
     val mapView = remember {
-        // osmdroid: identificarse ante el servidor de mapas y guardar la caché sin pedir permisos
         Configuration.getInstance().apply {
             userAgentValue = context.packageName
             osmdroidBasePath = File(context.cacheDir, "osmdroid")
@@ -94,7 +90,6 @@ fun MapaResultados(
         }
     }
 
-    // Cuando cambian los resultados, el mapa se ajusta para que se vean todas las boticas
     LaunchedEffect(marcadores) {
         mapView.post { ajustarVista(mapView, marcadores) }
     }
@@ -155,7 +150,6 @@ private fun ajustarVista(mapView: MapView, marcadores: List<MarcadorBotica>) {
         else -> {
             val puntos = marcadores.map { GeoPoint(it.lat, it.lng) }
             if (puntos.distinct().size == 1) {
-                // Una sola ubicación: no hay rango que ajustar, se acerca a ese punto
                 mapView.controller.setZoom(15.0)
                 mapView.controller.setCenter(puntos.first())
             } else {
@@ -165,7 +159,6 @@ private fun ajustarVista(mapView: MapView, marcadores: List<MarcadorBotica>) {
     }
 }
 
-// Dibuja la etiqueta del marcador: nombre de la botica y precio, con una punta hacia el lugar
 private fun crearIconoBotica(
     context: Context,
     nombre: String,

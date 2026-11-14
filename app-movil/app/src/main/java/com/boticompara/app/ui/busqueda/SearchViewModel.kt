@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.busqueda
 
 import android.app.Application
 import androidx.compose.runtime.getValue
@@ -9,25 +9,22 @@ import androidx.lifecycle.viewModelScope
 import com.boticompara.app.data.local.UbicacionManual
 import com.boticompara.app.data.local.UbicacionManualStore
 import com.boticompara.app.data.local.UbicacionProvider
-import com.boticompara.app.data.remote.ProductoResponse
+import com.boticompara.app.data.remote.dto.ProductoResponse
 import com.boticompara.app.data.repository.ProductoRepository
 import com.boticompara.app.data.repository.ResultadoBusqueda
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// ViewModel (MVVM) de la búsqueda: valida, llama al Repository y expone el estado a la vista
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ProductoRepository(application)
     private val ubicacionProvider = UbicacionProvider(application)
     private val ubicacionStore = UbicacionManualStore(application)
 
     companion object {
-        // H58: radios disponibles en kilómetros; null significa "Sin límite"
         val OPCIONES_RADIO: List<Double?> = listOf(2.0, 5.0, 10.0, null)
     }
 
-    // H26: tiempo de espera desde la última tecla antes de buscar
     private val esperaDebounceMs = 500L
     private var busquedaJob: Job? = null
 
@@ -35,7 +32,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var isLoading by mutableStateOf(false)
         private set
-    var isRefreshing by mutableStateOf(false)   // H40: deslizar para actualizar
+    var isRefreshing by mutableStateOf(false)
         private set
     var mensaje by mutableStateOf<String?>(null)
         private set
@@ -44,10 +41,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     var searchQuery by mutableStateOf("")
         private set
-    var searchType by mutableStateOf("nombre")   // "nombre" (H22) o "principio" (H23)
+    var searchType by mutableStateOf("nombre")
         private set
 
-    // H27: ordenar por cercanía
     var ordenCercanas by mutableStateOf(false)
         private set
     var buscandoUbicacion by mutableStateOf(false)
@@ -56,11 +52,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         private set
     private var ubicacion: UbicacionProvider.Coordenadas? = null
 
-    // H58: radio de búsqueda en km (null = sin límite). Solo se envía si hay ubicación
     var radioKm by mutableStateOf<Double?>(null)
         private set
 
-    // H48: alternar entre la lista de resultados y el mapa de boticas
     var vistaMapa by mutableStateOf(false)
         private set
 
@@ -68,14 +62,12 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         vistaMapa = mapa
     }
 
-    // H50: ubicación elegida a mano (distrito o punto en el mapa); tiene prioridad sobre el GPS
     var ubicacionManual by mutableStateOf<UbicacionManual?>(null)
         private set
     var mostrarSelector by mutableStateOf(false)
         private set
 
     init {
-        // H50: recupera la ubicación manual guardada de una sesión anterior
         viewModelScope.launch {
             val guardada = ubicacionStore.obtener() ?: return@launch
             ubicacionManual = guardada
@@ -84,27 +76,23 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // H26: cada tecla reinicia la espera; solo se busca cuando el usuario deja de escribir
     fun onQueryChange(texto: String) {
         searchQuery = texto
         programarBusqueda(inmediata = false)
     }
 
-    // Al cambiar el criterio se vuelve a buscar sin esperar
     fun onTipoChange(tipo: String) {
         if (tipo == searchType) return
         searchType = tipo
         programarBusqueda(inmediata = true)
     }
 
-    // H58: al cambiar el radio se vuelve a buscar sin esperar
     fun onRadioChange(valor: Double?) {
         if (valor == radioKm) return
         radioKm = valor
         if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
     }
 
-    // Tecla "Buscar" del teclado: busca al instante
     fun buscarProductos() {
         if (searchQuery.trim().length < 2) {
             busquedaJob?.cancel()
@@ -116,7 +104,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         programarBusqueda(inmediata = true)
     }
 
-    // H40: deslizar hacia abajo para actualizar los precios
     fun refrescar() {
         val query = searchQuery.trim()
         if (query.length < 2) return
@@ -128,12 +115,10 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // H40: al volver a la pantalla se recarga si había una búsqueda
     fun recargarAlVolver() {
         if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
     }
 
-    // Botón de borrar del campo de búsqueda
     fun limpiar() {
         busquedaJob?.cancel()
         searchQuery = ""
@@ -143,10 +128,8 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         isRefreshing = false
     }
 
-    // ---------- H27: ubicación y "Más cercanas" ----------
     fun tienePermisoUbicacion(): Boolean = ubicacionProvider.tienePermiso()
 
-    // Obtiene la ubicación (la manual si existe, si no el GPS) y reordena por distancia
     fun activarCercanas() {
         viewModelScope.launch {
             buscandoUbicacion = true
@@ -175,14 +158,12 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
     }
 
-    // H50: sin permiso de GPS se ofrece elegir la ubicación a mano
     fun permisoDenegado() {
         ordenCercanas = false
         mensajeUbicacion = "Sin permiso de ubicación no podemos usar tu GPS. Elige tu ubicación manualmente"
         mostrarSelector = true
     }
 
-    // ---------- H50: ubicación manual ----------
     fun abrirSelector() {
         mostrarSelector = true
     }
@@ -191,7 +172,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         mostrarSelector = false
     }
 
-    // Guarda la ubicación elegida y la usa de inmediato en la búsqueda
     fun fijarUbicacionManual(etiqueta: String, lat: Double, lng: Double) {
         val nueva = UbicacionManual(etiqueta, lat, lng)
         ubicacionManual = nueva
@@ -203,7 +183,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
     }
 
-    // Vuelve al GPS: borra la ubicación manual guardada
     fun quitarUbicacionManual() {
         ubicacionManual = null
         ubicacion = null
@@ -214,7 +193,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun programarBusqueda(inmediata: Boolean) {
-        busquedaJob?.cancel()   // cancela la búsqueda anterior si todavía no terminó
+        busquedaJob?.cancel()
         isRefreshing = false
         val query = searchQuery.trim()
         if (query.length < 2) {
@@ -235,10 +214,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         val coordenadas = ubicacion
         val conUbicacion = ordenCercanas && coordenadas != null
         val resultado = if (conUbicacion && coordenadas != null) {
-            // H27, H50 y H58: con ubicación se ordena por distancia y se aplica el radio elegido
             repository.buscar(query, searchType, "distancia", coordenadas.lat, coordenadas.lng, radioKm)
         } else {
-            repository.buscar(query, searchType, "precio_asc")   // H24
+            repository.buscar(query, searchType, "precio_asc")
         }
         when (resultado) {
             is ResultadoBusqueda.Exito -> {

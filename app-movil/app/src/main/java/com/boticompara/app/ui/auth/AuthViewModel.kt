@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.auth
 
 import android.app.Application
 import androidx.compose.runtime.getValue
@@ -7,9 +7,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.boticompara.app.data.local.TokenManager
-import com.boticompara.app.data.remote.LoginRequest
-import com.boticompara.app.data.remote.RegistroRequest
 import com.boticompara.app.data.remote.RetrofitClient
+import com.boticompara.app.data.remote.dto.LoginRequest
+import com.boticompara.app.data.remote.dto.RegistroRequest
 import kotlinx.coroutines.launch
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
@@ -42,13 +42,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 isLoading = false
             }
-            // Fuera del try: un error al navegar ya no se muestra como error de conexion
             if (exito) onSuccess()
         }
     }
 
-    // H15 + H20: registra la cuenta. El backend envía el correo de verificación,
-    // así que después se muestra la pantalla "Verifica tu correo" (sin iniciar sesión automático).
     fun registrar(
         nombre: String,
         correo: String,
@@ -75,7 +72,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 isLoading = false
             }
-            // Fuera del try: se navega a la pantalla de verificación solo si el registro salió bien
             if (registrado) onSuccess()
         }
     }

@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.busqueda
 
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -31,7 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.boticompara.app.data.remote.ProductoResponse
+import com.boticompara.app.data.remote.dto.ProductoResponse
+import com.boticompara.app.ui.components.*
 import java.util.Locale
 
 // Texto de cada opción del selector de radio (H58)

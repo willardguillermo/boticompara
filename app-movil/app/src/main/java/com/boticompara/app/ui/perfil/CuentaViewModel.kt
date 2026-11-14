@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.perfil
 
 import android.app.Application
 import android.util.Patterns
@@ -11,7 +11,6 @@ import com.boticompara.app.data.repository.CuentaRepository
 import com.boticompara.app.data.repository.ResultadoCuenta
 import kotlinx.coroutines.launch
 
-// ViewModel (MVVM) de las acciones de cuenta: valida, llama al Repository y expone el estado a la vista
 class CuentaViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = CuentaRepository(application)
 
@@ -28,7 +27,6 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
     var sesionVencida by mutableStateOf(false)
         private set
 
-    // H17: pide el código de 6 dígitos. Por seguridad el mensaje es el mismo exista o no el correo.
     fun solicitarCodigo(correo: String) {
         val limpio = correo.trim()
         if (!esCorreoValido(limpio)) {
@@ -49,7 +47,6 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // H17: cambia la contraseña con el código de 6 dígitos
     fun restablecer(correo: String, codigo: String, password: String, confirmar: String) {
         mensaje = null
         val limpio = correo.trim()
@@ -80,9 +77,6 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // H19: elimina la cuenta del usuario logueado y cierra la sesión
-    // H19: elimina la cuenta del usuario logueado y cierra la sesión.
-    // Si el token ya venció (401), la cuenta NO se eliminó: se avisa al usuario.
     fun eliminarCuenta() {
         viewModelScope.launch {
             isLoading = true

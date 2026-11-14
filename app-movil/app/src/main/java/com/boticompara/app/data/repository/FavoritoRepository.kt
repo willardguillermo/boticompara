@@ -2,10 +2,10 @@ package com.boticompara.app.data.repository
 
 import android.content.Context
 import com.boticompara.app.data.local.TokenManager
-import com.boticompara.app.data.remote.FavoritoRequest
-import com.boticompara.app.data.remote.FavoritoResponse
-import com.boticompara.app.data.remote.PrecioObjetivoRequest
 import com.boticompara.app.data.remote.RetrofitClient
+import com.boticompara.app.data.remote.dto.FavoritoRequest
+import com.boticompara.app.data.remote.dto.FavoritoResponse
+import com.boticompara.app.data.remote.dto.PrecioObjetivoRequest
 import kotlin.coroutines.cancellation.CancellationException
 
 // Resultado de consultar la lista de favoritos (H44)

@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.favoritos
 
 import android.app.Application
 import androidx.compose.runtime.getValue
@@ -6,13 +6,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.boticompara.app.data.remote.FavoritoResponse
+import com.boticompara.app.data.remote.dto.FavoritoResponse
 import com.boticompara.app.data.repository.FavoritoRepository
 import com.boticompara.app.data.repository.ResultadoAccionFavorito
 import com.boticompara.app.data.repository.ResultadoFavoritos
 import kotlinx.coroutines.launch
 
-// ViewModel (MVVM) de la pantalla de favoritos (H44, H45, H60)
 class FavoritosViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = FavoritoRepository(application)
 
@@ -20,16 +19,15 @@ class FavoritosViewModel(application: Application) : AndroidViewModel(applicatio
         private set
     var isLoading by mutableStateOf(false)
         private set
-    var isRefreshing by mutableStateOf(false)   // deslizar para actualizar
+    var isRefreshing by mutableStateOf(false)
         private set
     var mensajeError by mutableStateOf<String?>(null)
         private set
-    var mensajeAccion by mutableStateOf<String?>(null)   // aviso al quitar o cambiar un favorito
+    var mensajeAccion by mutableStateOf<String?>(null)
         private set
     var sesionVencida by mutableStateOf(false)
         private set
 
-    // H44: carga la lista. La carga grande solo se muestra si todavía no hay datos
     fun cargar() {
         viewModelScope.launch {
             isLoading = favoritos.isEmpty()
@@ -58,7 +56,6 @@ class FavoritosViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // H45: quitar un producto de los favoritos
     fun quitar(productoId: Long) {
         viewModelScope.launch {
             when (repository.quitar(productoId)) {
@@ -73,7 +70,6 @@ class FavoritosViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // H60: poner, cambiar o quitar (null) el precio objetivo de un favorito
     fun fijarPrecioObjetivo(productoId: Long, precio: Double?) {
         viewModelScope.launch {
             when (repository.fijarPrecioObjetivo(productoId, precio)) {

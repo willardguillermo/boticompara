@@ -1,14 +1,12 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.favoritos
 
 import java.math.BigDecimal
 
-// Resultado de validar el texto escrito como precio objetivo (H60)
 sealed interface ResultadoPrecioObjetivo {
     data class Valido(val valor: Double) : ResultadoPrecioObjetivo
     data class Invalido(val mensaje: String) : ResultadoPrecioObjetivo
 }
 
-// Reglas del backend: mayor que 0, máximo 2 decimales y menor que 100000
 object ValidadorPrecioObjetivo {
     private val FORMATO = Regex("^\\d+(\\.\\d+)?$")
     private val MAXIMO = BigDecimal("100000")

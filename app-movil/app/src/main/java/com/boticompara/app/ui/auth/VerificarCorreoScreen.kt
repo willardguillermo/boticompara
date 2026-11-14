@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*

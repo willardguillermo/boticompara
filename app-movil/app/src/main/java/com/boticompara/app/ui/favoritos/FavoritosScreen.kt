@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.favoritos
 
 import android.os.Build
 import androidx.compose.foundation.background
@@ -34,7 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.boticompara.app.data.remote.FavoritoResponse
+import com.boticompara.app.data.remote.dto.FavoritoResponse
+import com.boticompara.app.ui.components.*
 import java.util.Locale
 
 // ===================== MIS FAVORITOS (H44, H45, H60) =====================

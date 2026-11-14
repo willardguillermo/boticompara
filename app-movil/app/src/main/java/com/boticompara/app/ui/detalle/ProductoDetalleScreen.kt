@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.detalle
 
 import android.content.Intent
 import android.net.Uri
@@ -35,7 +35,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.boticompara.app.data.remote.AlternativaResponse
+import com.boticompara.app.data.remote.dto.AlternativaResponse
+import com.boticompara.app.ui.components.*
 import java.util.Locale
 
 // ===================== PANTALLA DETALLE DEL PRODUCTO (H28, H36, H37, H41, H43, H45) =====================

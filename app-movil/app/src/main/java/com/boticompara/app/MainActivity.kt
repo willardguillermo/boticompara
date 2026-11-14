@@ -26,27 +26,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.boticompara.app.data.local.TokenManager
+import com.boticompara.app.ui.alertas.AlertasViewModel
+import com.boticompara.app.ui.navigation.AppNav
+import com.boticompara.app.ui.navigation.BarraNavegacion
+import com.boticompara.app.ui.navigation.RUTAS_CON_BARRA
 import com.boticompara.app.ui.theme.BotiComparaAppTheme
-import com.boticompara.app.vistas.AlertasScreen
-import com.boticompara.app.vistas.AlertasViewModel
-import com.boticompara.app.vistas.BarraNavegacion
-import com.boticompara.app.vistas.FavoritosScreen
-import com.boticompara.app.vistas.LoginScreen
-import com.boticompara.app.vistas.ProductoDetalleScreen
-import com.boticompara.app.vistas.ProfileScreen
-import com.boticompara.app.vistas.RUTAS_CON_BARRA
-import com.boticompara.app.vistas.RecuperarScreen
-import com.boticompara.app.vistas.RegisterScreen
-import com.boticompara.app.vistas.RestablecerScreen
-import com.boticompara.app.vistas.SearchScreen
-import com.boticompara.app.vistas.VerificarCorreoScreen
 import kotlinx.coroutines.flow.first
 
 class MainActivity : ComponentActivity() {
@@ -111,36 +98,14 @@ class MainActivity : ComponentActivity() {
                     ) { paddingValues ->
                         val inferior = paddingValues.calculateBottomPadding()
 
-                        NavHost(
+                        AppNav(
                             navController = navController,
                             startDestination = startDestination!!,
+                            alertasViewModel = alertasViewModel,
                             modifier = Modifier
                                 .padding(bottom = inferior)
                                 .consumeWindowInsets(PaddingValues(bottom = inferior))
-                        ) {
-                            composable("login") { LoginScreen(navController) }
-                            composable("registro") { RegisterScreen(navController) }
-                            composable("recuperar") { RecuperarScreen(navController) }   // H17
-                            composable("restablecer/{correo}") { entry ->                 // H17
-                                RestablecerScreen(navController, entry.arguments?.getString("correo") ?: "")
-                            }
-                            composable("verificar/{correo}") { entry ->                   // H20
-                                VerificarCorreoScreen(navController, entry.arguments?.getString("correo") ?: "")
-                            }
-                            composable("busqueda") { SearchScreen(navController) }
-                            composable("favoritos") { FavoritosScreen(navController) }    // H44, H45
-                            composable("alertas") { AlertasScreen(navController, alertasViewModel) }   // H59
-                            composable("perfil") { ProfileScreen(navController) }
-
-                            // H28: Ruta para el detalle del producto por ID
-                            composable(
-                                route = "detalle/{productoId}",
-                                arguments = listOf(navArgument("productoId") { type = NavType.LongType })
-                            ) { backStackEntry ->
-                                val productoId = backStackEntry.arguments?.getLong("productoId") ?: 0L
-                                ProductoDetalleScreen(productoId = productoId, navController = navController)
-                            }
-                        }
+                        )
                     }
                 }
             }

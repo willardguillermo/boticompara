@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
 
-// Pestañas de la barra inferior
 private data class DestinoInferior(
     val ruta: String,
     val etiqueta: String,
@@ -30,14 +29,12 @@ private data class DestinoInferior(
 private val destinos = listOf(
     DestinoInferior("busqueda", "Buscar", Icons.Rounded.Search, Icons.Rounded.Search),
     DestinoInferior("favoritos", "Favoritos", Icons.Rounded.FavoriteBorder, Icons.Rounded.Favorite),
-    DestinoInferior("alertas", "Alertas", Icons.Rounded.NotificationsNone, Icons.Rounded.Notifications),   // H59
+    DestinoInferior("alertas", "Alertas", Icons.Rounded.NotificationsNone, Icons.Rounded.Notifications),
     DestinoInferior("perfil", "Perfil", Icons.Outlined.Person, Icons.Rounded.Person)
 )
 
-// La barra solo se muestra en estas pantallas (no en login, registro, detalle, etc.)
 val RUTAS_CON_BARRA = destinos.map { it.ruta }
 
-// Barra de navegación inferior (Material 3). alertasNoLeidas es el número sobre el ícono de Alertas (H59)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BarraNavegacion(navController: NavController, rutaActual: String?, alertasNoLeidas: Int = 0) {

@@ -1,4 +1,4 @@
-package com.boticompara.app.vistas
+package com.boticompara.app.ui.alertas
 
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
@@ -50,7 +50,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.navigation.NavController
-import com.boticompara.app.data.remote.AlertaResponse
+import com.boticompara.app.data.remote.dto.AlertaResponse
+import com.boticompara.app.ui.components.*
 import java.util.Locale
 
 // ===================== ALERTAS DE PRECIO (H59) =====================
