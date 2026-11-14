@@ -30,7 +30,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             // H19: además de la firma, la cuenta debe seguir activa (si se eliminó, el token deja de valer)
             jwtService.validar(header.substring(7).trim())
-                    .filter(u -> usuarios.existsByIdAndActivoTrue(u.id()))
+                    .filter(u -> usuarios.puedeEntrar(u.id(), java.time.Instant.now()))
                     .ifPresent(u -> {
                         var auth = new UsernamePasswordAuthenticationToken(
                                 u, null, List.of(new SimpleGrantedAuthority("ROLE_" + u.rol())));
