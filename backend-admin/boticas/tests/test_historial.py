@@ -4,11 +4,14 @@ H47: pruebas de las reglas del historial de revisiones.
 SimpleTestCase (sin BD): los modelos son managed = False y Django no podría crear sus
 tablas en una base de pruebas.
 """
-from datetime import date
+from datetime import date, datetime
+from datetime import timezone as dt_timezone
 
 from django.test import SimpleTestCase
 
+from boticas.admin import RevisionInline, UsuarioAccionInline
 from boticas.historial import SIN_REVISOR, texto_revisado_por, validar_rango
+from boticas.models import Botica, BoticaRevision
 
 
 class ValidarRangoTests(SimpleTestCase):
@@ -54,3 +57,18 @@ class RevisadoPorTests(SimpleTestCase):
 
     def test_con_administrador(self):
         self.assertEqual(texto_revisado_por('guillermo'), 'guillermo')
+
+
+class TextoDeLaRevisionTests(SimpleTestCase):
+    """H47: el texto de la revisión usa la hora de Lima y el historial en línea no lo muestra."""
+
+    def test_str_en_hora_de_lima(self):
+        # 02:35 en UTC son las 21:35 del día anterior en Lima (UTC-5)
+        revision = BoticaRevision(botica=Botica(nombre_comercial='Botica Rosa'), estado=BoticaRevision.Estado.APROBADO,
+                                  fecha=datetime(2026, 10, 6, 2, 35, tzinfo=dt_timezone.utc))
+        self.assertTrue(str(revision).endswith('Aprobado (05/10/2026 21:35)'))
+
+    def test_historiales_en_linea_sin_el_texto_del_objeto(self):
+        for inline in (RevisionInline, UsuarioAccionInline):
+            with self.subTest(inline.__name__):
+                self.assertEqual(inline.template, 'admin/boticas/historial_inline.html')

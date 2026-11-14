@@ -1,0 +1,86 @@
+{% extends "admin/base_site.html" %}
+{% load static admin_urls %}
+{% comment %}
+H91-H93: página de cada acción sobre una cuenta (formulario y, en la baja, la confirmación).
+Solo usa el marcado y las clases nativas del admin (forms.css): se ve igual en modo claro y oscuro.
+{% endcomment %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/forms.css" %}">{% endblock %}
+
+{# delete-confirmation es la clase nativa que pinta de rojo el botón de enviar en la confirmación de la baja #}
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% if peligrosa %} delete-confirmation{% endif %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Inicio</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{{ url_detalle }}">{{ usuario.nombre }}</a>
+  &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  {% if advertencia %}
+    <ul class="messagelist"><li class="warning">{{ advertencia }}</li></ul>
+  {% endif %}
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div>
+      <fieldset class="module aligned">
+        <h2 class="fieldset-heading">Cuenta</h2>
+        <div class="form-row">
+          <div><div class="flex-container"><label>Nombre:</label><div class="readonly">{{ usuario.nombre }}</div></div></div>
+        </div>
+        <div class="form-row">
+          <div><div class="flex-container"><label>Correo:</label><div class="readonly">{{ usuario.correo }}</div></div></div>
+        </div>
+        <div class="form-row">
+          <div><div class="flex-container"><label>Rol:</label><div class="readonly">{{ usuario.get_rol_display }}</div></div></div>
+        </div>
+        <div class="form-row">
+          <div><div class="flex-container"><label>Estado actual:</label><div class="readonly"><strong>{{ estado }}</strong></div></div></div>
+        </div>
+      </fieldset>
+
+      {% if confirmacion %}
+        <fieldset class="module aligned">
+          <div class="form-row">
+            <div><div class="flex-container"><label>Motivo:</label><div class="readonly">{{ form.cleaned_data.motivo }}</div></div></div>
+          </div>
+        </fieldset>
+        {% for campo in form %}{{ campo.as_hidden }}{% endfor %}
+        <input type="hidden" name="confirmado" value="si">
+      {% else %}
+        {% if form.errors %}
+          <p class="errornote">{% if form.errors|length == 1 %}Corrige el error de abajo.{% else %}Corrige los errores de abajo.{% endif %}</p>
+          {{ form.non_field_errors }}
+        {% endif %}
+        <fieldset class="module aligned">
+          {% for campo in form %}
+            <div class="form-row{% if campo.errors %} errors{% endif %} field-{{ campo.name }}">
+              {{ campo.errors }}
+              <div>
+                <div class="flex-container">
+                  <label for="{{ campo.id_for_label }}"{% if campo.field.required %} class="required"{% endif %}>{{ campo.label }}:</label>
+                  {{ campo }}
+                </div>
+                {% if campo.help_text %}
+                  <div class="help" id="{{ campo.auto_id }}_helptext"><div>{{ campo.help_text }}</div></div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </fieldset>
+      {% endif %}
+
+      <div class="submit-row">
+        <input type="submit" value="{{ boton }}" class="default">
+        <a href="{{ url_detalle }}" class="closelink">Cancelar</a>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
