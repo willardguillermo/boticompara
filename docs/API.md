@@ -308,7 +308,7 @@ Errores:
 ### `DELETE /productos/{id}` 🔒 — H10
 Baja lógica (`activo = false`): deja de aparecer en listados y búsquedas. Respuesta: 204 sin cuerpo.
 
-**Pedidos activos (H79, H80):** si el producto tiene reservas `CONFIRMADA` o `LISTA` → 409 "No puedes dar de baja un producto con pedidos confirmados o listos para recoger. Atiéndelos o recházalos primero." y el producto sigue activo. Se revisa con la fila del producto bloqueada (`select ... from producto where id = :id for update`), igual que en `PUT /productos/{id}`, para que una baja y una confirmación a la vez no se crucen. Las reservas `PENDIENTE` **no** bloquean la baja, pero una vez dado de baja el producto ya no se pueden confirmar: el dueño las rechaza con un motivo (`PATCH /pedidos/{id}/rechazar`, sección 10). Ejemplo: un pedido `LISTA` de 1 → 409; solo un pedido `PENDIENTE` de 2 → 204, y ese pedido queda para rechazar.
+**Pedidos activos (H79, H80):** si el producto tiene reservas `CONFIRMADA` o `LISTA` → 409 "No puedes dar de baja un producto con pedidos confirmados o listos para recoger. Atiéndelos o recházalos primero." y el producto sigue activo. Se revisa con la fila del producto bloqueada (`select ... from producto where id = :id for update`), igual que en `PUT /productos/{id}`, para que una baja y una confirmación a la vez no se crucen. Las reservas `PENDIENTE` **no** bloquean la baja, pero una vez dado de baja el producto ya no se pueden confirmar: `PATCH /pedidos/{id}/estado` a `CONFIRMADA` responde 409 "Este producto ya no está disponible en tu catálogo. Rechaza el pedido con un motivo." y el dueño las rechaza con un motivo (`PATCH /pedidos/{id}/rechazar`, sección 10). Ejemplo: un pedido `LISTA` de 1 → 409; solo un pedido `PENDIENTE` de 2 → 204, y ese pedido queda para rechazar.
 
 Errores: 401 (sin token), 403 (sin botica o botica no aprobada), 404 (el producto no existe o es de otra botica), 409 (tiene reservas `CONFIRMADA` o `LISTA`).
 
@@ -966,12 +966,25 @@ Respuesta: 200 con el pedido actualizado.
 
 - Cualquier otro cambio (saltarse un paso, volver atrás, salir de un estado final, o enviar `RECHAZADA`, `CANCELADA`, `VENCIDA` o `PENDIENTE`) → 409 "No se puede pasar de {actual} a {nuevo}". Para rechazar se usa `PATCH /pedidos/{id}/rechazar`.
 - **Validación al confirmar (`PENDIENTE` → `CONFIRMADA`):** **el dueño no puede aceptar un pedido que no puede cumplir.** Con la fila del producto bloqueada (`select ... from producto where id = :id for update`), se calcula lo disponible igual que el campo `disponible`: `producto.stock` − (suma de `cantidad` de las **otras** reservas `PENDIENTE`, `CONFIRMADA` y `LISTA` del producto), y si da menos de 0 se toma 0. Debe ser ≥ `cantidad`. Si no → 409 "No hay stock suficiente para aceptar este pedido: disponible {n}, pedido {m}. Recházalo con un motivo." y el pedido sigue en `PENDIENTE`; el dueño debe rechazarlo con `PATCH /pedidos/{id}/rechazar`. Puede pasar si el dueño bajó el stock en su catálogo después de que se creó la reserva. Ejemplo: stock 3, otra reserva `CONFIRMADA` de 2 y este pedido de 2 → disponible 3 − 2 = 1, menor que 2 → 409 "No hay stock suficiente para aceptar este pedido: disponible 1, pedido 2. Recházalo con un motivo."
+- **Producto dado de baja (H79):** al confirmar, con la misma fila del producto bloqueada y **antes** de calcular lo disponible, si el producto tiene `activo = false` → 409 "Este producto ya no está disponible en tu catálogo. Rechaza el pedido con un motivo." y el pedido sigue en `PENDIENTE`; el dueño lo rechaza con `PATCH /pedidos/{id}/rechazar`. Pasa cuando el dueño dio de baja el producto con reservas `PENDIENTE` (`DELETE /productos/{id}`, sección 4). Solo afecta al paso a `CONFIRMADA`: `CONFIRMADA` y `LISTA` no pueden existir en un producto dado de baja, porque la baja se bloquea si las tiene.
 - **`LISTA` y `ENTREGADA` ya tienen el stock garantizado:** al confirmar, el pedido quedó cubierto, y desde entonces el stock no puede bajar de las unidades comprometidas (sección 4). Por eso al pasar a `LISTA` no se valida stock.
 - **Descuento de stock al entregar (respaldo):** `update producto set stock = stock - :cantidad where id = :id and stock >= :cantidad`. Con la regla anterior siempre debería actualizar la fila; la condición `stock >= :cantidad` queda **solo como respaldo** por si algo inconsistente pasara (por ejemplo, un cambio hecho directo en la base). Si no actualiza ninguna fila → 409 "Stock insuficiente: quedan {stock} unidades" y el pedido sigue en `LISTA`. El producto se descuenta aunque esté dado de baja (la venta ocurrió). Si queda en 0, deja de verse en la búsqueda.
 - Si `venceEn` ya pasó → 409 "La reserva ya venció".
 - Correo al comprador **solo** al pasar a `LISTA`. Al pasar a `CONFIRMADA` o `ENTREGADA` no se envía correo: el estado se ve en la app (ver "Correos").
 
-Errores: 400 (falta `estado` o no es uno de los 7 estados), 401, 403, 404 (no tiene botica o el pedido no es suyo), 409 (cambio no permitido, stock insuficiente al confirmar, inconsistencia de stock al entregar, o reserva vencida).
+Errores:
+
+| Código | Cuándo | `mensaje` |
+|---|---|---|
+| 400 | Falta `estado` o no es uno de los 7 estados | El mismo que el resto de la API |
+| 401 | Sin token | El mismo que el resto de la API |
+| 403 | El rol no es `DUENO_BOTICA` | El mismo que el resto de la API |
+| 404 | No tiene botica, o el pedido no existe o no es suyo | "Todavía no registraste tu botica" o el mismo que `GET /pedidos/{id}` |
+| 409 | Cambio no permitido | "No se puede pasar de {actual} a {nuevo}" |
+| 409 | Al confirmar, el producto está dado de baja | "Este producto ya no está disponible en tu catálogo. Rechaza el pedido con un motivo." |
+| 409 | Al confirmar, lo disponible no alcanza | "No hay stock suficiente para aceptar este pedido: disponible {n}, pedido {m}. Recházalo con un motivo." |
+| 409 | Al entregar, inconsistencia de stock (respaldo) | "Stock insuficiente: quedan {stock} unidades" |
+| 409 | `venceEn` ya pasó | "La reserva ya venció" |
 
 ### `PATCH /pedidos/{id}/rechazar` 🔒 — H80
 ```json
