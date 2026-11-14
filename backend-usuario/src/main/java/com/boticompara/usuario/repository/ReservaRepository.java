@@ -5,6 +5,7 @@ import com.boticompara.usuario.entity.Reserva;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Collection;
 import java.util.List;
@@ -31,4 +32,30 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     /** Regla: un comprador no puede tener dos reservas activas del mismo producto (409). */
     boolean existsByUsuarioIdAndProductoIdAndEstadoIn(Long usuarioId, Long productoId,
                                                       Collection<EstadoReserva> estados);
+
+    /** H77, H81: pedidos de una botica, de la más reciente a la más antigua. */
+    @Query("select r from Reserva r, Producto p "
+            + "where r.productoId = p.id and p.boticaId = :boticaId "
+            + "order by r.creadoEn desc")
+    List<Reserva> pedidosDeBotica(@Param("boticaId") Long boticaId, Pageable pagina);
+
+    /** H81: pedidos de una botica filtrados por estado. */
+    @Query("select r from Reserva r, Producto p "
+            + "where r.productoId = p.id and p.boticaId = :boticaId and r.estado = :estado "
+            + "order by r.creadoEn desc")
+    List<Reserva> pedidosDeBoticaConEstado(@Param("boticaId") Long boticaId,
+                                           @Param("estado") EstadoReserva estado,
+                                           Pageable pagina);
+
+    /** H78-H80: solo si el pedido es de esa botica. Si no, no existe. */
+    @Query("select r from Reserva r, Producto p "
+            + "where r.id = :id and r.productoId = p.id and p.boticaId = :boticaId")
+    Optional<Reserva> pedidoDeBotica(@Param("id") Long id, @Param("boticaId") Long boticaId);
+
+    /** H79: unidades apartadas por las OTRAS reservas activas del producto (validación al confirmar). */
+    @Query("select coalesce(sum(r.cantidad), 0) from Reserva r "
+            + "where r.productoId = :productoId and r.estado in :estados and r.id <> :id")
+    long unidadesApartadasSinEsta(@Param("productoId") Long productoId,
+                                  @Param("estados") Collection<EstadoReserva> estados,
+                                  @Param("id") Long id);
 }
