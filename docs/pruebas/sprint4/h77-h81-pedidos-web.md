@@ -4,7 +4,7 @@
 - **Responsable:** Guillermo
 - **Entorno:** `web-usuario/` local (`npm run dev`, puerto 5173) en **modo simulado** (`VITE_USE_MOCK=true` en el `.env` local). Las respuestas salen de `src/services/api.mock.js`, con la forma de la sección 10 de `docs/API.md` y los ajustes del contrato del PR #89.
 - **Cuentas:** `rosa@boticompara.nissidev.dev` (Botica Salud Total) y `jorge@boticompara.nissidev.dev` (FarmaVida), contraseña `Boti2026!`.
-- **Datos:** el mock trae un pedido de Botica Salud Total en cada uno de los 7 estados, y en FarmaVida un pedido `PENDIENTE` de Ibuprofeno Genérico (stock 0) que no alcanza para aceptarse.
+- **Datos:** el mock trae un pedido de Botica Salud Total en cada uno de los 7 estados.
 
 > **Pendiente:** la prueba en modo real se hace cuando el backend tenga los endpoints de pedidos del dueño con la regla de stock comprometido (contrato del PR #89).
 
@@ -15,7 +15,7 @@
 | 1 | H77 | Lista de pedidos de la botica en **Pedidos** del menú del panel | Correcto |
 | 2 | H81 | Filtro por estado guardado en la URL (`/panel/pedidos?estado=...`): se conserva al recargar y al volver atrás | Correcto |
 | 3 | H78, H79 | Flujo completo de **BC-7K2QXM** (Paracetamol Genérico): detalle, `PENDIENTE` → `CONFIRMADA` → `LISTA` → `ENTREGADA` | Correcto |
-| 4 | H80 | Rechazo de un pedido con motivo | Correcto |
+| 4 | H80 | Rechazo con motivo de **BC-H4NP2T** (Rosa): un motivo corto da error, se ve el contador de caracteres y Esc cierra solo el modal de rechazo | Correcto |
 | 5 | — | Esc en modales apilados: cierra solo el de arriba y el foco vuelve al modal de abajo | Correcto |
 | 6 | — | Modal del catálogo (editar y eliminar producto) sigue funcionando con los cambios de `Modal.jsx` | Correcto |
 
@@ -23,7 +23,7 @@
 
 | # | Cuenta | Caso | Resultado esperado | Resultado |
 |---|---|---|---|---|
-| 7 | Jorge | Pedido `PENDIENTE` sin stock suficiente | "Disponible" en rojo, **Confirmar** desactivado con el aviso "No hay stock suficiente para aceptar este pedido" y **Rechazar** disponible | Correcto |
+| 7 | Rosa | Pedido `PENDIENTE` de 2 Paracetamol Genérico sin stock suficiente | "Disponible: 1" en rojo, **Confirmar** desactivado con el aviso "No hay stock suficiente para aceptar este pedido" y **Rechazar** disponible | Correcto |
 | 8 | Rosa | Eliminar **Advil** (pedido `CONFIRMADA` de 1) | Modal "No se puede eliminar" con el mensaje del 409 y el botón **Ver pedidos**; el producto sigue en el catálogo | Correcto |
 | 9 | Rosa | Eliminar **Losartán Genérico** (pedido `LISTA` de 2) | Igual que el caso 8 | Correcto |
 | 10 | Rosa | Eliminar **Omeprazol Genérico** (solo un pedido `RECHAZADA`) | Se elimina normalmente | Correcto |
