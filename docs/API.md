@@ -52,17 +52,19 @@ Inicia sesión con Google o crea la cuenta si no existe. No requiere token.
 
 ```json
 {
-  "idToken": "eyJhbGciOi..."
+   "idToken": "eyJhbGciOi..."
 }
 ```
 
 **Reglas**
 
-- El token de Firebase se verifica en el servidor: emisor, audiencia, firma y `email_verified = true`.
-- Si el `google_uid` ya existe, inicia sesión.
-- Si no existe, crea una cuenta solo con Google (`password_hash` nulo) con rol `COMPRADOR`.
+- El token de Firebase se verifica en el servidor: emisor, audiencia, firma y `email_verified = true`. La audiencia es el proyecto configurado en `FIREBASE_PROJECT_ID` (`.env` y `.env.example`, por ejemplo `FIREBASE_PROJECT_ID=boticompara`).
+- Si el `google_uid` ya existe, se inicia sesión con esa cuenta.
+- Si no existe, se crea una cuenta solo con Google: `password_hash` nulo, rol `COMPRADOR` y `correo_verificado = true`, porque Google ya verificó el correo.
+- `nombre`: el claim `name` del token. Si no viene, la parte del correo antes de la `@`.
 - Si ya existe una cuenta con contraseña y ese mismo correo, **no** se vincula.
-- Una cuenta suspendida o dada de baja no entra (mismo criterio que `POST /auth/login`).
+- Cuenta dada de baja: 401 genérico, con el mismo criterio que `POST /auth/login`.
+- Cuenta suspendida: 403 con la fecha de fin. Como el token de Google ya verificó la identidad, el 403 se devuelve sin paso extra; es el equivalente a validar la contraseña en el login.
 
 **Respuesta 200:** igual que `POST /auth/login`.
 
@@ -72,9 +74,9 @@ Inicia sesión con Google o crea la cuenta si no existe. No requiere token.
 |---|---|---|
 | 400 | `idToken` vacío | "Falta el token de Google" |
 | 401 | Token inválido, expirado, de otro emisor o audiencia, o correo sin verificar | "No pudimos verificar tu cuenta de Google" |
-| 403 | Cuenta suspendida o dada de baja | Igual que en `POST /auth/login` |
+| 401 | Cuenta dada de baja | "No pudimos iniciar sesión con esta cuenta" |
+| 403 | Cuenta suspendida | "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima) |
 | 409 | Ya existe una cuenta con contraseña y ese correo | "Ya existe una cuenta con este correo. Inicia sesión con tu contraseña" |
-
 
 ### `POST /auth/registro` — H1, H15, H20
 Crea un comprador o un dueño de botica.
@@ -110,7 +112,12 @@ Errores: 400, 409 (correo ya registrado).
   "usuario": { "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev", "rol": "COMPRADOR" }
 }
 ```
-El token dura 24 h. Errores: 401.
+El token dura 24 h. Errores:
+
+- **401:** correo o contraseña incorrectos, cuenta dada de baja o cuenta sin contraseña (creada con Google). Es el mismo mensaje en todos los casos, para no revelar qué correos existen.
+- **403:** cuenta suspendida, **solo si la contraseña es correcta**. Responde "Tu cuenta está suspendida hasta el dd/MM/yyyy", con la fecha en hora de Lima. Sin contraseña correcta no se revela la suspensión.
+
+Una sesión ya abierta sigue funcionando hasta que el token venza o la cuenta quede suspendida: en ese caso, cada petición responde 401 y la app debe cerrar sesión. Al volver a entrar, el login da el 403 con la fecha.
 
 ### `POST /auth/recuperar` — H17
 Inicia la recuperación de contraseña. **Siempre responde 200**, exista o no el correo, para no revelar qué correos están registrados.
