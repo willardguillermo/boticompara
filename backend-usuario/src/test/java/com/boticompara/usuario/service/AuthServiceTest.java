@@ -19,9 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -82,16 +80,6 @@ class AuthServiceTest {
     }
 
     @Test
-    void cuentaSuspendidaNoEntra() {
-        Usuario u = cuentaActiva();
-        u.setSuspendidoHasta(Instant.now().plus(7, ChronoUnit.DAYS));
-        u.setMotivoEstado("Publicó precios falsos");
-        existe(u);
-
-        assertNoAutoriza(login());
-    }
-
-    @Test
     void suspensionVencidaSiPermiteEntrar() {
         Usuario u = cuentaActiva();
         u.setSuspendidoHasta(Instant.now().minus(1, ChronoUnit.DAYS));
@@ -101,15 +89,6 @@ class AuthServiceTest {
         LoginResponse r = service.login(new LoginRequest(CORREO, CLAVE));
 
         assertNotNull(r.token());
-    }
-
-    @Test
-    void cuentaDadaDeBajaNoEntra() {
-        Usuario u = cuentaActiva();
-        u.setActivo(false);
-        existe(u);
-
-        assertNoAutoriza(login());
     }
 
     @Test
@@ -134,5 +113,38 @@ class AuthServiceTest {
         when(usuarios.findByCorreoIgnoreCase(CORREO)).thenReturn(Optional.empty());
 
         assertNoAutoriza(login());
+    }
+
+    @Test
+    void cuentaSuspendidaConClaveCorrectaResponde403ConLaFecha() {
+        Usuario u = cuentaActiva();
+        u.setSuspendidoHasta(Instant.now().plus(7, ChronoUnit.DAYS));
+        existe(u);
+
+        ApiException ex = assertThrows(ApiException.class, login());
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+        assertTrue(ex.getMessage().startsWith("Tu cuenta está suspendida hasta "));
+    }
+
+    @Test
+    void cuentaSuspendidaConClaveIncorrectaResponde401SinRevelarNada() {
+        Usuario u = cuentaActiva();
+        u.setSuspendidoHasta(Instant.now().plus(7, ChronoUnit.DAYS));
+        existe(u);
+
+        assertNoAutoriza(() -> service.login(new LoginRequest(CORREO, "otra-clave")));
+    }
+
+    @Test
+    void cuentaDadaDeBajaConClaveCorrectaResponde403() {
+        Usuario u = cuentaActiva();
+        u.setActivo(false);
+        existe(u);
+
+        ApiException ex = assertThrows(ApiException.class, login());
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+        assertEquals("Tu cuenta fue dada de baja", ex.getMessage());
     }
 }

@@ -13,6 +13,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 @Service
@@ -43,12 +46,22 @@ public class AuthService {
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest r) {
         Usuario u = usuarios.findByCorreoIgnoreCase(r.correo().trim())
-                .filter(x -> x.isActivo() && !x.estaSuspendido())
                 .orElseThrow(() -> ApiException.unauthorized("Correo o contraseña incorrectos"));
-        // H91: cuenta solo de Google (sin contraseña) no entra por login con contraseña
+        // Primero la credencial: el estado de la cuenta solo se revela a quien la tiene
         if (u.getPasswordHash() == null || !encoder.matches(r.password(), u.getPasswordHash())) {
             throw ApiException.unauthorized("Correo o contraseña incorrectos");
         }
+        if (!u.isActivo()) {
+            throw ApiException.forbidden("Tu cuenta fue dada de baja");
+        }
+        if (u.estaSuspendido()) {
+            throw ApiException.forbidden("Tu cuenta está suspendida hasta " + fechaLima(u.getSuspendidoHasta()));
+        }
         return new LoginResponse(jwt.generar(u), "Bearer", UsuarioResponse.from(u));
+    }
+
+    /** dd/MM/yyyy en hora de Lima, como pide el contrato. */
+    static String fechaLima(Instant instante) {
+        return instante.atZone(ZoneId.of("America/Lima")).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
     }
 }
