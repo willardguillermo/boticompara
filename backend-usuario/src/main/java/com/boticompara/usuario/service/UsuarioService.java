@@ -71,6 +71,8 @@ public class UsuarioService {
         // Contraseña aleatoria que nadie conoce: la cuenta no vuelve a poder iniciar sesión
         u.setPasswordHash(encoder.encode(HexFormat.of().formatHex(bytes)));
         u.setActivo(false);
+        // H91: libera la cuenta de Google para que pueda registrarse de nuevo
+        u.setGoogleUid(null);
         usuarios.save(u);
 
         boticas.findByUsuarioId(id).ifPresent(b -> productos.desactivarPorBotica(b.getId()));
