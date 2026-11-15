@@ -193,11 +193,7 @@ fun ProductoDetalleScreen(
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(modifier = Modifier.padding(Dimens.Space20)) {
-                                Text(
-                                    "Disponible en",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                SeccionTitulo(titulo = "Disponible en")
                                 Spacer(Modifier.height(Dimens.Space12))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconoCircular(icono = Icons.Rounded.LocalPharmacy, tamano = 48.dp)
@@ -218,43 +214,28 @@ fun ProductoDetalleScreen(
 
                                 if (!producto.boticaTelefono.isNullOrBlank()) {
                                     Spacer(Modifier.height(Dimens.Space16))
-                                    FilledTonalButton(
+                                    BotiTonalButton(
+                                        text = "Llamar · ${producto.boticaTelefono}",
                                         onClick = {
                                             context.startActivity(
                                                 Intent(Intent.ACTION_DIAL, Uri.parse("tel:${producto.boticaTelefono}"))
                                             )
                                         },
+                                        icon = Icons.Rounded.Call,
                                         modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.Call,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(ButtonDefaults.IconSize)
-                                        )
-                                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                                        Text("Llamar · ${producto.boticaTelefono}")
-                                    }
+                                    )
                                 }
                             }
                         }
 
                         Spacer(Modifier.height(Dimens.Space24))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconoCircular(icono = Icons.Rounded.Savings, tamano = 40.dp)
-                            Spacer(Modifier.width(Dimens.Space12))
-                            Column {
-                                Text(
-                                    "Alternativas",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "Otras opciones para el mismo medicamento",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        SeccionTitulo(titulo = "Alternativas")
+                        Spacer(Modifier.height(Dimens.Space4))
+                        Text(
+                            "Otras opciones para el mismo medicamento",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Spacer(Modifier.height(Dimens.Space12))
 
                         val datosAlternativas = vm.alternativas

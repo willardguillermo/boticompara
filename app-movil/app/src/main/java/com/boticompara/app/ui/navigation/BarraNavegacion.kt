@@ -2,6 +2,7 @@ package com.boticompara.app.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Notifications
@@ -12,6 +13,7 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
@@ -27,7 +29,7 @@ private data class DestinoInferior(
 )
 
 private val destinos = listOf(
-    DestinoInferior("busqueda", "Buscar", Icons.Rounded.Search, Icons.Rounded.Search),
+    DestinoInferior("busqueda", "Buscar", Icons.Outlined.Search, Icons.Rounded.Search),
     DestinoInferior("favoritos", "Favoritos", Icons.Rounded.FavoriteBorder, Icons.Rounded.Favorite),
     DestinoInferior("alertas", "Alertas", Icons.Rounded.NotificationsNone, Icons.Rounded.Notifications),
     DestinoInferior("perfil", "Perfil", Icons.Outlined.Person, Icons.Rounded.Person)
@@ -56,7 +58,12 @@ fun BarraNavegacion(navController: NavController, rutaActual: String?, alertasNo
                     BadgedBox(
                         badge = {
                             if (destino.ruta == "alertas" && alertasNoLeidas > 0) {
-                                Badge { Text(if (alertasNoLeidas > 99) "99+" else alertasNoLeidas.toString()) }
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    contentColor = MaterialTheme.colorScheme.onError
+                                ) {
+                                    Text(if (alertasNoLeidas > 99) "99+" else alertasNoLeidas.toString())
+                                }
                             }
                         }
                     ) {

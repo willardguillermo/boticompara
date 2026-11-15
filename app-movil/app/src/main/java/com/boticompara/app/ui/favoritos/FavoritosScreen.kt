@@ -72,28 +72,12 @@ fun FavoritosScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "Mis favoritos",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        if (vm.favoritos.isNotEmpty()) {
-                            Text(
-                                if (vm.favoritos.size == 1) "1 producto guardado"
-                                else "${vm.favoritos.size} productos guardados",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+            CabeceraPantalla(
+                titulo = "Mis favoritos",
+                subtitulo = if (vm.favoritos.isNotEmpty()) {
+                    if (vm.favoritos.size == 1) "1 producto guardado"
+                    else "${vm.favoritos.size} productos guardados"
+                } else null
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -165,81 +149,41 @@ private fun FavoritoCard(
     onQuitar: () -> Unit,
     onEditarObjetivo: () -> Unit
 ) {
-    Card(
+    ProductoCard(
+        nombre = favorito.nombreComercial,
+        presentacion = favorito.presentacion,
+        principioActivo = favorito.principioActivo,
+        precio = favorito.precio,
+        stock = favorito.stock,
+        boticaNombre = favorito.boticaNombre,
+        boticaDireccion = favorito.boticaDireccion,
+        boticaDistrito = favorito.boticaDistrito,
+        distanciaKm = null,
+        esMasBarato = false,
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(Dimens.Space16)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        favorito.nombreComercial,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        favorito.presentacion,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(onClick = onQuitar) {
-                    Icon(
-                        Icons.Rounded.Favorite,
-                        contentDescription = "Quitar de favoritos",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Spacer(Modifier.height(Dimens.Space4))
-
-            Etiqueta(texto = favorito.principioActivo, icono = Icons.Rounded.Medication)
-            Spacer(Modifier.height(Dimens.Space12))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "S/ ${String.format(Locale.US, "%.2f", favorito.precio)}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+        trailingContent = {
+            IconButton(onClick = onQuitar) {
+                Icon(
+                    Icons.Rounded.Favorite,
+                    contentDescription = "Quitar de favoritos",
+                    tint = MaterialTheme.colorScheme.primary
                 )
-                Spacer(Modifier.weight(1f))
-                EtiquetaStock(favorito.stock)
             }
-            Spacer(Modifier.height(Dimens.Space12))
-
-            BloquePrecioObjetivo(favorito = favorito, onEditar = onEditarObjetivo)
-            Spacer(Modifier.height(Dimens.Space12))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(Dimens.Space12))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconoCircular(icono = Icons.Rounded.LocalPharmacy, tamano = 40.dp)
-                Spacer(Modifier.width(Dimens.Space12))
-                Column {
-                    Text(
-                        favorito.boticaNombre,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    LineaConIcono(
-                        icono = Icons.Rounded.LocationOn,
-                        texto = "${favorito.boticaDireccion}, ${favorito.boticaDistrito}"
-                    )
-                    LineaConIcono(
-                        icono = Icons.Rounded.Event,
-                        texto = "Guardado el ${formatearFecha(favorito.fecha)}",
-                        modifier = Modifier.padding(top = Dimens.Space2)
-                    )
-                }
+        },
+        contentAdicional = {
+            Column {
+                BloquePrecioObjetivo(favorito = favorito, onEditar = onEditarObjetivo)
+                Spacer(Modifier.height(Dimens.Space8))
+                LineaConIcono(
+                    icono = Icons.Rounded.Event,
+                    texto = "Guardado el ${formatearFecha(favorito.fecha)}",
+                    estilo = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Dimens.Space2)
+                )
             }
         }
-    }
+    )
 }
 
 @Composable
@@ -250,7 +194,7 @@ private fun BloquePrecioObjetivo(
     val objetivo = favorito.precioObjetivo
 
     if (objetivo == null) {
-        OutlinedButton(
+        FilledTonalButton(
             onClick = onEditar,
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.medium

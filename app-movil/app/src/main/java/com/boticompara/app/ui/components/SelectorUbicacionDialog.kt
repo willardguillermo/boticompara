@@ -8,20 +8,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -58,7 +55,6 @@ import java.io.File
 private val CENTRO_LIMA = GeoPoint(-12.0464, -77.0300)
 private const val ETIQUETA_PUNTO = "Punto en el mapa"
 
-// H50: pantalla para elegir la ubicación a mano (distrito de la lista o punto en el mapa)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SelectorUbicacionDialog(
@@ -140,16 +136,13 @@ private fun ListaDistritos(
     val lista = remember(filtro) { Distritos.filtrar(filtro) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        OutlinedTextField(
+        BotiTextField(
             value = filtro,
             onValueChange = { filtro = it },
-            label = { Text("Buscar distrito") },
-            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+            label = "Buscar distrito",
+            leadingIcon = Icons.Rounded.Search,
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+            modifier = Modifier.padding(16.dp)
         )
         if (lista.isEmpty()) {
             Text(
@@ -186,7 +179,6 @@ private fun SelectorMapa(
     var punto by remember { mutableStateOf(inicial?.let { GeoPoint(it.lat, it.lng) }) }
 
     val mapView = remember {
-        // osmdroid: identificarse ante el servidor de mapas y guardar la caché sin pedir permisos
         Configuration.getInstance().apply {
             userAgentValue = context.packageName
             osmdroidBasePath = File(context.cacheDir, "osmdroid")
@@ -239,14 +231,13 @@ private fun SelectorMapa(
                 .fillMaxWidth()
                 .clipToBounds()
         )
-        Button(
+        BotiButton(
+            text = if (punto == null) "Toca el mapa para marcar tu ubicación" else "Usar este punto",
             onClick = { punto?.let { onConfirmar(it.latitude, it.longitude) } },
             enabled = punto != null,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-        ) {
-            Text(if (punto == null) "Toca el mapa para marcar tu ubicación" else "Usar este punto")
-        }
+        )
     }
 }

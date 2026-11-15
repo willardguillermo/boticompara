@@ -1,5 +1,10 @@
 package com.boticompara.app.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -28,23 +33,26 @@ fun AppNav(
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        modifier = modifier
+        modifier = modifier,
+        enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(animationSpec = tween(300)) { it / 4 } },
+        exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(animationSpec = tween(300)) { -it / 4 } },
+        popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(animationSpec = tween(300)) { -it / 4 } },
+        popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(animationSpec = tween(300)) { it / 4 } }
     ) {
         composable("login") { LoginScreen(navController) }
         composable("registro") { RegisterScreen(navController) }
-        composable("recuperar") { RecuperarScreen(navController) }   // H17
-        composable("restablecer/{correo}") { entry ->                 // H17
+        composable("recuperar") { RecuperarScreen(navController) }
+        composable("restablecer/{correo}") { entry ->
             RestablecerScreen(navController, entry.arguments?.getString("correo") ?: "")
         }
-        composable("verificar/{correo}") { entry ->                   // H20
+        composable("verificar/{correo}") { entry ->
             VerificarCorreoScreen(navController, entry.arguments?.getString("correo") ?: "")
         }
         composable("busqueda") { SearchScreen(navController) }
-        composable("favoritos") { FavoritosScreen(navController) }    // H44, H45
-        composable("alertas") { AlertasScreen(navController, alertasViewModel) }   // H59
+        composable("favoritos") { FavoritosScreen(navController) }
+        composable("alertas") { AlertasScreen(navController, alertasViewModel) }
         composable("perfil") { ProfileScreen(navController) }
 
-        // H28: Ruta para el detalle del producto por ID
         composable(
             route = "detalle/{productoId}",
             arguments = listOf(navArgument("productoId") { type = NavType.LongType })

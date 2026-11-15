@@ -1,12 +1,17 @@
 package com.boticompara.app.ui.components
 
+import android.content.res.Configuration
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,7 +21,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.boticompara.app.ui.theme.BotiComparaAppTheme
 
 @Composable
 fun LineaConIcono(
@@ -46,5 +53,18 @@ fun LineaConIcono(
             maxLines = maxLineas,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@Preview(name = "Light", showBackground = true)
+@Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true)
+@Composable
+private fun LineaConIconoPreview() {
+    BotiComparaAppTheme {
+        Surface {
+            Column(modifier = Modifier.padding(16.dp)) {
+                LineaConIcono(icono = Icons.Rounded.LocationOn, texto = "Av. Brasil 1234, Jesús María")
+            }
+        }
     }
 }

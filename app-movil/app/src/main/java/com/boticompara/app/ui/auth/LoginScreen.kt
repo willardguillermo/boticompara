@@ -21,7 +21,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.boticompara.app.ui.components.BotiButton
+import com.boticompara.app.ui.components.BotiTextField
 import com.boticompara.app.ui.components.IconoCircular
+import com.boticompara.app.ui.components.SeccionTitulo
 import com.boticompara.app.ui.theme.Dimens
 
 @Composable
@@ -39,7 +42,6 @@ fun LoginScreen(navController: NavController, authViewModel: AuthViewModel = vie
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Logo
         IconoCircular(
             icono = Icons.Rounded.LocalPharmacy,
             tamano = 96.dp,
@@ -69,42 +71,32 @@ fun LoginScreen(navController: NavController, authViewModel: AuthViewModel = vie
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(Dimens.Space20)) {
-                Text(
-                    "Inicia sesión",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                SeccionTitulo(titulo = "Inicia sesión")
                 Spacer(Modifier.height(Dimens.Space12))
 
-                OutlinedTextField(
+                BotiTextField(
                     value = correo,
                     onValueChange = { correo = it },
-                    label = { Text("Correo electrónico") },
-                    placeholder = { Text("tucorreo@ejemplo.com") },
-                    leadingIcon = { Icon(Icons.Rounded.Mail, contentDescription = null) },
+                    label = "Correo electrónico",
+                    leadingIcon = Icons.Rounded.Mail,
                     singleLine = true,
-                    shape = MaterialTheme.shapes.medium,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    modifier = Modifier.fillMaxWidth()
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                 )
                 Spacer(Modifier.height(Dimens.Space12))
 
-                OutlinedTextField(
+                BotiTextField(
                     value = contrasena,
                     onValueChange = { contrasena = it },
-                    label = { Text("Contraseña") },
-                    leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null) },
+                    label = "Contraseña",
+                    leadingIcon = Icons.Rounded.Lock,
                     singleLine = true,
-                    shape = MaterialTheme.shapes.medium,
-                    visualTransformation = if (verContrasena) VisualTransformation.None
-                    else PasswordVisualTransformation(),
+                    visualTransformation = if (verContrasena) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         TextButton(onClick = { verContrasena = !verContrasena }) {
                             Text(if (verContrasena) "Ocultar" else "Ver")
                         }
                     },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth()
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
                 )
 
                 TextButton(
@@ -115,26 +107,16 @@ fun LoginScreen(navController: NavController, authViewModel: AuthViewModel = vie
                 }
                 Spacer(Modifier.height(Dimens.Space8))
 
-                Button(
+                BotiButton(
+                    text = if (authViewModel.isLoading) "Iniciando..." else "Iniciar sesión",
                     onClick = {
                         authViewModel.login(correo, contrasena) {
                             navController.navigate("busqueda") { popUpTo("login") { inclusive = true } }
                         }
                     },
                     enabled = correo.isNotBlank() && contrasena.isNotBlank() && !authViewModel.isLoading,
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.fillMaxWidth().height(Dimens.MinTouchTarget + 2.dp)
-                ) {
-                    if (authViewModel.isLoading) {
-                        CircularProgressIndicator(
-                            Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    } else {
-                        Text("Iniciar sesión", fontWeight = FontWeight.SemiBold)
-                    }
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
 

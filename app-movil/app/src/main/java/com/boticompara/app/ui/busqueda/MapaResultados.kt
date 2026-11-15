@@ -8,17 +8,31 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.toArgb
@@ -26,6 +40,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.boticompara.app.data.remote.dto.ProductoResponse
+import com.boticompara.app.ui.components.BotiButton
+import com.boticompara.app.ui.components.ProductoCard
+import com.boticompara.app.ui.theme.Dimens
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -68,6 +85,8 @@ fun MapaResultados(
         productos.map { it.boticaId }.distinct().size - marcadores.size
     }
 
+    var boticaSeleccionada by remember { mutableStateOf<MarcadorBotica?>(null) }
+
     val mapView = remember {
         Configuration.getInstance().apply {
             userAgentValue = context.packageName
@@ -94,48 +113,96 @@ fun MapaResultados(
         mapView.post { ajustarVista(mapView, marcadores) }
     }
 
-    Column(modifier = modifier) {
-        AndroidView(
-            factory = { mapView },
-            update = { vista ->
-                vista.overlays.removeAll { it is Marker }
-                marcadores.forEach { marcador ->
-                    vista.overlays.add(
-                        Marker(vista).apply {
-                            position = GeoPoint(marcador.lat, marcador.lng)
-                            icon = crearIconoBotica(
-                                context = context,
-                                nombre = marcador.producto.boticaNombre,
-                                precio = "S/ ${String.format(Locale.US, "%.2f", marcador.producto.precio)}",
-                                colorFondo = colorFondo,
-                                colorTexto = colorTexto
+    Box(modifier = modifier) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            AndroidView(
+                factory = { mapView },
+                update = { vista ->
+                    vista.overlays.removeAll { it is Marker }
+                    marcadores.forEach { marcador ->
+                        vista.overlays.add(
+                            Marker(vista).apply {
+                                position = GeoPoint(marcador.lat, marcador.lng)
+                                icon = crearIconoBotica(
+                                    context = context,
+                                    nombre = marcador.producto.boticaNombre,
+                                    precio = "S/ ${String.format(Locale.US, "%.2f", marcador.producto.precio)}",
+                                    colorFondo = colorFondo,
+                                    colorTexto = colorTexto
+                                )
+                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                setOnMarkerClickListener { _, _ ->
+                                    boticaSeleccionada = marcador
+                                    true
+                                }
+                            }
+                        )
+                    }
+                    vista.invalidate()
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clipToBounds()
+            )
+            if (sinUbicacion > 0) {
+                Text(
+                    if (sinUbicacion == 1) {
+                        "1 botica no tiene ubicación registrada y no aparece en el mapa"
+                    } else {
+                        "$sinUbicacion boticas no tienen ubicación registrada y no aparecen en el mapa"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
+        }
+
+        boticaSeleccionada?.let { seleccion ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(Dimens.Space16)
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(Dimens.Space16)) {
+                        ProductoCard(
+                            nombre = seleccion.producto.nombreComercial,
+                            presentacion = seleccion.producto.presentacion,
+                            principioActivo = seleccion.producto.principioActivo,
+                            precio = seleccion.producto.precio,
+                            stock = seleccion.producto.stock,
+                            boticaNombre = seleccion.producto.boticaNombre,
+                            boticaDireccion = seleccion.producto.boticaDireccion,
+                            boticaDistrito = seleccion.producto.boticaDistrito,
+                            distanciaKm = seleccion.producto.distanciaKm,
+                            esMasBarato = false,
+                            onClick = { alTocar(seleccion.producto.productoId) }
+                        )
+                        Spacer(Modifier.height(Dimens.Space12))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.Space8),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            BotiButton(
+                                text = "Ver detalle",
+                                onClick = { alTocar(seleccion.producto.productoId) },
+                                modifier = Modifier.weight(1f)
                             )
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            setOnMarkerClickListener { _, _ ->
-                                alTocar(marcador.producto.productoId)
-                                true
+                            IconButton(onClick = { boticaSeleccionada = null }) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Cerrar")
                             }
                         }
-                    )
+                    }
                 }
-                vista.invalidate()
-            },
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .clipToBounds()
-        )
-        if (sinUbicacion > 0) {
-            Text(
-                if (sinUbicacion == 1) {
-                    "1 botica no tiene ubicación registrada y no aparece en el mapa"
-                } else {
-                    "$sinUbicacion boticas no tienen ubicación registrada y no aparecen en el mapa"
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
+            }
         }
     }
 }

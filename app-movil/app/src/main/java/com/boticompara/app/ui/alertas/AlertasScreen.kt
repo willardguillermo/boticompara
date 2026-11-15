@@ -44,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -87,35 +88,19 @@ fun AlertasScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "Alertas",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        if (vm.alertas.isNotEmpty()) {
-                            Text(
-                                if (vm.alertas.size == 1) "1 alerta sin leer"
-                                else "${vm.alertas.size} alertas sin leer",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
+            CabeceraPantalla(
+                titulo = "Alertas",
+                subtitulo = if (vm.alertas.isNotEmpty()) {
+                    if (vm.alertas.size == 1) "1 alerta sin leer"
+                    else "${vm.alertas.size} alertas sin leer"
+                } else null,
                 actions = {
                     if (vm.alertas.isNotEmpty()) {
                         TextButton(onClick = { vm.marcarTodasLeidas() }) {
                             Text("Marcar todas")
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -128,18 +113,59 @@ fun AlertasScreen(
         ) {
             when {
                 vm.isLoading -> {
-                    EstadoCargando("Cargando tus alertas...")
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        EstadoCargando("Cargando tus alertas...")
+                    }
                 }
 
                 vm.alertas.isEmpty() && vm.mensajeError != null -> {
-                    EstadoError(vm.mensajeError!!) { vm.cargar() }
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        EstadoError(vm.mensajeError!!) { vm.cargar() }
+                    }
                 }
 
                 vm.alertas.isEmpty() -> {
-                    EstadoVacio(
-                        Icons.Rounded.NotificationsNone,
-                        "No tienes alertas nuevas. Te avisaremos cuando baje el precio de uno de tus favoritos."
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(Dimens.Space24),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        IconoCircular(
+                            icono = Icons.Rounded.NotificationsNone,
+                            tamano = 96.dp,
+                            fondo = MaterialTheme.colorScheme.primaryContainer,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(Modifier.height(Dimens.Space16))
+                        Text(
+                            "Sin alertas nuevas",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(Dimens.Space8))
+                        Text(
+                            "Te avisaremos cuando baje el precio de uno de tus favoritos.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(Dimens.Space24))
+                        FilledTonalButton(
+                            onClick = { navController.navigate("favoritos") },
+                            shape = MaterialTheme.shapes.extraLarge
+                        ) {
+                            Text("Ir a mis favoritos")
+                        }
+                    }
                 }
 
                 else -> {
@@ -154,7 +180,7 @@ fun AlertasScreen(
                             contentPadding = PaddingValues(top = Dimens.Space8, bottom = Dimens.Space24)
                         ) {
                             items(vm.alertas, key = { it.id }) { alerta ->
-                                AlertaCard(
+                                ItemAlertaCard(
                                     alerta = alerta,
                                     onClick = { navController.navigate("detalle/${alerta.productoId}") },
                                     onMarcarLeida = { vm.marcarLeida(alerta.id) }
@@ -169,103 +195,23 @@ fun AlertasScreen(
 }
 
 @Composable
-private fun AlertaCard(
+private fun ItemAlertaCard(
     alerta: AlertaResponse,
     onClick: () -> Unit,
     onMarcarLeida: () -> Unit
 ) {
-    Card(
+    AlertaCard(
+        nombreComercial = alerta.nombreComercial,
+        presentacion = alerta.presentacion,
+        boticaNombre = alerta.boticaNombre,
+        precioAnterior = alerta.precioAnterior,
+        precioNuevo = alerta.precioNuevo,
+        ahorro = alerta.ahorro,
+        fecha = formatearFechaAlerta(alerta.fecha),
+        leida = alerta.leida,
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(Dimens.Space16)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        alerta.nombreComercial,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (!alerta.presentacion.isNullOrBlank()) {
-                        Text(
-                            alerta.presentacion,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                Spacer(Modifier.width(Dimens.Space8))
-                Etiqueta(
-                    texto = "Ahorras S/ ${String.format(Locale.US, "%.2f", alerta.ahorro)}",
-                    icono = Icons.Rounded.Savings,
-                    fondo = MaterialTheme.colorScheme.primary,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-            Spacer(Modifier.height(Dimens.Space12))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "S/ ${String.format(Locale.US, "%.2f", alerta.precioAnterior)}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textDecoration = TextDecoration.LineThrough
-                )
-                Spacer(Modifier.width(Dimens.Space8))
-                Icon(
-                    Icons.AutoMirrored.Rounded.ArrowForward,
-                    contentDescription = "bajó a",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(Dimens.Space8))
-                Text(
-                    "S/ ${String.format(Locale.US, "%.2f", alerta.precioNuevo)}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Spacer(Modifier.height(Dimens.Space12))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconoCircular(icono = Icons.Rounded.LocalPharmacy, tamano = 40.dp)
-                Spacer(Modifier.width(Dimens.Space12))
-                Column {
-                    Text(
-                        alerta.boticaNombre,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    LineaConIcono(
-                        icono = Icons.Rounded.Event,
-                        texto = formatearFechaAlerta(alerta.fecha),
-                        modifier = Modifier.padding(top = Dimens.Space2)
-                    )
-                }
-            }
-            Spacer(Modifier.height(Dimens.Space12))
-
-            FilledTonalButton(
-                onClick = onMarcarLeida,
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Icon(
-                    Icons.Rounded.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(Dimens.Space8))
-                Text("Marcar como leída")
-            }
-        }
-    }
+        onMarcarLeida = onMarcarLeida
+    )
 }
 
 private fun formatearFechaAlerta(iso: String): String {
