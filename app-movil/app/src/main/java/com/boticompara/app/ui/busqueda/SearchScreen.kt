@@ -33,20 +33,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.dto.ProductoResponse
 import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.theme.Dimens
 import java.util.Locale
 
-// Texto de cada opción del selector de radio (H58)
 private fun etiquetaRadio(radioKm: Double?): String =
     if (radioKm == null) "Sin límite" else "${radioKm.toInt()} km"
 
-// ===================== BÚSQUEDA (H22, H23, H24, H25, H26, H27, H40, H48, H50, H58) =====================
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel = viewModel()) {
     val vm = searchViewModel
 
-    // H27: pide el permiso de ubicación y, si lo dan, activa "Más cercanas"
-    // H50: si lo niegan, se abre la pantalla para elegir la ubicación a mano
     val permisoLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { resultado ->
@@ -61,7 +58,6 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
         )
     }
 
-    // Si el token venció, volver al login limpiando la navegación
     LaunchedEffect(vm.sesionVencida) {
         if (vm.sesionVencida) {
             navController.navigate("login") {
@@ -70,13 +66,11 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
         }
     }
 
-    // H40: cada vez que la pantalla vuelve a estar visible (ej. al regresar del detalle) se recarga
     LifecycleResumeEffect(Unit) {
         vm.recargarAlVolver()
         onPauseOrDispose { }
     }
 
-    // H50: elegir o cambiar la ubicación manualmente
     if (vm.mostrarSelector) {
         SelectorUbicacionDialog(
             ubicacionActual = vm.ubicacionManual,
@@ -118,21 +112,20 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = Dimens.Space20)
         ) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Dimens.Space8))
 
-            // ---------- Tarjeta de búsqueda ----------
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(Dimens.Space16)) {
                     OutlinedTextField(
                         value = vm.searchQuery,
-                        onValueChange = { vm.onQueryChange(it) },   // H26: busca sola al dejar de escribir
+                        onValueChange = { vm.onQueryChange(it) },
                         label = {
                             Text(if (vm.searchType == "nombre") "Nombre comercial" else "Principio activo")
                         },
@@ -148,17 +141,16 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                             }
                         },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.medium,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { vm.buscarProductos() }),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(Dimens.Space12))
 
-                    // Criterios de búsqueda (H22 / H23) y orden por cercanía (H27)
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.Space8),
+                        verticalArrangement = Arrangement.spacedBy(Dimens.Space4)
                     ) {
                         FilterChip(
                             selected = vm.searchType == "nombre",
@@ -171,7 +163,7 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                                     modifier = Modifier.size(FilterChipDefaults.IconSize)
                                 )
                             },
-                            shape = RoundedCornerShape(50)
+                            shape = MaterialTheme.shapes.extraLarge
                         )
                         FilterChip(
                             selected = vm.searchType == "principio",
@@ -184,20 +176,19 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                                     modifier = Modifier.size(FilterChipDefaults.IconSize)
                                 )
                             },
-                            shape = RoundedCornerShape(50)
+                            shape = MaterialTheme.shapes.extraLarge
                         )
                         FilterChip(
                             selected = vm.ordenCercanas,
                             onClick = {
                                 when {
                                     vm.ordenCercanas -> vm.desactivarCercanas()
-                                    // H50: con ubicación manual guardada no hace falta el GPS
                                     vm.ubicacionManual != null || vm.tienePermisoUbicacion() -> vm.activarCercanas()
                                     else -> pedirPermisoUbicacion()
                                 }
                             },
                             label = {
-                                Text(if (vm.buscandoUbicacion) "Obteniendo ubicación…" else "Más cercanas")
+                                Text(if (vm.buscandoUbicacion) "Obteniendo ubicación..." else "Más cercanas")
                             },
                             leadingIcon = {
                                 Icon(
@@ -206,12 +197,11 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                                     modifier = Modifier.size(FilterChipDefaults.IconSize)
                                 )
                             },
-                            shape = RoundedCornerShape(50)
+                            shape = MaterialTheme.shapes.extraLarge
                         )
                     }
 
-                    // ---------- H50: ubicación en uso y botón para cambiarla ----------
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Dimens.Space8))
                     val etiquetaUbicacion = vm.ubicacionManual?.etiqueta
                         ?: if (vm.ordenCercanas) "Tu ubicación (GPS)" else "Sin definir"
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -239,19 +229,17 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                         )
                     }
 
-                    // ---------- H58: selector de radio (solo se activa si hay ubicación) ----------
-                    // En la vista de mapa se oculta para darle más espacio al mapa
                     if (!vm.vistaMapa) {
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(Dimens.Space12))
                         Text(
                             "Radio de búsqueda",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(Dimens.Space4))
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.Space8),
+                            verticalArrangement = Arrangement.spacedBy(Dimens.Space4)
                         ) {
                             SearchViewModel.OPCIONES_RADIO.forEach { opcion ->
                                 FilterChip(
@@ -259,7 +247,7 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                                     onClick = { vm.onRadioChange(opcion) },
                                     enabled = vm.ordenCercanas,
                                     label = { Text(etiquetaRadio(opcion)) },
-                                    shape = RoundedCornerShape(50)
+                                    shape = MaterialTheme.shapes.extraLarge
                                 )
                             }
                         }
@@ -271,19 +259,18 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                             )
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(Dimens.Space12))
 
-                    // H26: indicador de carga (no se muestra si la carga viene de deslizar, ahí sale el círculo)
                     if (vm.isLoading && !vm.isRefreshing) {
                         LinearProgressIndicator(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(4.dp)
-                                .clip(RoundedCornerShape(50))
+                                .clip(MaterialTheme.shapes.extraLarge)
                         )
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(Dimens.Space8))
                         Text(
-                            "Buscando en boticas…",
+                            "Buscando en boticas...",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -297,11 +284,9 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                     }
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Dimens.Space16))
 
-            // ---------- Resultados ----------
             when {
-                // Hay resultados: se muestran aunque se esté actualizando (no "parpadea")
                 vm.productos.isNotEmpty() -> {
                     val radio = vm.radioKm
                     Text(
@@ -315,9 +300,8 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Dimens.Space8))
 
-                    // H48: alternar entre la lista y el mapa de boticas
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         SegmentedButton(
                             selected = !vm.vistaMapa,
@@ -330,10 +314,9 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                         ) { Text("Mapa") }
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Dimens.Space8))
 
                     if (vm.vistaMapa) {
-                        // H48: un marcador por botica; al tocarlo se abre el detalle (H28)
                         MapaResultados(
                             productos = vm.productos,
                             onProductoClick = { productoId -> navController.navigate("detalle/$productoId") },
@@ -344,7 +327,6 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                     } else {
                         val precioMinimo = vm.productos.minOf { it.precio }
 
-                        // H40: deslizar hacia abajo para actualizar
                         PullToRefreshBox(
                             isRefreshing = vm.isRefreshing,
                             onRefresh = { vm.refrescar() },
@@ -352,13 +334,12 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                         ) {
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                                contentPadding = PaddingValues(bottom = 24.dp)
+                                verticalArrangement = Arrangement.spacedBy(Dimens.Space12),
+                                contentPadding = PaddingValues(bottom = Dimens.Space24)
                             ) {
                                 itemsIndexed(vm.productos, key = { _, p -> p.productoId }) { indice, producto ->
                                     ResultadoCard(
                                         producto = producto,
-                                        // "Más barato" es el de menor precio, aunque se ordene por cercanía
                                         esMasBarato = if (vm.ordenCercanas) producto.precio == precioMinimo else indice == 0,
                                         onClick = { navController.navigate("detalle/${producto.productoId}") }
                                     )
@@ -368,22 +349,8 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                     }
                 }
 
-                // Primera búsqueda en curso
                 vm.isLoading ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 40.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Comparando precios…",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    EstadoCargando("Comparando precios...")
 
                 vm.mensaje != null -> EstadoVacio(Icons.Rounded.SearchOff, vm.mensaje!!)
 
@@ -396,7 +363,6 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
     }
 }
 
-// ===================== TARJETA DE RESULTADO (H25, H27) =====================
 @Composable
 fun ResultadoCard(
     producto: ProductoResponse,
@@ -406,12 +372,11 @@ fun ResultadoCard(
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Nombre + etiqueta "Más barato"
+        Column(modifier = Modifier.padding(Dimens.Space16)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -428,7 +393,7 @@ fun ResultadoCard(
                     )
                 }
                 if (esMasBarato) {
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(Dimens.Space8))
                     Etiqueta(
                         texto = "Más barato",
                         icono = Icons.Rounded.Savings,
@@ -437,13 +402,11 @@ fun ResultadoCard(
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Dimens.Space8))
 
-            // Principio activo
             Etiqueta(texto = producto.principioActivo, icono = Icons.Rounded.Medication)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
 
-            // Precio + stock
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "S/ ${String.format(Locale.US, "%.2f", producto.precio)}",
@@ -454,14 +417,13 @@ fun ResultadoCard(
                 Spacer(Modifier.weight(1f))
                 EtiquetaStock(producto.stock)
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
 
-            // Botica
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconoCircular(icono = Icons.Rounded.LocalPharmacy, tamano = 40.dp)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Dimens.Space12))
                 Column {
                     Text(
                         producto.boticaNombre,
@@ -472,7 +434,6 @@ fun ResultadoCard(
                         icono = Icons.Rounded.LocationOn,
                         texto = "${producto.boticaDireccion}, ${producto.boticaDistrito}"
                     )
-                    // H27: distancia desde la ubicación del comprador
                     if (producto.distanciaKm != null) {
                         LineaConIcono(
                             icono = Icons.Rounded.NearMe,
@@ -480,7 +441,7 @@ fun ResultadoCard(
                             color = MaterialTheme.colorScheme.primary,
                             estilo = MaterialTheme.typography.labelMedium,
                             peso = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = 2.dp)
+                            modifier = Modifier.padding(top = Dimens.Space2)
                         )
                     }
                 }

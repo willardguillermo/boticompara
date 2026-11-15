@@ -4,12 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.NotificationsOff
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,16 +24,16 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.theme.Dimens
 
 @Composable
 fun ProfileScreen(
     navController: NavController,
     vm: ProfileViewModel = viewModel(),
-    cuentaVm: CuentaViewModel = viewModel()   // H19
+    cuentaVm: CuentaViewModel = viewModel()
 ) {
     var mostrarDialogo by remember { mutableStateOf(false) }
 
-    // Si el token venció o la cuenta se eliminó, volver al login limpiando la navegación
     LaunchedEffect(vm.sesionVencida, cuentaVm.cuentaEliminada) {
         if (vm.sesionVencida || cuentaVm.cuentaEliminada) {
             navController.navigate("login") {
@@ -40,7 +42,6 @@ fun ProfileScreen(
         }
     }
 
-    // Iniciales para el avatar (ej. "Carlos Ramírez" -> "CR")
     val iniciales = vm.nombre.trim().split(" ").filter { it.isNotBlank() }
         .take(2).joinToString("") { it.first().uppercase() }.ifBlank { "?" }
 
@@ -50,19 +51,17 @@ fun ProfileScreen(
             .background(MaterialTheme.colorScheme.surface)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .padding(Dimens.Space24),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Barra superior simple
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = { navController.popBackStack() }) { Text("← Volver") }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(Dimens.Space8))
 
-        // Avatar con iniciales
         Box(
             modifier = Modifier
                 .size(96.dp)
@@ -76,7 +75,7 @@ fun ProfileScreen(
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(Dimens.Space12))
         Text(
             vm.nombre.ifBlank { "Mi perfil" },
             style = MaterialTheme.typography.headlineSmall,
@@ -88,51 +87,49 @@ fun ProfileScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(Dimens.Space24))
 
-        // ---------- Datos personales (H16) ----------
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(modifier = Modifier.padding(Dimens.Space20)) {
                 Text(
                     "Datos personales",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                Spacer(Modifier.height(12.dp))
-
+                Spacer(Modifier.height(Dimens.Space12))
                 OutlinedTextField(
                     value = vm.nombre, onValueChange = { vm.nombre = it },
                     label = { Text("Nombre") }, singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(Dimens.Space12))
                 OutlinedTextField(
                     value = vm.telefono, onValueChange = { vm.telefono = it },
                     label = { Text("Teléfono") }, singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(Dimens.Space12))
                 OutlinedTextField(
                     value = vm.direccion, onValueChange = { vm.direccion = it },
                     label = { Text("Dirección") }, singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(Dimens.Space16))
 
                 Button(
                     onClick = { vm.guardar() },
                     enabled = !vm.isLoading,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().height(Dimens.MinTouchTarget + 2.dp)
                 ) {
                     if (vm.isLoading) {
                         CircularProgressIndicator(
@@ -147,39 +144,47 @@ fun ProfileScreen(
             }
         }
 
-        // Mensaje de guardado
         vm.mensaje?.let {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
-                shape = RoundedCornerShape(12.dp),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    "✅  $it",
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(14.dp)
-                )
+                Row(
+                    modifier = Modifier.padding(Dimens.Space16),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(Modifier.width(Dimens.Space12))
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Dimens.Space16))
 
-        // ---------- Alertas de precio (H66) ----------
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(modifier = Modifier.padding(Dimens.Space20)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconoCircular(
                         icono = if (vm.notificacionesPrecio) Icons.Rounded.NotificationsActive
                         else Icons.Rounded.NotificationsOff
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(Dimens.Space12))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             "Alertas de baja de precio",
@@ -192,7 +197,7 @@ fun ProfileScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(Dimens.Space8))
                     Switch(
                         checked = vm.notificacionesPrecio,
                         onCheckedChange = { vm.cambiarNotificaciones(it) },
@@ -200,16 +205,15 @@ fun ProfileScreen(
                     )
                 }
                 if (!vm.notificacionesPrecio) {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Dimens.Space8))
                     Text(
-                        "Con las alertas apagadas no se crean avisos nuevos ni llegan correos. " +
-                                "Las alertas que ya tienes se conservan.",
+                        "Con las alertas apagadas no se crean avisos nuevos ni llegan correos. Las alertas que ya tienes se conservan.",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 vm.mensajeNotificaciones?.let {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Dimens.Space8))
                     Text(
                         it,
                         style = MaterialTheme.typography.labelMedium,
@@ -218,9 +222,8 @@ fun ProfileScreen(
                 }
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Dimens.Space16))
 
-        // ---------- Sesión ----------
         OutlinedButton(
             onClick = {
                 vm.cerrarSesion {
@@ -229,42 +232,41 @@ fun ProfileScreen(
                     }
                 }
             },
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth().height(50.dp)
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth().height(Dimens.MinTouchTarget + 2.dp)
         ) {
             Text("Cerrar sesión", fontWeight = FontWeight.SemiBold)
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(Dimens.Space24))
 
-        // ---------- Zona de peligro (H19) ----------
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(modifier = Modifier.padding(Dimens.Space20)) {
                 Text(
                     "Zona de peligro",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(Dimens.Space4))
                 Text(
                     "Si eliminas tu cuenta se borrarán tus datos personales y no podrás recuperarla.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(Dimens.Space12))
                 Button(
                     onClick = { mostrarDialogo = true },
                     enabled = !cuentaVm.isLoading,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     ),
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                    modifier = Modifier.fillMaxWidth().height(Dimens.MinTouchTarget + 2.dp)
                 ) {
                     if (cuentaVm.isLoading) {
                         CircularProgressIndicator(
@@ -277,19 +279,18 @@ fun ProfileScreen(
                     }
                 }
                 cuentaVm.error?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text("⚠️  $it", color = MaterialTheme.colorScheme.onErrorContainer)
+                    Spacer(Modifier.height(Dimens.Space8))
+                    Text(it, color = MaterialTheme.colorScheme.onErrorContainer)
                 }
             }
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(Dimens.Space24))
     }
 
-    // Diálogo de confirmación (H19)
     if (mostrarDialogo) {
         AlertDialog(
             onDismissRequest = { mostrarDialogo = false },
-            icon = { Text("⚠️", fontSize = 28.sp) },
+            icon = { Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("¿Eliminar tu cuenta?") },
             text = {
                 Text("Se borrarán tus datos personales y se cerrará tu sesión. Esta acción no se puede deshacer.")
@@ -312,11 +313,10 @@ fun ProfileScreen(
         )
     }
 
-    // H19: el token venció, la cuenta NO se eliminó
     if (cuentaVm.sesionVencida) {
         AlertDialog(
             onDismissRequest = { },
-            icon = { Text("⏰", fontSize = 28.sp) },
+            icon = { Icon(Icons.Rounded.Alarm, contentDescription = null) },
             title = { Text("Tu sesión venció") },
             text = {
                 Text("Tu cuenta no se eliminó. Inicia sesión otra vez para eliminar tu cuenta.")

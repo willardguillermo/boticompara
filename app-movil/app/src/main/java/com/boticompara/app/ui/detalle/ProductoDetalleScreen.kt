@@ -37,9 +37,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.dto.AlternativaResponse
 import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.theme.Dimens
 import java.util.Locale
 
-// ===================== PANTALLA DETALLE DEL PRODUCTO (H28, H36, H37, H41, H43, H45) =====================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductoDetalleScreen(
@@ -63,7 +63,6 @@ fun ProductoDetalleScreen(
         }
     }
 
-    // Aviso al guardar o quitar el favorito
     LaunchedEffect(vm.mensajeFavorito) {
         vm.mensajeFavorito?.let {
             snackbarHostState.showSnackbar(it)
@@ -82,7 +81,6 @@ fun ProductoDetalleScreen(
                     }
                 },
                 actions = {
-                    // H43 y H45: guardar o quitar de favoritos
                     if (vm.productoDetalle != null) {
                         IconButton(
                             onClick = { vm.alternarFavorito() },
@@ -111,23 +109,11 @@ fun ProductoDetalleScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = Dimens.Space20)
         ) {
             when {
                 vm.isLoading -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Cargando detalle…",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    EstadoCargando("Cargando detalle...")
                 }
 
                 vm.mensajeError != null -> {
@@ -140,18 +126,17 @@ fun ProductoDetalleScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(bottom = 24.dp)
+                            .padding(bottom = Dimens.Space24)
                     ) {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(Dimens.Space8))
 
-                        // Tarjeta principal del producto
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
+                            shape = MaterialTheme.shapes.extraLarge,
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
+                            Column(modifier = Modifier.padding(Dimens.Space20)) {
                                 Text(
                                     producto.nombreComercial,
                                     style = MaterialTheme.typography.headlineSmall,
@@ -162,12 +147,12 @@ fun ProductoDetalleScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Spacer(Modifier.height(12.dp))
+                                Spacer(Modifier.height(Dimens.Space12))
 
                                 Etiqueta(texto = producto.principioActivo, icono = Icons.Rounded.Medication)
 
                                 if (!producto.fabricante.isNullOrEmpty()) {
-                                    Spacer(Modifier.height(8.dp))
+                                    Spacer(Modifier.height(Dimens.Space8))
                                     Text(
                                         "Laboratorio: ${producto.fabricante}",
                                         style = MaterialTheme.typography.bodySmall,
@@ -175,11 +160,10 @@ fun ProductoDetalleScreen(
                                     )
                                 }
 
-                                Spacer(Modifier.height(16.dp))
+                                Spacer(Modifier.height(Dimens.Space16))
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                                Spacer(Modifier.height(16.dp))
+                                Spacer(Modifier.height(Dimens.Space16))
 
-                                // Precio y stock
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column {
                                         Text(
@@ -200,25 +184,24 @@ fun ProductoDetalleScreen(
                             }
                         }
 
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(Dimens.Space16))
 
-                        // Tarjeta de la botica
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
+                            shape = MaterialTheme.shapes.extraLarge,
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
+                            Column(modifier = Modifier.padding(Dimens.Space20)) {
                                 Text(
                                     "Disponible en",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Spacer(Modifier.height(12.dp))
+                                Spacer(Modifier.height(Dimens.Space12))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconoCircular(icono = Icons.Rounded.LocalPharmacy, tamano = 48.dp)
-                                    Spacer(Modifier.width(16.dp))
+                                    Spacer(Modifier.width(Dimens.Space16))
                                     Column {
                                         Text(
                                             producto.boticaNombre,
@@ -233,9 +216,8 @@ fun ProductoDetalleScreen(
                                     }
                                 }
 
-                                // Teléfono de la botica: abre el marcador del celular (no pide permisos)
                                 if (!producto.boticaTelefono.isNullOrBlank()) {
-                                    Spacer(Modifier.height(16.dp))
+                                    Spacer(Modifier.height(Dimens.Space16))
                                     FilledTonalButton(
                                         onClick = {
                                             context.startActivity(
@@ -256,11 +238,10 @@ fun ProductoDetalleScreen(
                             }
                         }
 
-                        // ---------- Alternativas (H36, H37, H41) ----------
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(Dimens.Space24))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconoCircular(icono = Icons.Rounded.Savings, tamano = 40.dp)
-                            Spacer(Modifier.width(12.dp))
+                            Spacer(Modifier.width(Dimens.Space12))
                             Column {
                                 Text(
                                     "Alternativas",
@@ -274,7 +255,7 @@ fun ProductoDetalleScreen(
                                 )
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(Dimens.Space12))
 
                         val datosAlternativas = vm.alternativas
                         when {
@@ -283,11 +264,11 @@ fun ProductoDetalleScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(4.dp)
-                                        .clip(RoundedCornerShape(50))
+                                        .clip(MaterialTheme.shapes.extraLarge)
                                 )
-                                Spacer(Modifier.height(6.dp))
+                                Spacer(Modifier.height(Dimens.Space8))
                                 Text(
-                                    "Buscando alternativas…",
+                                    "Buscando alternativas...",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -301,7 +282,6 @@ fun ProductoDetalleScreen(
                                 )
                             }
 
-                            // H41: no hay genéricos ni equivalentes
                             datosAlternativas.sinEquivalentes || datosAlternativas.alternativas.isEmpty() -> {
                                 SinAlternativasCard(
                                     icono = Icons.Rounded.SearchOff,
@@ -311,7 +291,7 @@ fun ProductoDetalleScreen(
                             }
 
                             else -> {
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(Dimens.Space12)) {
                                     datosAlternativas.alternativas.forEach { alternativa ->
                                         AlternativaCard(
                                             alternativa = alternativa,
@@ -330,7 +310,6 @@ fun ProductoDetalleScreen(
     }
 }
 
-// D11: el porcentaje de ahorro sube de 0 al valor real en menos de un segundo
 @Composable
 private fun porcentajeAnimado(objetivo: Double): Double {
     val avance = remember(objetivo) { Animatable(0f) }
@@ -340,18 +319,16 @@ private fun porcentajeAnimado(objetivo: Double): Double {
     return objetivo * avance.value
 }
 
-// ===================== TARJETA DE ALTERNATIVA (H36, H37) =====================
 @Composable
 private fun AlternativaCard(alternativa: AlternativaResponse, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Nombre + etiqueta de ahorro (H37)
+        Column(modifier = Modifier.padding(Dimens.Space16)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -367,10 +344,9 @@ private fun AlternativaCard(alternativa: AlternativaResponse, onClick: () -> Uni
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                // H37: solo aparece si la alternativa es más barata que el producto consultado
                 if (alternativa.ahorroPorcentaje != null) {
-                    val ahorroMostrado = porcentajeAnimado(alternativa.ahorroPorcentaje)   // D11
-                    Spacer(Modifier.width(8.dp))
+                    val ahorroMostrado = porcentajeAnimado(alternativa.ahorroPorcentaje)
+                    Spacer(Modifier.width(Dimens.Space8))
                     Etiqueta(
                         texto = "Ahorras ${String.format(Locale.US, "%.1f", ahorroMostrado)} %",
                         icono = Icons.Rounded.Savings,
@@ -379,17 +355,15 @@ private fun AlternativaCard(alternativa: AlternativaResponse, onClick: () -> Uni
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Dimens.Space8))
 
-            // Tipo de coincidencia (H36)
             if (alternativa.tipoCoincidencia == "EQUIVALENTE") {
                 Etiqueta(texto = "Genérico equivalente", icono = Icons.Rounded.CheckCircle)
             } else {
                 Etiqueta(texto = "Mismo principio activo", icono = Icons.Rounded.Medication)
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
 
-            // Precio + stock
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "S/ ${String.format(Locale.US, "%.2f", alternativa.precio)}",
@@ -400,14 +374,13 @@ private fun AlternativaCard(alternativa: AlternativaResponse, onClick: () -> Uni
                 Spacer(Modifier.weight(1f))
                 EtiquetaStock(alternativa.stock)
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
 
-            // Botica
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconoCircular(icono = Icons.Rounded.LocalPharmacy, tamano = 40.dp)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Dimens.Space12))
                 Column {
                     Text(
                         alternativa.boticaNombre,
@@ -424,7 +397,6 @@ private fun AlternativaCard(alternativa: AlternativaResponse, onClick: () -> Uni
     }
 }
 
-// ===================== SIN ALTERNATIVAS / ERROR (H41) =====================
 @Composable
 private fun SinAlternativasCard(
     icono: ImageVector,
@@ -433,25 +405,25 @@ private fun SinAlternativasCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(Dimens.Space20),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             IconoCircular(icono = icono, tamano = 64.dp)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
             Text(
                 titulo,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(Dimens.Space4))
             Text(
                 detalle,
                 style = MaterialTheme.typography.bodyMedium,

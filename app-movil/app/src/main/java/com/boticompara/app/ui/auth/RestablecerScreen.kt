@@ -3,10 +3,13 @@ package com.boticompara.app.ui.auth
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Mail
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,12 +20,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.boticompara.app.ui.components.IconoCircular
 import com.boticompara.app.ui.perfil.CuentaViewModel
+import com.boticompara.app.ui.theme.Dimens
 
-// ===================== RESTABLECER CONTRASEÑA CON CÓDIGO (H17) =====================
 @Composable
 fun RestablecerScreen(
     navController: NavController,
@@ -42,84 +45,80 @@ fun RestablecerScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .padding(Dimens.Space24),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(24.dp))
-        Box(
-            modifier = Modifier
-                .size(88.dp)
-                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(if (vm.restablecido) "✅" else "🔑", fontSize = 40.sp)
-        }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(Dimens.Space24))
+        IconoCircular(
+            icono = if (vm.restablecido) Icons.Rounded.CheckCircle else Icons.Rounded.Key,
+            tamano = 88.dp,
+            fondo = MaterialTheme.colorScheme.primaryContainer,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        Spacer(Modifier.height(Dimens.Space20))
 
         if (vm.restablecido) {
-            // ---------- Éxito ----------
             Text(
                 "¡Contraseña actualizada!",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Dimens.Space8))
             Text(
                 "Ya puedes iniciar sesión con tu nueva contraseña.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(Dimens.Space28))
             Button(
                 onClick = {
                     navController.navigate("login") {
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().height(50.dp)
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().height(Dimens.MinTouchTarget + 2.dp)
             ) {
                 Text("Ir a iniciar sesión", fontWeight = FontWeight.SemiBold)
             }
         } else {
-            // ---------- Formulario ----------
             Text(
                 "Restablece tu contraseña",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Dimens.Space8))
             Text(
                 "Escribe el código de 6 dígitos que te llegó al correo y tu nueva contraseña.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(Dimens.Space24))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = MaterialTheme.shapes.extraLarge,
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(modifier = Modifier.padding(Dimens.Space20)) {
                     OutlinedTextField(
                         value = correo,
                         onValueChange = { correo = it },
                         label = { Text("Correo electrónico") },
+                        leadingIcon = { Icon(Icons.Rounded.Mail, contentDescription = null) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.medium,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(Dimens.Space12))
 
-                    // Solo acepta números y máximo 6
                     OutlinedTextField(
                         value = codigo,
                         onValueChange = { nuevo ->
@@ -127,20 +126,22 @@ fun RestablecerScreen(
                         },
                         label = { Text("Código de 6 dígitos") },
                         placeholder = { Text("000000") },
+                        leadingIcon = { Icon(Icons.Rounded.Key, contentDescription = null) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.medium,
                         supportingText = { Text("${codigo.length}/6") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(Dimens.Space4))
 
                     OutlinedTextField(
                         value = nueva,
                         onValueChange = { nueva = it },
                         label = { Text("Nueva contraseña") },
+                        leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.medium,
                         visualTransformation = transformacion,
                         trailingIcon = {
                             TextButton(onClick = { verContrasena = !verContrasena }) {
@@ -156,14 +157,15 @@ fun RestablecerScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(Dimens.Space4))
 
                     OutlinedTextField(
                         value = confirmar,
                         onValueChange = { confirmar = it },
                         label = { Text("Repite la nueva contraseña") },
+                        leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.medium,
                         visualTransformation = transformacion,
                         isError = confirmar.isNotEmpty() && confirmar != nueva,
                         supportingText = {
@@ -172,14 +174,14 @@ fun RestablecerScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(Dimens.Space16))
 
                     Button(
                         onClick = { vm.restablecer(correo, codigo, nueva, confirmar) },
                         enabled = correo.isNotBlank() && codigo.isNotEmpty() &&
                                 nueva.isNotEmpty() && confirmar.isNotEmpty() && !vm.isLoading,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth().height(Dimens.MinTouchTarget + 2.dp)
                     ) {
                         if (vm.isLoading) {
                             CircularProgressIndicator(
@@ -195,27 +197,27 @@ fun RestablecerScreen(
             }
 
             vm.error?.let {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(Dimens.Space16))
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        "⚠️  $it",
+                        it,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(14.dp)
+                        modifier = Modifier.padding(Dimens.Space16)
                     )
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Dimens.Space16))
             TextButton(onClick = { navController.popBackStack() }) {
-                Text("← Pedir otro código")
+                Text("Pedir otro código")
             }
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(Dimens.Space24))
     }
 }

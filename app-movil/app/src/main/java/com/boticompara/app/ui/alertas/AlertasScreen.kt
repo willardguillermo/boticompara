@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Check
@@ -52,9 +51,9 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.dto.AlertaResponse
 import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.theme.Dimens
 import java.util.Locale
 
-// ===================== ALERTAS DE PRECIO (H59) =====================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlertasScreen(
@@ -64,7 +63,6 @@ fun AlertasScreen(
     val vm = alertasViewModel
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Si el token venció, volver al login limpiando la navegación
     LaunchedEffect(vm.sesionVencida) {
         if (vm.sesionVencida) {
             navController.navigate("login") {
@@ -74,13 +72,11 @@ fun AlertasScreen(
         }
     }
 
-    // Cada vez que la pantalla vuelve a estar visible se actualiza la lista
     LifecycleResumeEffect(Unit) {
         vm.cargar()
         onPauseOrDispose { }
     }
 
-    // Aviso al marcar una alerta como leída
     LaunchedEffect(vm.mensajeAccion) {
         vm.mensajeAccion?.let {
             snackbarHostState.showSnackbar(it)
@@ -128,36 +124,15 @@ fun AlertasScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = Dimens.Space20)
         ) {
             when {
                 vm.isLoading -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Cargando tus alertas…",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    EstadoCargando("Cargando tus alertas...")
                 }
 
                 vm.alertas.isEmpty() && vm.mensajeError != null -> {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        EstadoVacio(Icons.Rounded.Warning, vm.mensajeError!!)
-                        Spacer(Modifier.height(16.dp))
-                        FilledTonalButton(onClick = { vm.cargar() }) {
-                            Text("Reintentar")
-                        }
-                    }
+                    EstadoError(vm.mensajeError!!) { vm.cargar() }
                 }
 
                 vm.alertas.isEmpty() -> {
@@ -175,8 +150,8 @@ fun AlertasScreen(
                     ) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
+                            verticalArrangement = Arrangement.spacedBy(Dimens.Space12),
+                            contentPadding = PaddingValues(top = Dimens.Space8, bottom = Dimens.Space24)
                         ) {
                             items(vm.alertas, key = { it.id }) { alerta ->
                                 AlertaCard(
@@ -193,7 +168,6 @@ fun AlertasScreen(
     }
 }
 
-// ===================== TARJETA DE ALERTA (H59) =====================
 @Composable
 private fun AlertaCard(
     alerta: AlertaResponse,
@@ -203,12 +177,11 @@ private fun AlertaCard(
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Nombre + cuánto bajó
+        Column(modifier = Modifier.padding(Dimens.Space16)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -226,7 +199,7 @@ private fun AlertaCard(
                         )
                     }
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Dimens.Space8))
                 Etiqueta(
                     texto = "Ahorras S/ ${String.format(Locale.US, "%.2f", alerta.ahorro)}",
                     icono = Icons.Rounded.Savings,
@@ -234,9 +207,8 @@ private fun AlertaCard(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
 
-            // Precio anterior -> precio nuevo
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "S/ ${String.format(Locale.US, "%.2f", alerta.precioAnterior)}",
@@ -244,14 +216,14 @@ private fun AlertaCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textDecoration = TextDecoration.LineThrough
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Dimens.Space8))
                 Icon(
                     Icons.AutoMirrored.Rounded.ArrowForward,
                     contentDescription = "bajó a",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Dimens.Space8))
                 Text(
                     "S/ ${String.format(Locale.US, "%.2f", alerta.precioNuevo)}",
                     style = MaterialTheme.typography.headlineSmall,
@@ -259,12 +231,11 @@ private fun AlertaCard(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
 
-            // Botica y fecha
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconoCircular(icono = Icons.Rounded.LocalPharmacy, tamano = 40.dp)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Dimens.Space12))
                 Column {
                     Text(
                         alerta.boticaNombre,
@@ -274,30 +245,29 @@ private fun AlertaCard(
                     LineaConIcono(
                         icono = Icons.Rounded.Event,
                         texto = formatearFechaAlerta(alerta.fecha),
-                        modifier = Modifier.padding(top = 2.dp)
+                        modifier = Modifier.padding(top = Dimens.Space2)
                     )
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
 
             FilledTonalButton(
                 onClick = onMarcarLeida,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = MaterialTheme.shapes.medium
             ) {
                 Icon(
                     Icons.Rounded.Check,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Dimens.Space8))
                 Text("Marcar como leída")
             }
         }
     }
 }
 
-// Convierte la fecha ISO del backend (UTC) a dd/MM/yyyy en la zona horaria del celular
 private fun formatearFechaAlerta(iso: String): String {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         try {
@@ -306,7 +276,7 @@ private fun formatearFechaAlerta(iso: String): String {
                 .toLocalDate()
             return fecha.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
         } catch (e: Exception) {
-            // si no se puede interpretar, se usa el formato simple de abajo
+            // fallback
         }
     }
     val partes = iso.take(10).split("-")

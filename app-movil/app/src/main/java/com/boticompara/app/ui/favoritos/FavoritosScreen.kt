@@ -36,9 +36,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.dto.FavoritoResponse
 import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.theme.Dimens
 import java.util.Locale
 
-// ===================== MIS FAVORITOS (H44, H45, H60) =====================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritosScreen(
@@ -49,7 +49,6 @@ fun FavoritosScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var favoritoEditando by remember { mutableStateOf<FavoritoResponse?>(null) }
 
-    // Si el token venció, volver al login limpiando la navegación
     LaunchedEffect(vm.sesionVencida) {
         if (vm.sesionVencida) {
             navController.navigate("login") {
@@ -58,13 +57,11 @@ fun FavoritosScreen(
         }
     }
 
-    // Cada vez que la pantalla vuelve a estar visible se actualiza la lista
     LifecycleResumeEffect(Unit) {
         vm.cargar()
         onPauseOrDispose { }
     }
 
-    // Aviso al quitar un favorito o cambiar su precio objetivo
     LaunchedEffect(vm.mensajeAccion) {
         vm.mensajeAccion?.let {
             snackbarHostState.showSnackbar(it)
@@ -105,36 +102,15 @@ fun FavoritosScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = Dimens.Space20)
         ) {
             when {
                 vm.isLoading -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Cargando tus favoritos…",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    EstadoCargando("Cargando tus favoritos...")
                 }
 
                 vm.favoritos.isEmpty() && vm.mensajeError != null -> {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        EstadoVacio(Icons.Rounded.Warning, vm.mensajeError!!)
-                        Spacer(Modifier.height(16.dp))
-                        FilledTonalButton(onClick = { vm.cargar() }) {
-                            Text("Reintentar")
-                        }
-                    }
+                    EstadoError(vm.mensajeError!!) { vm.cargar() }
                 }
 
                 vm.favoritos.isEmpty() -> {
@@ -152,8 +128,8 @@ fun FavoritosScreen(
                     ) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
+                            verticalArrangement = Arrangement.spacedBy(Dimens.Space12),
+                            contentPadding = PaddingValues(top = Dimens.Space8, bottom = Dimens.Space24)
                         ) {
                             items(vm.favoritos, key = { it.productoId }) { favorito ->
                                 FavoritoCard(
@@ -170,7 +146,6 @@ fun FavoritosScreen(
         }
     }
 
-    // H60: diálogo para poner, cambiar o quitar el precio objetivo
     favoritoEditando?.let { favorito ->
         DialogPrecioObjetivo(
             favorito = favorito,
@@ -183,7 +158,6 @@ fun FavoritosScreen(
     }
 }
 
-// ===================== TARJETA DE FAVORITO (H44, H45, H60) =====================
 @Composable
 private fun FavoritoCard(
     favorito: FavoritoResponse,
@@ -194,12 +168,11 @@ private fun FavoritoCard(
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Nombre + botón para quitar de favoritos (H45)
+        Column(modifier = Modifier.padding(Dimens.Space16)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -223,12 +196,11 @@ private fun FavoritoCard(
                     )
                 }
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(Dimens.Space4))
 
             Etiqueta(texto = favorito.principioActivo, icono = Icons.Rounded.Medication)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
 
-            // Precio + stock
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "S/ ${String.format(Locale.US, "%.2f", favorito.precio)}",
@@ -239,18 +211,16 @@ private fun FavoritoCard(
                 Spacer(Modifier.weight(1f))
                 EtiquetaStock(favorito.stock)
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
 
-            // Precio objetivo (H60)
             BloquePrecioObjetivo(favorito = favorito, onEditar = onEditarObjetivo)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Dimens.Space12))
 
-            // Botica
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconoCircular(icono = Icons.Rounded.LocalPharmacy, tamano = 40.dp)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Dimens.Space12))
                 Column {
                     Text(
                         favorito.boticaNombre,
@@ -264,7 +234,7 @@ private fun FavoritoCard(
                     LineaConIcono(
                         icono = Icons.Rounded.Event,
                         texto = "Guardado el ${formatearFecha(favorito.fecha)}",
-                        modifier = Modifier.padding(top = 2.dp)
+                        modifier = Modifier.padding(top = Dimens.Space2)
                     )
                 }
             }
@@ -272,7 +242,6 @@ private fun FavoritoCard(
     }
 }
 
-// ===================== BLOQUE DE PRECIO OBJETIVO (H60) =====================
 @Composable
 private fun BloquePrecioObjetivo(
     favorito: FavoritoResponse,
@@ -284,20 +253,19 @@ private fun BloquePrecioObjetivo(
         OutlinedButton(
             onClick = onEditar,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+            shape = MaterialTheme.shapes.medium
         ) {
             Icon(
                 Icons.Rounded.NotificationsNone,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Dimens.Space8))
             Text("Definir precio objetivo")
         }
         return
     }
 
-    // Si el precio actual ya está en el objetivo, el bloque cambia de color
     val alcanzado = favorito.precio <= objetivo
     val fondo = if (alcanzado) MaterialTheme.colorScheme.tertiaryContainer
     else MaterialTheme.colorScheme.primaryContainer
@@ -307,10 +275,10 @@ private fun BloquePrecioObjetivo(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(fondo)
             .clickable(onClick = onEditar)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = Dimens.Space12),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -319,7 +287,7 @@ private fun BloquePrecioObjetivo(
             tint = contenido,
             modifier = Modifier.size(24.dp)
         )
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(Dimens.Space12))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 if (alcanzado) "Objetivo alcanzado" else "Precio objetivo",
@@ -342,7 +310,6 @@ private fun BloquePrecioObjetivo(
     }
 }
 
-// ===================== DIÁLOGO DE PRECIO OBJETIVO (H60) =====================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DialogPrecioObjetivo(
@@ -369,7 +336,7 @@ private fun DialogPrecioObjetivo(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(Dimens.Space16))
                 OutlinedTextField(
                     value = texto,
                     onValueChange = {
@@ -382,19 +349,18 @@ private fun DialogPrecioObjetivo(
                     isError = error != null,
                     supportingText = { error?.let { Text(it) } },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(Dimens.Space4))
 
-                // Sugerencias rápidas: un porcentaje menos que el precio de hoy
                 Text(
                     "Bajar respecto al precio de hoy",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(Modifier.height(Dimens.Space4))
+                Row(horizontalArrangement = Arrangement.spacedBy(Dimens.Space8)) {
                     listOf(5, 10, 20).forEach { porcentaje ->
                         SuggestionChip(
                             onClick = {
@@ -408,7 +374,7 @@ private fun DialogPrecioObjetivo(
                 }
 
                 if (favorito.precioObjetivo != null) {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Dimens.Space8))
                     TextButton(
                         onClick = { onGuardar(null) },
                         colors = ButtonDefaults.textButtonColors(
@@ -420,7 +386,7 @@ private fun DialogPrecioObjetivo(
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(Dimens.Space8))
                         Text("Quitar precio objetivo")
                     }
                 }
@@ -440,7 +406,6 @@ private fun DialogPrecioObjetivo(
     )
 }
 
-// Convierte la fecha ISO del backend (UTC) a dd/MM/yyyy en la zona horaria del celular
 private fun formatearFecha(iso: String): String {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         try {
@@ -449,7 +414,7 @@ private fun formatearFecha(iso: String): String {
                 .toLocalDate()
             return fecha.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
         } catch (e: Exception) {
-            // si no se puede interpretar, se usa el formato simple de abajo
+            // fallback
         }
     }
     val partes = iso.take(10).split("-")
