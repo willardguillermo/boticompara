@@ -256,6 +256,10 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado, onEn
       if (err.status === 400 && cuerpo.medicamentoId && /medicamento/i.test(err.mensaje ?? '')) {
         setErrorMedicamento(ERROR_MEDICAMENTO)
         setError('')
+      } else if (err.status === 409 && /comprometida/i.test(err.mensaje ?? '')) {
+        // Regla nueva: el stock no puede bajar de las unidades de pedidos confirmados o listos
+        setErrores((er) => ({ ...er, stock: err.mensaje }))
+        document.getElementById('stock')?.focus()
       } else {
         setError(err.mensaje ?? 'No se pudo guardar el producto.')
       }

@@ -95,4 +95,11 @@ export const apiReal = {
       { mensaje, historial, ...(lat != null && lng != null && { lat, lng }) },
       { signal },
     ),
+
+  // 10. Pedidos del dueño
+  listarPedidos: (estado) =>
+    solicitar('GET', `/pedidos${estado ? `?estado=${encodeURIComponent(estado)}` : ''}`),
+  obtenerPedido: (id) => solicitar('GET', `/pedidos/${id}`),
+  cambiarEstadoPedido: (id, estado) => solicitar('PATCH', `/pedidos/${id}/estado`, { estado }),
+  rechazarPedido: (id, motivo) => solicitar('PATCH', `/pedidos/${id}/rechazar`, { motivo: motivo.trim() }),
 }

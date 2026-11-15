@@ -24,6 +24,9 @@ function Cabecera() {
             <NavLink to="/panel/catalogo">
               <Icono nombre={aprobada ? 'caja' : 'candado'} /> Catálogo
             </NavLink>
+            <NavLink to="/panel/pedidos">
+              <Icono nombre="pedido" /> Pedidos
+            </NavLink>
           </nav>
         )}
         <div className="usuario-sesion">

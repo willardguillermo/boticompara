@@ -1479,6 +1479,202 @@ a {
   border-radius: var(--radio);
 }
 
+/* ---------- Pedidos (H77 a H81) ---------- */
+.estado-pedido {
+  padding: 0.2rem 0.65rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.estado-pedido-PENDIENTE {
+  background: var(--aviso-fondo);
+  color: var(--aviso);
+}
+
+.estado-pedido-CONFIRMADA {
+  background: var(--info-fondo);
+  color: var(--info);
+}
+
+.estado-pedido-LISTA {
+  background: var(--color-primario-suave);
+  color: var(--color-primario-oscuro);
+}
+
+.estado-pedido-ENTREGADA {
+  background: var(--exito-fondo);
+  color: var(--exito);
+}
+
+.estado-pedido-RECHAZADA {
+  background: var(--error-fondo);
+  color: var(--error);
+}
+
+.estado-pedido-CANCELADA,
+.estado-pedido-VENCIDA {
+  background: #eef2f1;
+  color: var(--color-texto-suave);
+}
+
+.barra-pedidos {
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.filtro-estado {
+  min-width: 220px;
+}
+
+/* Nueve columnas: en pantallas medianas la tabla se desplaza en vez de apretarse */
+.tabla-contenedor:has(.tabla-pedidos) {
+  overflow-x: auto;
+}
+
+.tabla-pedidos td {
+  vertical-align: middle;
+}
+
+.codigo-pedido {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.producto-pedido {
+  display: grid;
+}
+
+.producto-pedido .texto-suave {
+  font-size: 0.85rem;
+}
+
+.cantidad-pedido {
+  display: grid;
+  justify-items: end;
+}
+
+.cantidad-pedido > span {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.disponible-insuficiente {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.aviso-sin-stock {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--error);
+  white-space: normal;
+  text-align: right;
+}
+
+.plazo-urgente {
+  color: var(--aviso);
+  font-weight: 700;
+}
+
+.detalle-pedido {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1.25rem;
+  margin: 0;
+}
+
+.detalle-pedido dt {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-texto-suave);
+}
+
+.detalle-pedido dd {
+  display: grid;
+  justify-items: start;
+  gap: 0.2rem;
+  margin: 0.15rem 0 0;
+}
+
+.detalle-pedido .detalle-ancho {
+  grid-column: 1 / -1;
+}
+
+.campo textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.campo textarea:focus-visible {
+  outline: 3px solid rgb(15 118 110 / 35%);
+  outline-offset: 1px;
+}
+
+.campo textarea[aria-invalid='true'] {
+  border-color: var(--error);
+  background: #fffafa;
+}
+
+.pie-campo {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.contador {
+  font-size: 0.85rem;
+  color: var(--color-texto-suave);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.contador-excedido {
+  color: var(--error);
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .tabla-pedidos td.acciones {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .tabla-pedidos .acciones .btn + .btn {
+    margin-left: 0;
+  }
+
+  .tabla-pedidos .aviso-sin-stock {
+    flex-basis: 100%;
+    margin-bottom: 0;
+  }
+
+  .producto-pedido {
+    justify-items: end;
+  }
+}
+
+@media (max-width: 479px) {
+  .barra-pedidos > * {
+    flex-basis: 100%;
+  }
+
+  .detalle-pedido {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---------- Modal ---------- */
 .modal-fondo {
   position: fixed;
@@ -1499,6 +1695,11 @@ a {
 
 .modal-pequeno {
   max-width: 420px;
+}
+
+/* El foco inicial va a la ventana; no hace falta el contorno del navegador */
+.modal:focus {
+  outline: none;
 }
 
 /* ---------- Celular ---------- */
