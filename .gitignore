@@ -33,6 +33,8 @@ captures/
 *.keystore
 *.jks
 .kotlin/
+# Configuración de Firebase: se comparte en privado, nunca en el repo
+google-services.json
 
 # ===== Django (Python) =====
 venv/
