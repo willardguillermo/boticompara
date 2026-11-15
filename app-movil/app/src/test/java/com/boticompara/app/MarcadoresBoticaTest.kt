@@ -1,7 +1,7 @@
 package com.boticompara.app
 
-import com.boticompara.app.data.remote.ProductoResponse
-import com.boticompara.app.vistas.agruparPorBotica
+import com.boticompara.app.data.remote.dto.ProductoResponse
+import com.boticompara.app.ui.busqueda.agruparPorBotica
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

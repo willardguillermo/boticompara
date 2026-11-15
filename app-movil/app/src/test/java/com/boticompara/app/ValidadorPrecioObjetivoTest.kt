@@ -1,7 +1,7 @@
 package com.boticompara.app
 
-import com.boticompara.app.vistas.ResultadoPrecioObjetivo
-import com.boticompara.app.vistas.ValidadorPrecioObjetivo
+import com.boticompara.app.ui.favoritos.ResultadoPrecioObjetivo
+import com.boticompara.app.ui.favoritos.ValidadorPrecioObjetivo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

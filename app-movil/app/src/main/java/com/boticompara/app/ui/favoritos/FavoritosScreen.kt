@@ -1,0 +1,366 @@
+package com.boticompara.app.ui.favoritos
+
+import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.LocalPharmacy
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.Medication
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.NotificationsNone
+import androidx.compose.material.icons.rounded.NotificationsOff
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import com.boticompara.app.data.remote.dto.FavoritoResponse
+import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.theme.Dimens
+import java.util.Locale
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FavoritosScreen(
+    navController: NavController,
+    favoritosViewModel: FavoritosViewModel = viewModel()
+) {
+    val vm = favoritosViewModel
+    val snackbarHostState = remember { SnackbarHostState() }
+    var favoritoEditando by remember { mutableStateOf<FavoritoResponse?>(null) }
+
+    LaunchedEffect(vm.sesionVencida) {
+        if (vm.sesionVencida) {
+            navController.navigate("login") {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
+        }
+    }
+
+    LifecycleResumeEffect(Unit) {
+        vm.cargar()
+        onPauseOrDispose { }
+    }
+
+    LaunchedEffect(vm.mensajeAccion) {
+        vm.mensajeAccion?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.mensajeMostrado()
+        }
+    }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            CabeceraPantalla(
+                titulo = "Mis favoritos",
+                subtitulo = if (vm.favoritos.isNotEmpty()) {
+                    if (vm.favoritos.size == 1) "1 producto guardado"
+                    else "${vm.favoritos.size} productos guardados"
+                } else null
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = Dimens.Space20)
+        ) {
+            when {
+                vm.isLoading -> {
+                    EstadoCargando("Cargando tus favoritos...")
+                }
+
+                vm.favoritos.isEmpty() && vm.mensajeError != null -> {
+                    EstadoError(vm.mensajeError!!) { vm.cargar() }
+                }
+
+                vm.favoritos.isEmpty() -> {
+                    EstadoVacio(
+                        Icons.Rounded.FavoriteBorder,
+                        "Todavía no tienes favoritos. Guarda un producto desde su detalle para verlo aquí."
+                    )
+                }
+
+                else -> {
+                    PullToRefreshBox(
+                        isRefreshing = vm.isRefreshing,
+                        onRefresh = { vm.refrescar() },
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(Dimens.Space12),
+                            contentPadding = PaddingValues(top = Dimens.Space8, bottom = Dimens.Space24)
+                        ) {
+                            items(vm.favoritos, key = { it.productoId }) { favorito ->
+                                FavoritoCard(
+                                    favorito = favorito,
+                                    onClick = { navController.navigate("detalle/${favorito.productoId}") },
+                                    onQuitar = { vm.quitar(favorito.productoId) },
+                                    onEditarObjetivo = { favoritoEditando = favorito }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    favoritoEditando?.let { favorito ->
+        DialogPrecioObjetivo(
+            favorito = favorito,
+            onGuardar = { precio ->
+                vm.fijarPrecioObjetivo(favorito.productoId, precio)
+                favoritoEditando = null
+            },
+            onDismiss = { favoritoEditando = null }
+        )
+    }
+}
+
+@Composable
+private fun FavoritoCard(
+    favorito: FavoritoResponse,
+    onClick: () -> Unit,
+    onQuitar: () -> Unit,
+    onEditarObjetivo: () -> Unit
+) {
+    ProductoCard(
+        nombre = favorito.nombreComercial,
+        presentacion = favorito.presentacion,
+        principioActivo = favorito.principioActivo,
+        precio = favorito.precio,
+        stock = favorito.stock,
+        boticaNombre = favorito.boticaNombre,
+        boticaDireccion = favorito.boticaDireccion,
+        boticaDistrito = favorito.boticaDistrito,
+        distanciaKm = null,
+        esMasBarato = false,
+        onClick = onClick,
+        trailingContent = {
+            IconButton(onClick = onQuitar) {
+                Icon(
+                    Icons.Rounded.Favorite,
+                    contentDescription = "Quitar de favoritos",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        contentAdicional = {
+            Column {
+                BloquePrecioObjetivo(favorito = favorito, onEditar = onEditarObjetivo)
+                Spacer(Modifier.height(Dimens.Space8))
+                LineaConIcono(
+                    icono = Icons.Rounded.Event,
+                    texto = "Guardado el ${formatearFecha(favorito.fecha)}",
+                    estilo = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Dimens.Space2)
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun BloquePrecioObjetivo(
+    favorito: FavoritoResponse,
+    onEditar: () -> Unit
+) {
+    val objetivo = favorito.precioObjetivo
+
+    if (objetivo == null) {
+        FilledTonalButton(
+            onClick = onEditar,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Icon(
+                Icons.Rounded.NotificationsNone,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(Dimens.Space8))
+            Text("Definir precio objetivo")
+        }
+        return
+    }
+
+    val alcanzado = favorito.precio <= objetivo
+    val fondo = if (alcanzado) MaterialTheme.colorScheme.tertiaryContainer
+    else MaterialTheme.colorScheme.primaryContainer
+    val contenido = if (alcanzado) MaterialTheme.colorScheme.onTertiaryContainer
+    else MaterialTheme.colorScheme.onPrimaryContainer
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .background(fondo)
+            .clickable(onClick = onEditar)
+            .padding(horizontal = 14.dp, vertical = Dimens.Space12),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            if (alcanzado) Icons.Rounded.CheckCircle else Icons.Rounded.NotificationsActive,
+            contentDescription = null,
+            tint = contenido,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(Dimens.Space12))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                if (alcanzado) "Objetivo alcanzado" else "Precio objetivo",
+                style = MaterialTheme.typography.labelMedium,
+                color = contenido
+            )
+            Text(
+                "S/ ${String.format(Locale.US, "%.2f", objetivo)} o menos",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = contenido
+            )
+        }
+        Icon(
+            Icons.Rounded.Edit,
+            contentDescription = "Cambiar precio objetivo",
+            tint = contenido,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DialogPrecioObjetivo(
+    favorito: FavoritoResponse,
+    onGuardar: (Double?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var texto by remember {
+        mutableStateOf(
+            favorito.precioObjetivo?.let { String.format(Locale.US, "%.2f", it) } ?: ""
+        )
+    }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Rounded.NotificationsActive, contentDescription = null) },
+        title = { Text("Precio objetivo") },
+        text = {
+            Column {
+                Text(
+                    "${favorito.nombreComercial} cuesta hoy S/ ${String.format(Locale.US, "%.2f", favorito.precio)}. " +
+                            "Te avisaremos cuando baje a este precio o menos.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(Dimens.Space16))
+                OutlinedTextField(
+                    value = texto,
+                    onValueChange = {
+                        texto = it
+                        error = null
+                    },
+                    label = { Text("Precio en soles") },
+                    prefix = { Text("S/ ") },
+                    singleLine = true,
+                    isError = error != null,
+                    supportingText = { error?.let { Text(it) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(Dimens.Space4))
+
+                Text(
+                    "Bajar respecto al precio de hoy",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(Dimens.Space4))
+                Row(horizontalArrangement = Arrangement.spacedBy(Dimens.Space8)) {
+                    listOf(5, 10, 20).forEach { porcentaje ->
+                        SuggestionChip(
+                            onClick = {
+                                val sugerido = Math.round(favorito.precio * (100 - porcentaje)) / 100.0
+                                texto = String.format(Locale.US, "%.2f", sugerido)
+                                error = null
+                            },
+                            label = { Text("$porcentaje%", maxLines = 1) }
+                        )
+                    }
+                }
+
+                if (favorito.precioObjetivo != null) {
+                    Spacer(Modifier.height(Dimens.Space8))
+                    TextButton(
+                        onClick = { onGuardar(null) },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            Icons.Rounded.NotificationsOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(Dimens.Space8))
+                        Text("Quitar precio objetivo")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                when (val resultado = ValidadorPrecioObjetivo.validar(texto)) {
+                    is ResultadoPrecioObjetivo.Valido -> onGuardar(resultado.valor)
+                    is ResultadoPrecioObjetivo.Invalido -> error = resultado.mensaje
+                }
+            }) { Text("Guardar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
+}
+
+private fun formatearFecha(iso: String): String {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        try {
+            val fecha = java.time.Instant.parse(iso)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDate()
+            return fecha.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+        } catch (e: Exception) {
+            // fallback
+        }
+    }
+    val partes = iso.take(10).split("-")
+    return if (partes.size == 3) "${partes[2]}/${partes[1]}/${partes[0]}" else iso
+}

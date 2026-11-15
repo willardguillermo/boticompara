@@ -5,8 +5,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 
-// Esquema de color Material 3 de BotiCompara
 private val LightColorScheme = lightColorScheme(
     primary = VerdePrimario,
     onPrimary = SobreVerdePrimario,
@@ -31,7 +31,12 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = SuperficieVarianteClaro,
     onSurfaceVariant = SobreSuperficieVarianteClaro,
     outline = ContornoClaro,
-    outlineVariant = ContornoVarianteClaro
+    outlineVariant = ContornoVarianteClaro,
+    surfaceContainerLowest = SurfaceContainerLowestClaro,
+    surfaceContainerLow = SurfaceContainerLowClaro,
+    surfaceContainer = SurfaceContainerClaro,
+    surfaceContainerHigh = SurfaceContainerHighClaro,
+    surfaceContainerHighest = SurfaceContainerHighestClaro
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -58,7 +63,12 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = SuperficieVarianteOscuro,
     onSurfaceVariant = SobreSuperficieVarianteOscuro,
     outline = ContornoOscuro,
-    outlineVariant = ContornoVarianteOscuro
+    outlineVariant = ContornoVarianteOscuro,
+    surfaceContainerLowest = SurfaceContainerLowestOscuro,
+    surfaceContainerLow = SurfaceContainerLowOscuro,
+    surfaceContainer = SurfaceContainerOscuro,
+    surfaceContainerHigh = SurfaceContainerHighOscuro,
+    surfaceContainerHighest = SurfaceContainerHighestOscuro
 )
 
 @Composable
@@ -66,12 +76,21 @@ fun BotiComparaAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    // Sin colores dinámicos: la app usa siempre la paleta de BotiCompara
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val extendedColors = if (darkTheme) DarkExtendedColors else LightExtendedColors
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalExtendedColors provides extendedColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            shapes = BotiComparaShapes,
+            content = content
+        )
+    }
+}
+
+object BotiComparaTheme {
+    val extendedColors: ExtendedColors
+        @Composable
+        get() = LocalExtendedColors.current
 }
