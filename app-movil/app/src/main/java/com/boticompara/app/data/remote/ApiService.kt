@@ -8,6 +8,10 @@ interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
 
+    // H67: inicia sesión con Google (o crea la cuenta de comprador). Devuelve nuestro JWT, igual que el login
+    @POST("auth/google")
+    suspend fun loginGoogle(@Body request: GoogleAuthRequest): Response<AuthResponse>
+
     @POST("auth/registro")   // 201, devuelve el usuario SIN token -> luego llamar a login
     suspend fun registro(@Body request: RegistroRequest): Response<UsuarioResponse>
 
