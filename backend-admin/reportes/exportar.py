@@ -8,16 +8,19 @@ Cada hoja tiene: fila 1 con el título y el periodo (en hora de Lima), fila 2 co
 en negrita y debajo los datos.
 """
 from io import BytesIO
+from math import ceil
 
 from django.http import HttpResponse
 from django.utils import timezone
 from openpyxl import Workbook
-from openpyxl.styles import Font
+from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 
 TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 FILA_ENCABEZADOS = 2
 ANCHO_MAXIMO = 60
+ALTO_DE_LINEA = 15  # puntos, para la fuente por defecto (Calibri 11)
+COLUMNA_CALIFICACION = 8  # H: "Calificación promedio" del ranking (H95)
 
 TIPOS_DE_BUSQUEDA = {'nombre': 'Nombre comercial', 'principio': 'Principio activo'}
 
@@ -106,9 +109,25 @@ def libro_ranking(filas, rango, formula):
             for fila in filas
         ],
     )
-    # Después de calcular los anchos, para que la nota larga no ensanche la primera columna
+    # Calificación con 1 decimal (5,0 y no 5); la raya de "sin calificación", a la derecha como los números
+    for (celda,) in hoja.iter_rows(min_row=FILA_ENCABEZADOS + 1, min_col=COLUMNA_CALIFICACION,
+                                   max_col=COLUMNA_CALIFICACION):
+        if isinstance(celda.value, str):
+            celda.alignment = Alignment(horizontal='right')
+        else:
+            celda.number_format = '0.0'
+    # Después de calcular los anchos, para que la nota larga no ensanche la primera columna.
+    # Ocupa todas las columnas, con el texto ajustado y alto suficiente para leerla completa.
     hoja.append([])
     hoja.append([formula])
+    fila_nota = hoja.max_row
+    columnas = hoja.max_column
+    hoja.merge_cells(start_row=fila_nota, start_column=1, end_row=fila_nota, end_column=columnas)
+    hoja.cell(fila_nota, 1).alignment = Alignment(wrap_text=True, vertical='top')
+    ancho = sum(hoja.column_dimensions[get_column_letter(i)].width for i in range(1, columnas + 1))
+    # Unos 0,9 caracteres por unidad de ancho; una línea de más por margen
+    lineas = ceil(len(formula) / max(ancho * 0.9, 1)) + 1
+    hoja.row_dimensions[fila_nota].height = lineas * ALTO_DE_LINEA
     return libro
 
 

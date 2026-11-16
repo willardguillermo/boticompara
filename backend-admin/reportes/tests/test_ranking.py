@@ -321,3 +321,22 @@ class PaginaDelRankingTests(ConTablasDelRanking):
             [2, 'Botica Jorge', 'Lima', 0, 0, 1, 1, '—', 0],
         ])
         self.assertEqual(filas[-1][0], FORMULA)
+
+    def test_formato_del_excel(self):
+        rosa = crear_botica(nombre='Botica Rosa')
+        entregar(rosa)
+        resenar(rosa, estrellas=5)
+        entregar(crear_botica(nombre='Botica Jorge'))
+        self.client.force_login(self.staff)
+
+        hoja = load_workbook(BytesIO(self.client.get(URL_EXPORTAR).content))['Ranking']
+
+        # Calificación con 1 decimal (5,0) y la raya alineada a la derecha como los números
+        self.assertEqual((hoja['H3'].value, hoja['H3'].number_format), (5, '0.0'))
+        self.assertEqual((hoja['H4'].value, hoja['H4'].alignment.horizontal), ('—', 'right'))
+        # La fórmula ocupa todas las columnas, con el texto ajustado y alto para más de una línea
+        fila_nota = hoja.max_row
+        self.assertEqual(hoja.cell(fila_nota, 1).value, FORMULA)
+        self.assertIn(f'A{fila_nota}:I{fila_nota}', [str(rango) for rango in hoja.merged_cells.ranges])
+        self.assertTrue(hoja.cell(fila_nota, 1).alignment.wrap_text)
+        self.assertGreater(hoja.row_dimensions[fila_nota].height, 2 * 15)
