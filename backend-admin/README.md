@@ -138,7 +138,7 @@ python -m venv venv
 venv\Scripts\activate          # Windows (PowerShell: venv\Scripts\Activate.ps1)
 source venv/bin/activate       # Linux / macOS
 
-# 2. Dependencias
+# 2. Dependencias (versiones exactas, SEC-20)
 pip install -r requirements.txt
 
 # 3. Tablas internas de Django (auth_user, django_session, django_admin_log, ...).

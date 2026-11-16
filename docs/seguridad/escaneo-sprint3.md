@@ -29,8 +29,8 @@ en `backend-admin/venv`). No se agregó ninguna al `requirements.txt`, `package.
 | Alta | 2 | 2 | 0 | 0 |
 | Media | 6 | 4 | 1 | 1 |
 | Baja | 7 | 1 | 6 | 0 |
-| Informativa | 5 | 0 | 2 | 3 |
-| **Total** | **20** | **7** | **9** | **4** |
+| Informativa | 5 | 1 | 1 | 3 |
+| **Total** | **20** | **8** | **8** | **4** |
 
 Sin secretos reales en el historial ni en los archivos versionados. Los falsos positivos de las herramientas no
 se cuentan como hallazgos; se explican en cada fase.
@@ -38,8 +38,8 @@ se cuentan como hallazgos; se explican en cada fase.
 **Actualización del 2026-11-09:** SEC-01 y SEC-05 se corrigieron en `main` después del informe (PR #70 y #71). Ver
 "Cierre del Sprint 3" al final.
 
-**Actualización del 2026-11-16:** SEC-14 se corrigió en la rama `feature/admin-seguridad`. Ver
-"Sprint 4: SEC-14" al final.
+**Actualización del 2026-11-16:** SEC-14 y SEC-20 se corrigieron en la rama `feature/admin-seguridad`. Ver
+"Sprint 4: SEC-14 y SEC-20" al final.
 
 ## Tabla de hallazgos
 
@@ -64,7 +64,7 @@ se cuentan como hallazgos; se explican en cada fase.
 | SEC-17 | Informativa | bd | `seed.sql` crea usuarios de prueba con una contraseña conocida y documentada. | `database/seed.sql:4` | Guillermo | Aceptado: solo para desarrollo; no cargar en producción |
 | SEC-18 | Informativa | backend | En la búsqueda, `%` y `_` del texto del usuario funcionan como comodines de `LIKE`. No es inyección (va como parámetro); solo amplía resultados. | `backend-usuario/.../service/BusquedaService.java:70` | Alexander | Aceptado |
 | SEC-19 | Informativa | móvil | Las dependencias de Gradle no se pudieron escanear: osv-scanner necesita un archivo de bloqueo (`gradle.lockfile`). | `app-movil/gradle/libs.versions.toml` | Mijael | Pendiente |
-| SEC-20 | Informativa | admin | `requirements.txt` solo fija versiones mínimas (`>=`): dos instalaciones pueden tener versiones distintas. | `backend-admin/requirements.txt` | Guillermo | Pendiente |
+| SEC-20 | Informativa | admin | `requirements.txt` solo fija versiones mínimas (`>=`): dos instalaciones pueden tener versiones distintas. | `backend-admin/requirements.txt` | Guillermo | Corregido en `feature/admin-seguridad`: versiones exactas (`==`) de las dependencias directas; pip-audit sin vulnerabilidades |
 
 ## Fase 1: herramientas
 
@@ -282,8 +282,8 @@ Acordadas por Guillermo el 2026-11-07, después del escaneo:
   pasar el JWT a una cookie `HttpOnly; Secure; SameSite` (SEC-06).
 - **Móvil:** `BASE_URL` con HTTPS en la variante release y token cifrado con Android Keystore.
 - **Base de datos:** no cargar `seed.sql` en producción (SEC-17) y mantener RLS en todas las tablas nuevas.
-- **Dependencias:** escanear en cada PR (osv-scanner o Dependabot) y fijar versiones exactas en `requirements.txt` con un
-  archivo de bloqueo (SEC-20); activar el bloqueo de dependencias de Gradle (SEC-19).
+- **Dependencias:** escanear en cada PR (osv-scanner o Dependabot) (las directas de `requirements.txt` ya están fijadas, SEC-20;
+  las transitivas se fijarían con un archivo de bloqueo); activar el bloqueo de dependencias de Gradle (SEC-19).
 - **Claves:** rotar `JWT_SECRET`, la clave secreta de Supabase y la API key de correo antes de salir a producción, y no reutilizar
   las de desarrollo.
 
@@ -328,7 +328,7 @@ sin límite de intentos por IP o correo; queda abajo como pendiente.
 | Bajas del backend: CORS desde el entorno, revocación de JWT, tiempo de respuesta del login, clave HMAC separada | SEC-10 a SEC-13 | Alexander |
 | Límite de intentos en `POST /auth/login` y subir Jackson, pgjdbc, commons-lang3 y log4j-api a las versiones corregidas | SEC-05 (login), SEC-01 (restos) | Alexander |
 
-## Sprint 4: SEC-14 (2026-11-16, rama `feature/admin-seguridad`)
+## Sprint 4: SEC-14 y SEC-20 (2026-11-16, rama `feature/admin-seguridad`)
 
 ### SEC-14: corregido
 
@@ -352,3 +352,9 @@ Pruebas en `reportes/tests/test_bloqueo_login.py` (10, con SQLite y un reloj sim
 si el usuario no existe, otro usuario y otra IP no bloqueados, reinicio con un login correcto, sigue bloqueado a los 14:59 y
 deja entrar a los 15:01, un intento durante el bloqueo reinicia la espera, y axes sin migraciones.
 
+### SEC-20: corregido
+
+`backend-admin/requirements.txt` fija con `==` las dependencias directas, con las versiones instaladas hoy en el venv:
+Django 5.2.18, psycopg[binary] 3.3.6, python-dotenv 1.2.4, openpyxl 3.1.5, defusedxml 0.7.1 y django-axes 9.0.0. Las
+transitivas (asgiref, sqlparse, et-xmlfile, psycopg-binary) siguen sin fijarse. `pip-audit 2.10.1 -r requirements.txt`:
+**sin vulnerabilidades conocidas**.
