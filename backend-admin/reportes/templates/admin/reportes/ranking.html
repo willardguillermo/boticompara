@@ -1,0 +1,72 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static "reportes/reportes.css" %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label='reportes' %}">Reportes</a>
+  &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+{# H95: ranking de las boticas aprobadas más activas (reportes/ranking.py) #}
+<div id="content-main">
+  {% include "admin/reportes/rango_fechas.html" %}
+  <p class="reporte-nota">
+    Solo boticas aprobadas con actividad en el periodo. Días en hora de Lima; «Hasta» incluye todo ese día.
+    Sin fechas se muestran los últimos {{ dias }} días.
+  </p>
+  <p class="reporte-exportar">
+    <a href="{% url 'admin:reportes_ranking_exportar' %}{{ sufijo_url }}" class="button" id="exportar-ranking">Exportar a Excel</a>
+  </p>
+
+  {% if filas %}
+  <div class="results">
+    <table class="reporte-tabla" id="result_list">
+      <caption>{{ rango }}</caption>
+      <thead>
+        <tr>
+          <th scope="col" class="numero">Puesto</th>
+          <th scope="col">Botica</th>
+          <th scope="col">Distrito</th>
+          <th scope="col" class="numero">Pedidos entregados</th>
+          <th scope="col" class="numero">Reseñas respondidas</th>
+          <th scope="col" class="numero">Productos actualizados</th>
+          <th scope="col" class="numero">Puntaje</th>
+          <th scope="col" class="numero">Calificación promedio</th>
+          <th scope="col" class="numero">Veces comparado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fila in filas %}
+        <tr>
+          <td class="numero">{{ fila.puesto }}</td>
+          <td><a href="{% url 'admin:boticas_botica_change' fila.botica_id %}">{{ fila.botica }}</a></td>
+          <td>{{ fila.distrito }}</td>
+          <td class="numero">{{ fila.pedidos_entregados }}</td>
+          <td class="numero">{{ fila.resenas_respondidas }}</td>
+          <td class="numero">{{ fila.productos_actualizados }}</td>
+          <td class="numero puntaje">{{ fila.puntaje }}</td>
+          <td class="numero">{% if fila.calificacion is None %}—{% else %}{{ fila.calificacion|floatformat:1 }}{% endif %}</td>
+          <td class="numero informativo">{{ fila.veces_comparado }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="reporte-vacio" id="ranking-vacio">
+      <strong>{{ rango }}:</strong> ninguna botica aprobada tuvo actividad en este periodo (sin pedidos entregados,
+      reseñas respondidas ni productos actualizados).{% if rango_desde or rango_hasta %} Prueba con otras fechas o pulsa «Limpiar» para volver a los últimos {{ dias }} días.{% endif %}
+    </p>
+  {% endif %}
+
+  <p class="reporte-nota ranking-formula" id="ranking-formula"><strong>¿Cómo se calcula el puntaje?</strong> {{ formula }}</p>
+</div>
+{% endblock %}

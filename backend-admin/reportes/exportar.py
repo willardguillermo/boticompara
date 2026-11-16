@@ -89,6 +89,29 @@ def libro_panel(indicadores, comparados, rango):
     return libro
 
 
+def libro_ranking(filas, rango, formula):
+    """H95: libro con una hoja "Ranking": las mismas columnas que la tabla y la fórmula al final."""
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = 'Ranking'
+    _llenar_hoja(
+        hoja, 'Ranking de boticas', rango,
+        ['Puesto', 'Botica', 'Distrito', 'Pedidos entregados', 'Reseñas respondidas', 'Productos actualizados',
+         'Puntaje', 'Calificación promedio', 'Veces comparado'],
+        [
+            [fila['puesto'], fila['botica'], fila['distrito'], fila['pedidos_entregados'],
+             fila['resenas_respondidas'], fila['productos_actualizados'], fila['puntaje'],
+             round(fila['calificacion'], 1) if fila['calificacion'] is not None else '—',
+             fila['veces_comparado']]
+            for fila in filas
+        ],
+    )
+    # Después de calcular los anchos, para que la nota larga no ensanche la primera columna
+    hoja.append([])
+    hoja.append([formula])
+    return libro
+
+
 def nombre_de_archivo(reporte, hoy=None):
     """boticompara-<reporte>-AAAA-MM-DD.xlsx con la fecha de hoy en Lima."""
     hoy = hoy or timezone.localdate()
