@@ -101,6 +101,18 @@ fechas. El título de la tabla dice el rango aplicado; si no hubo búsquedas, se
 
 Al bajar esta versión, correr `python manage.py migrate`: la migración de `reportes` no crea la tabla.
 
+## Ranking de boticas (H95)
+
+**Reportes → Ranking de boticas** (`/admin/reportes/ranking/`, también enlazado desde el panel principal con
+las mismas fechas) ordena las boticas **APROBADO** más activas del periodo, con el mismo filtro Desde/Hasta
+(por defecto, los últimos 30 días). Por botica: pedidos entregados (reservas `ENTREGADA` por `actualizado_en`),
+reseñas respondidas (`respondida_en`), productos actualizados (`producto.actualizado_en`), puntaje,
+calificación promedio (reseñas no ocultas, de siempre; "—" si no tiene) y veces comparado (solo informativo).
+
+**Puntaje = 3 × pedidos entregados + 2 × reseñas respondidas + 1 × productos actualizados.** Orden: puntaje,
+luego calificación promedio y luego nombre. Solo aparecen las boticas con al menos un punto; si ninguna tiene,
+se muestra un mensaje. **Exportar a Excel** baja el mismo ranking. No usa tablas nuevas ni migraciones.
+
 **Pruebas:** `python manage.py test` usa SQLite en memoria, porque el rol `boticompara_app` no puede crear
 la base de pruebas en Supabase; las pruebas de `reportes` crean su tabla `busqueda` temporal.
 
