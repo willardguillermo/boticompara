@@ -3,7 +3,7 @@
 Panel de administración de BotiCompara: revisión de boticas pendientes (aprobar o rechazar con motivo), gestión de usuarios (suspender, reactivar y dar de baja) y consulta de productos.
 
 - **Responsable:** Guillermo
-- **Tecnología:** Django 5.2 (Python 3.12+), Django Admin, psycopg 3, python-dotenv
+- **Tecnología:** Django 5.2 (Python 3.12+), Django Admin, psycopg 3, python-dotenv, django-axes
 - **Puerto local:** 8000 (`http://localhost:8000/admin/`)
 - **Rama:** `feature/admin-boticas`
 
@@ -104,6 +104,22 @@ Al bajar esta versión, correr `python manage.py migrate`: la migración de `rep
 **Pruebas:** `python manage.py test` usa SQLite en memoria, porque el rol `boticompara_app` no puede crear
 la base de pruebas en Supabase; las pruebas de `reportes` crean su tabla `busqueda` temporal.
 
+## Límite de intentos en el login (SEC-14)
+
+El login del admin usa [django-axes](https://django-axes.readthedocs.io/) (ajustes `AXES_*` al final de
+`config/settings.py`):
+
+- **5 intentos fallidos** con el mismo usuario desde la misma IP bloquean ese usuario en esa IP **15 minutos**.
+  Otro usuario desde la misma IP sigue pudiendo entrar.
+- Un login correcto borra los fallos acumulados. Un intento durante el bloqueo vuelve a empezar los 15 minutos.
+- Al bloquearse se muestra "Demasiados intentos fallidos" con el estilo del admin (respuesta 429). La página es la
+  misma exista o no el usuario.
+- Los intentos se guardan en la **caché en memoria** del proceso, no en la base: axes no crea tablas y `migrate`
+  no le hace nada (`MIGRATION_MODULES = {'axes': None}`). Por eso **reiniciar `runserver` borra los bloqueos**; es
+  la forma de desbloquear en local (los comandos `axes_reset_*` corren en otro proceso y no ven esa caché).
+- Para producción con varios procesos: caché compartida (Redis o Memcached) y quitar `axes.W001` de
+  `SILENCED_SYSTEM_CHECKS`.
+
 ## Puesta en marcha
 
 Requisito: el archivo `.env` en la **raíz del repo** (copia de [`.env.example`](../.env.example))
@@ -126,7 +142,7 @@ source venv/bin/activate       # Linux / macOS
 pip install -r requirements.txt
 
 # 3. Tablas internas de Django (auth_user, django_session, django_admin_log, ...).
-#    No toca usuario, botica ni producto.
+#    No toca usuario, botica ni producto, ni crea tablas de django-axes.
 python manage.py migrate
 
 # 4. Usuario administrador del panel

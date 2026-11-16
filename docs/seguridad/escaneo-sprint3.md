@@ -28,15 +28,18 @@ en `backend-admin/venv`). No se agregó ninguna al `requirements.txt`, `package.
 | Crítica | 0 | 0 | 0 | 0 |
 | Alta | 2 | 2 | 0 | 0 |
 | Media | 6 | 4 | 1 | 1 |
-| Baja | 7 | 0 | 7 | 0 |
+| Baja | 7 | 1 | 6 | 0 |
 | Informativa | 5 | 0 | 2 | 3 |
-| **Total** | **20** | **6** | **10** | **4** |
+| **Total** | **20** | **7** | **9** | **4** |
 
 Sin secretos reales en el historial ni en los archivos versionados. Los falsos positivos de las herramientas no
 se cuentan como hallazgos; se explican en cada fase.
 
 **Actualización del 2026-11-09:** SEC-01 y SEC-05 se corrigieron en `main` después del informe (PR #70 y #71). Ver
 "Cierre del Sprint 3" al final.
+
+**Actualización del 2026-11-16:** SEC-14 se corrigió en la rama `feature/admin-seguridad`. Ver
+"Sprint 4: SEC-14" al final.
 
 ## Tabla de hallazgos
 
@@ -55,7 +58,7 @@ se cuentan como hallazgos; se explican en cada fase.
 | SEC-11 | Baja | backend | El JWT no se puede revocar: al cambiar la contraseña o cerrar sesión, el token anterior sigue valiendo hasta 24 h (sí se invalida si la cuenta se elimina, H19). | `backend-usuario/src/main/resources/application.properties:20` | Alexander | Pendiente |
 | SEC-12 | Baja | backend | El login responde más rápido cuando el correo no existe (no ejecuta BCrypt): permite adivinar qué correos están registrados midiendo tiempos. | `backend-usuario/.../service/AuthService.java:45` | Alexander | Pendiente |
 | SEC-13 | Baja | backend | `JWT_SECRET` se usa también como clave HMAC de los tokens de verificación y recuperación. Si se filtra, compromete las dos cosas. | `backend-usuario/.../service/VerificacionService.java:43` | Alexander | Pendiente |
-| SEC-14 | Baja | admin | El login del admin de Django no limita intentos. | `backend-admin/config/urls.py` | Guillermo | Pendiente (para producción: `django-axes` o límite en el proxy) |
+| SEC-14 | Baja | admin | El login del admin de Django no limita intentos. | `backend-admin/config/urls.py` | Guillermo | Corregido en `feature/admin-seguridad`: django-axes 9.0.0 con `AxesCacheHandler` (sin tablas); 5 fallos por usuario + IP bloquean 15 minutos |
 | SEC-15 | Baja | admin | Faltan los ajustes de producción: cookies seguras, HSTS y redirección a HTTPS (`check --deploy` da W004, W008, W012 y W016). | `backend-admin/config/settings.py` | Guillermo | Pendiente: solo documentado hasta que haya despliegue (decisión del 2026-11-07) |
 | SEC-16 | Informativa | bd | El linter de Supabase da 10 avisos INFO "RLS enabled no policy" en las tablas internas de Django (`auth_*`, `django_*`). | `database/rls_todas_las_tablas.sql` | Guillermo | Aceptado: no es un riesgo (ver Fase 5) |
 | SEC-17 | Informativa | bd | `seed.sql` crea usuarios de prueba con una contraseña conocida y documentada. | `database/seed.sql:4` | Guillermo | Aceptado: solo para desarrollo; no cargar en producción |
@@ -270,7 +273,8 @@ Acordadas por Guillermo el 2026-11-07, después del escaneo:
 
 - **Django:** con `DJANGO_DEBUG=False`, activar `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`,
   `SECURE_HSTS_SECONDS` (empezar con poco y subir), `CSRF_TRUSTED_ORIGINS` con el dominio del admin y `SECURE_PROXY_SSL_HEADER`
-  si va detrás de un proxy. Verificar con `python manage.py check --deploy` (SEC-15). Limitar intentos del login del admin (SEC-14).
+  si va detrás de un proxy. Verificar con `python manage.py check --deploy` (SEC-15). El límite de intentos del login (SEC-14) usa la caché en
+  memoria: con varios procesos, pasar `CACHES` a Redis o Memcached y configurar la IP real del cliente si hay proxy.
 - **Spring Boot:** CORS desde una variable de entorno con el dominio real de la web (SEC-10); `APP_BASE_URL` con HTTPS; considerar
   una clave HMAC separada de `JWT_SECRET` para los tokens de correo (SEC-13) y una forma de revocar JWT, por ejemplo con una
   versión de sesión en el usuario (SEC-11).
@@ -320,6 +324,31 @@ sin límite de intentos por IP o correo; queda abajo como pendiente.
 | Reevaluar el JWT de la web en `localStorage` frente a una cookie `HttpOnly` antes de producción (aceptado para el Sprint 3) | SEC-06 | Guillermo, con Alexander (requiere cambiar la API) |
 | Limitar el texto plano a `10.0.2.2` con `network_security_config.xml` en la app | SEC-07 | Mijael |
 | Excluir el token de las copias de seguridad de Android y cifrarlo con Android Keystore | SEC-09 | Mijael |
-| Ajustes de producción de Django (cookies seguras, HSTS, HTTPS, `check --deploy`) y límite de intentos en el login del admin | SEC-15, SEC-14 | Guillermo |
+| Ajustes de producción de Django (cookies seguras, HSTS, HTTPS, `check --deploy`) | SEC-15 | Guillermo |
 | Bajas del backend: CORS desde el entorno, revocación de JWT, tiempo de respuesta del login, clave HMAC separada | SEC-10 a SEC-13 | Alexander |
 | Límite de intentos en `POST /auth/login` y subir Jackson, pgjdbc, commons-lang3 y log4j-api a las versiones corregidas | SEC-05 (login), SEC-01 (restos) | Alexander |
+
+## Sprint 4: SEC-14 (2026-11-16, rama `feature/admin-seguridad`)
+
+### SEC-14: corregido
+
+El login del admin (`/admin/login/`) usa **django-axes 9.0.0** (soporta Django 5.2 y Python 3.14):
+
+- **5 intentos fallidos** con el mismo usuario desde la misma IP bloquean **15 minutos** (`AXES_LOCKOUT_PARAMETERS =
+  [['username', 'ip_address']]`). Otro usuario desde la misma IP, o el mismo usuario desde otra IP, puede seguir entrando.
+- Un login correcto borra los fallos acumulados (`AXES_RESET_ON_SUCCESS`). Un intento durante el bloqueo vuelve a empezar
+  los 15 minutos (comportamiento por defecto de axes).
+- La página del bloqueo está en español, con el estilo del login del admin (`reportes/bloqueo.py` y
+  `reportes/templates/admin/reportes/bloqueo_login.html`), responde **429** con `Retry-After: 900` y dice cuánto esperar.
+  Es la misma para un usuario que existe y para uno que no.
+- **Sin tablas nuevas:** los intentos se guardan en la caché (`AxesCacheHandler`), el admin de axes está apagado y
+  `MIGRATION_MODULES = {'axes': None}` evita que `migrate` cree sus tablas en Supabase (lo comprueba una prueba).
+- **Límite conocido:** la caché es `LocMemCache`, en la memoria del proceso. Sirve para `runserver`, pero se reinicia al
+  reiniciar el servidor y no se comparte entre procesos; axes lo advierte con `axes.W001`, que se silenció en `settings.py`.
+  En producción con varios procesos hay que usar Redis o Memcached y quitar el silencio. La IP sale de `REMOTE_ADDR`: detrás de
+  un proxy habrá que configurar `AXES_IPWARE_*`.
+
+Pruebas en `reportes/tests/test_bloqueo_login.py` (10, con SQLite y un reloj simulado): bloqueo al quinto fallo, misma página
+si el usuario no existe, otro usuario y otra IP no bloqueados, reinicio con un login correcto, sigue bloqueado a los 14:59 y
+deja entrar a los 15:01, un intento durante el bloqueo reinicia la espera, y axes sin migraciones.
+
