@@ -12,11 +12,14 @@ import java.time.Instant;
 public record PedidoResponse(Long id, String codigo, EstadoReserva estado,
                              Long productoId, String nombreComercial, String presentacion,
                              Integer cantidad, BigDecimal precioUnitario, BigDecimal total,
-                             Integer stockActual, String compradorNombre, String motivoRechazo,
-                             Instant venceEn, Instant creadoEn, Instant actualizadoEn) {
+                             Integer stockActual, Long disponible, String compradorNombre,
+                             String motivoRechazo, Instant venceEn, Instant creadoEn, Instant actualizadoEn) {
 
-    /** nombreComprador es el nombre completo de la cuenta; aquí se acorta. */
-    public static PedidoResponse from(Reserva r, Producto p, String nombreComprador) {
+    /**
+     * disponible solo se llena en PENDIENTE (lo calcula el servicio); en los demás estados es null.
+     * nombreComprador es el nombre completo de la cuenta; aquí se acorta.
+     */
+    public static PedidoResponse from(Reserva r, Producto p, String nombreComprador, Long disponible) {
         return new PedidoResponse(
                 r.getId(), r.getCodigo(), r.getEstado(),
                 r.getProductoId(),
@@ -26,6 +29,7 @@ public record PedidoResponse(Long id, String codigo, EstadoReserva estado,
                 r.getPrecioUnitario(),
                 r.getPrecioUnitario().multiply(BigDecimal.valueOf(r.getCantidad())).setScale(2, RoundingMode.HALF_UP),
                 p == null ? null : p.getStock(),
+                disponible,
                 NombreCorto.de(nombreComprador),
                 r.getMotivoRechazo(),
                 r.getVenceEn(),

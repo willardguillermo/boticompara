@@ -160,7 +160,7 @@ class PedidoServiceTest {
                 () -> service.cambiarEstado(DUENO, ID, "CONFIRMADA"));
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
-        assertEquals("No alcanza el stock para confirmar: hay 1 unidades disponibles y el pedido es de 2",
+        assertEquals("No hay stock suficiente para aceptar este pedido: disponible 1, pedido 2. Recházalo con un motivo.",
                 ex.getMessage());
         verify(reservas, never()).save(any(Reserva.class));
     }

@@ -105,7 +105,15 @@ public class PedidoService {
         return respuestas(List.of(reservas.save(r))).get(0);
     }
 
-    /** Stock disponible para este pedido: el stock menos las otras reservas activas. */
+    /**
+     * Lo disponible para este pedido: stock menos las otras reservas activas, sin contar esta.
+     * Nunca es negativo. Es el mismo cálculo que el campo disponible y que la validación al confirmar.
+     */
+    private long disponibleParaPedido(Producto p, Reserva r) {
+        long otras = reservas.unidadesApartadasSinEsta(p.getId(), EstadoReserva.ACTIVAS, r.getId());
+        return Math.max(0, p.getStock() - otras);
+    }
+
     private void validarStockAlConfirmar(Reserva r) {
         Producto p = productos.bloquearPorId(r.getProductoId())
                 .orElseThrow(() -> ApiException.notFound("El producto no existe"));
@@ -113,11 +121,10 @@ public class PedidoService {
             throw ApiException.conflict("Este producto ya no está disponible en tu catálogo. "
                     + "Rechaza el pedido con un motivo.");
         }
-        long otras = reservas.unidadesApartadasSinEsta(r.getProductoId(), EstadoReserva.ACTIVAS, r.getId());
-        long disponible = Math.max(0, p.getStock() - otras);
+        long disponible = disponibleParaPedido(p, r);
         if (disponible < r.getCantidad()) {
-            throw ApiException.conflict("No alcanza el stock para confirmar: hay " + disponible
-                    + " unidades disponibles y el pedido es de " + r.getCantidad());
+            throw ApiException.conflict("No hay stock suficiente para aceptar este pedido: disponible "
+                    + disponible + ", pedido " + r.getCantidad() + ". Recházalo con un motivo.");
         }
     }
 
@@ -145,7 +152,10 @@ public class PedidoService {
         return !r.getVenceEn().isAfter(Instant.now());
     }
 
-    /** Lee producto y comprador de sus tablas (no de la vista) en dos consultas, sin repetir por pedido. */
+    /**
+     * Lee producto y comprador de sus tablas (no de la vista) en dos consultas, sin repetir por pedido.
+     * disponible solo se calcula en PENDIENTE.
+     */
     private List<PedidoResponse> respuestas(List<Reserva> lista) {
         if (lista.isEmpty()) {
             return List.of();
@@ -158,9 +168,12 @@ public class PedidoService {
                 .stream().collect(Collectors.toMap(Usuario::getId, Function.identity()));
         return lista.stream()
                 .map(r -> {
+                    Producto p = prods.get(r.getProductoId());
                     Usuario u = users.get(r.getUsuarioId());
-                    return PedidoResponse.from(r, prods.get(r.getProductoId()),
-                            u == null ? null : u.getNombre());
+                    Long disponible = (r.getEstado() == EstadoReserva.PENDIENTE && p != null)
+                            ? disponibleParaPedido(p, r)
+                            : null;
+                    return PedidoResponse.from(r, p, u == null ? null : u.getNombre(), disponible);
                 })
                 .toList();
     }
