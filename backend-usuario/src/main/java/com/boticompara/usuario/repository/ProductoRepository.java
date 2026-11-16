@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Lock;
-
 import java.util.List;
 import java.util.Optional;
 
@@ -35,4 +34,9 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Producto p where p.id = :id")
     Optional<Producto> bloquearPorId(@Param("id") Long id);
+
+    /** H79: descuenta solo si alcanza. Devuelve las filas afectadas (0 = no había stock suficiente). */
+    @Modifying
+    @Query("update Producto p set p.stock = p.stock - :cantidad where p.id = :id and p.stock >= :cantidad")
+    int descontarStock(@Param("id") Long id, @Param("cantidad") int cantidad);
 }
