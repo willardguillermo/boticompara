@@ -12,6 +12,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     boolean existsByCorreoIgnoreCase(String correo);
 
     Optional<Usuario> findByCorreoIgnoreCase(String correo);
+    Optional<Usuario> findByGoogleUid(String googleUid);
 
     /** H19: el filtro JWT lo usa para dejar de aceptar los tokens de una cuenta eliminada. */
     boolean existsByIdAndActivoTrue(Long id);
