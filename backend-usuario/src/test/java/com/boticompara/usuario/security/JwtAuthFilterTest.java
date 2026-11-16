@@ -14,10 +14,16 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.time.Instant;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -70,7 +76,7 @@ class JwtAuthFilterTest {
 
     @Test
     void unTokenValidoDeUnaCuentaActivaAutentica() throws Exception {
-        when(usuarios.existsByIdAndActivoTrue(10L)).thenReturn(true);
+        when(usuarios.puedeEntrar(eq(10L), any(Instant.class))).thenReturn(true);
 
         ejecutar("Bearer " + tokenDe(10L));
 
@@ -82,11 +88,22 @@ class JwtAuthFilterTest {
 
     @Test
     void unTokenValidoDeUnaCuentaEliminadaNoAutentica() throws Exception {
-        when(usuarios.existsByIdAndActivoTrue(10L)).thenReturn(false);
+        when(usuarios.puedeEntrar(eq(10L), any(Instant.class))).thenReturn(false);
 
         ejecutar("Bearer " + tokenDe(10L));
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void unTokenValidoDeUnaCuentaSuspendidaNoAutentica() throws Exception {
+        // H91: la firma es válida, pero puedeEntrar devuelve false porque suspendido_hasta > now()
+        when(usuarios.puedeEntrar(eq(10L), any(Instant.class))).thenReturn(false);
+
+        ejecutar("Bearer " + tokenDe(10L));
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verify(usuarios).puedeEntrar(eq(10L), any(Instant.class));
     }
 
     @Test
