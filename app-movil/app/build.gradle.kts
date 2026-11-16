@@ -9,6 +9,7 @@ val baseUrl: String = localProps.getProperty("BASE_URL") ?: "http://10.0.2.2:808
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)   // H67: lee google-services.json
 }
 
 android {
@@ -64,6 +65,13 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
+
+    // H67: iniciar sesión con Google (Firebase Authentication + Credential Manager)
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
