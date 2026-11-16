@@ -44,6 +44,40 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 
 ## 1. Autenticación
 
+### POST /auth/google (H67)
+
+Inicia sesión con Google o crea la cuenta si no existe. No requiere token.
+
+**Body**
+
+```json
+{
+   "idToken": "eyJhbGciOi..."
+}
+```
+
+**Reglas**
+
+- El token de Firebase se verifica en el servidor: emisor, audiencia, firma y `email_verified = true`. La audiencia es el proyecto configurado en `FIREBASE_PROJECT_ID` (`.env` y `.env.example`, por ejemplo `FIREBASE_PROJECT_ID=boticompara`).
+- Si el `google_uid` ya existe, se inicia sesión con esa cuenta.
+- Si no existe, se crea una cuenta solo con Google: `password_hash` nulo, rol `COMPRADOR` y `correo_verificado = true`, porque Google ya verificó el correo.
+- `nombre`: el claim `name` del token. Si no viene, la parte del correo antes de la `@`.
+- Si ya existe una cuenta con contraseña y ese mismo correo, **no** se vincula.
+- Cuenta dada de baja: 403 "Tu cuenta fue dada de baja", solo después de verificar el token de Google.
+- Cuenta suspendida: 403 con la fecha de fin. Como el token de Google ya verificó la identidad, el 403 se devuelve sin paso extra; es el equivalente a validar la contraseña en el login.
+
+**Respuesta 200:** igual que `POST /auth/login`.
+
+**Errores**
+
+| Código | Cuándo | Mensaje |
+|---|---|---|
+| 400 | `idToken` vacío | "Falta el token de Google" |
+| 401 | Token inválido, expirado, de otro emisor o audiencia, o correo sin verificar | "No pudimos verificar tu cuenta de Google" |
+| 403 | Cuenta suspendida | "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima) |
+| 403 | Cuenta dada de baja | "Tu cuenta fue dada de baja" |
+| 409 | Ya existe una cuenta con contraseña y ese correo | "Ya existe una cuenta con este correo. Inicia sesión con tu contraseña" |
+
 ### `POST /auth/registro` — H1, H15, H20
 Crea un comprador o un dueño de botica.
 
@@ -78,7 +112,12 @@ Errores: 400, 409 (correo ya registrado).
   "usuario": { "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev", "rol": "COMPRADOR" }
 }
 ```
-El token dura 24 h. Errores: 401.
+El token dura 24 h. Errores:
+
+- **401:** correo o contraseña incorrectos, o cuenta sin contraseña (creada con Google). Es el mismo mensaje en todos los casos, para no revelar qué correos existen.
+- **403:** cuenta dada de baja o suspendida, **solo si la contraseña es correcta**. Responde "Tu cuenta fue dada de baja" o "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima). Sin contraseña correcta no se revela el estado de la cuenta.
+
+Una sesión ya abierta sigue funcionando hasta que el token venza o la cuenta quede dada de baja o suspendida: en ese caso, cada petición responde 401 y la app debe cerrar sesión. Al volver a entrar, el login da el 403 correspondiente.
 
 ### `POST /auth/recuperar` — H17
 Inicia la recuperación de contraseña. **Siempre responde 200**, exista o no el correo, para no revelar qué correos están registrados.
@@ -293,8 +332,24 @@ Respuesta: 201 con el producto creado. Validaciones: `precio > 0`, `stock >= 0`,
 ### `PUT /productos/{id}` 🔒 — H9
 Mismo cuerpo que el POST. Si no se envía `medicamentoId`, se conserva el enlace actual (H31); para quitarlo se usa `DELETE /productos/{id}/medicamento` (enviar `null` no lo borra). Respuesta: 200 con el producto actualizado. 404 si no es de su botica.
 
+**Stock comprometido (H79, H80):** el `stock` nuevo no puede quedar por debajo de las **unidades comprometidas** del producto (suma de `cantidad` de sus reservas `CONFIRMADA` y `LISTA`, ver sección 10) → 409 y el producto no cambia. El mensaje va en singular o plural según `n`: "Tienes 1 unidad comprometida en pedidos confirmados o listos para recoger; el stock no puede ser menor" o "Tienes {n} unidades comprometidas en pedidos confirmados o listos para recoger; el stock no puede ser menor". Ejemplo: un pedido `CONFIRMADA` de 2 y otro `LISTA` de 3 → comprometidas 5; se puede guardar stock 5 o más, pero no 4 (409 "Tienes 5 unidades comprometidas…"). Las reservas `PENDIENTE` no cuentan: el dueño todavía no las aceptó. Se calcula con la fila del producto bloqueada (`select ... from producto where id = :id for update`), igual que al confirmar un pedido, para que una edición y una confirmación a la vez no se crucen.
+
+Errores:
+
+| Código | Cuándo | `mensaje` |
+|---|---|---|
+| 400 | Las mismas validaciones del `POST` | Los mismos mensajes del `POST` |
+| 401 | Sin token | El mismo que el resto de la API |
+| 403 | Sin botica o botica no aprobada | El mismo que el `POST` |
+| 404 | El producto no existe o no es de su botica | El mismo que el resto de la API |
+| 409 | El `stock` nuevo es menor que las unidades comprometidas (`n`) | `n` = 1: "Tienes 1 unidad comprometida en pedidos confirmados o listos para recoger; el stock no puede ser menor". `n` > 1: "Tienes {n} unidades comprometidas en pedidos confirmados o listos para recoger; el stock no puede ser menor" |
+
 ### `DELETE /productos/{id}` 🔒 — H10
 Baja lógica (`activo = false`): deja de aparecer en listados y búsquedas. Respuesta: 204 sin cuerpo.
+
+**Pedidos activos (H79, H80):** si el producto tiene reservas `CONFIRMADA` o `LISTA` → 409 "No puedes dar de baja un producto con pedidos confirmados o listos para recoger. Atiéndelos o recházalos primero." y el producto sigue activo. Se revisa con la fila del producto bloqueada (`select ... from producto where id = :id for update`), igual que en `PUT /productos/{id}`, para que una baja y una confirmación a la vez no se crucen. Las reservas `PENDIENTE` **no** bloquean la baja, pero una vez dado de baja el producto ya no se pueden confirmar: `PATCH /pedidos/{id}/estado` a `CONFIRMADA` responde 409 "Este producto ya no está disponible en tu catálogo. Rechaza el pedido con un motivo." y el dueño las rechaza con un motivo (`PATCH /pedidos/{id}/rechazar`, sección 10). Ejemplo: un pedido `LISTA` de 1 → 409; solo un pedido `PENDIENTE` de 2 → 204, y ese pedido queda para rechazar.
+
+Errores: 401 (sin token), 403 (sin botica o botica no aprobada), 404 (el producto no existe o es de otra botica), 409 (tiene reservas `CONFIRMADA` o `LISTA`).
 
 ### `DELETE /productos/{id}/medicamento` 🔒 — H31
 Quita el enlace del producto con el catálogo maestro (`medicamentoId` pasa a `null`). El producto sigue activo y conserva su nombre, precio, stock y principio activo (el texto copiado al enlazar, regla D2). Respuesta: 204 sin cuerpo, también si el producto no estaba enlazado (se puede repetir sin error).
@@ -322,6 +377,7 @@ Las columnas `stockMinimo` y `medicamentoId` son opcionales. Las columnas se rec
 - Si la botica ya tiene un producto activo con el mismo `nombreComercial` y `presentacion` (sin distinguir mayúsculas), se **actualizan** su precio y su stock (y `stockMinimo` si la fila lo trae). Si no existe, se **crea**.
 - Si el mismo producto aparece dos veces en el archivo, la segunda aparición se informa como error.
 - Las filas válidas se guardan aunque otras tengan errores.
+- **Stock comprometido (H79, H80):** al actualizar un producto existente, el `stock` de la fila no puede quedar por debajo de sus unidades comprometidas (reservas `CONFIRMADA` y `LISTA`, igual que en `PUT /productos/{id}`). Si pasa, esa fila se informa como error con el mismo mensaje, en singular o plural ("Tienes 1 unidad comprometida en pedidos confirmados o listos para recoger; el stock no puede ser menor" o "Tienes {n} unidades comprometidas en pedidos confirmados o listos para recoger; el stock no puede ser menor"), el producto no cambia y las demás filas se siguen procesando.
 - `medicamentoId` enlaza el producto con un medicamento del catálogo maestro (H31), igual que en `POST /productos`.
 - Si `medicamentoId` no es un número entero, el medicamento no existe o está oculto, esa fila se informa como error (con el mismo mensaje que da `POST /productos`) y las demás se siguen procesando.
 - Si `medicamentoId` está vacío o el archivo no trae la columna, se conserva el enlace actual del producto: la carga masiva no quita enlaces (para eso se usa `DELETE /productos/{id}/medicamento`).
@@ -335,7 +391,8 @@ Las columnas `stockMinimo` y `medicamentoId` son opcionales. Las columnas se rec
   "errores": [
     { "fila": 7, "mensaje": "El precio debe ser mayor a 0." },
     { "fila": 9, "mensaje": "Producto duplicado en el archivo (ya aparece en la fila 2)." },
-    { "fila": 11, "mensaje": "El medicamento no existe en el catálogo" }
+    { "fila": 11, "mensaje": "El medicamento no existe en el catálogo" },
+    { "fila": 14, "mensaje": "Tienes 5 unidades comprometidas en pedidos confirmados o listos para recoger; el stock no puede ser menor" }
   ]
 }
 ```
@@ -645,7 +702,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
       "distanciaKm": 2.10
     }
   ],
-  "respaldo": false
+  "respaldo": false,
+  "ayuda": false
 }
 ```
 
@@ -668,7 +726,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
       "distanciaKm": null
     }
   ],
-  "respaldo": false
+  "respaldo": false,
+  "ayuda": false
 }
 ```
 
@@ -677,7 +736,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 {
   "respuesta": "No puedo recomendarte medicamentos ni dosis. Consulta con el químico farmacéutico de tu botica o con tu médico. Si es una emergencia, llama al SAMU al 106. Si ya sabes qué medicamento necesitas, te ayudo a encontrar dónde está más barato.",
   "productos": [],
-  "respaldo": false
+  "respaldo": false,
+  "ayuda": false
 }
 ```
 
@@ -686,7 +746,18 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 {
   "respuesta": "Encontré 3 opciones. La más barata es Paracetamol Genérico a 2 soles con 20 en FarmaVida, Lurigancho-Chosica.",
   "productos": [ /* las 3 tarjetas, con las mismas reglas de siempre */ ],
-  "respaldo": true
+  "respaldo": true,
+  "ayuda": false
+}
+```
+
+```json
+// 200 OK — filtro de crisis ("Últimamente pienso en hacerme daño"): responde el servidor al instante, sin llamar a Gemini
+{
+  "respuesta": "Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento.",
+  "productos": [],
+  "respaldo": false,
+  "ayuda": true
 }
 ```
 
@@ -694,11 +765,14 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 
 **`respaldo`:** `false` en una respuesta normal. `true` cuando el texto no lo escribió Gemini sino el servidor, porque la llamada final falló o no llegó a tiempo (ver "Tiempos y respuesta de respaldo").
 
+**`ayuda`:** `true` solo cuando respondió el filtro de crisis (ver "Crisis y números de ayuda"); `false` en todas las demás respuestas. Sirve para que la web y la app destaquen esa respuesta.
+
 **`productos`:** siempre es una lista (vacía si la respuesta no trata de productos). Sirve para que la web y la app muestren tarjetas con enlace al detalle.
 - La arma **el servidor** con lo que devolvieron las herramientas en esta pregunta, no el modelo: los ids, precios y stock son los reales aunque el texto se equivoque. Si el texto y una tarjeta no coinciden, vale la tarjeta.
 - Máximo 10, sin repetidos, en el orden en que los devolvieron las herramientas.
 - `stockMinimo` solo tiene valor en los productos propios del dueño (herramientas `ver_stock_bajo` y `buscar_en_mi_catalogo`); en los demás es `null`.
-- `distanciaKm` solo tiene valor si el pedido trae `lat` y `lng` y la botica registró ubicación; si no, `null`. Mismo cálculo que en `GET /productos/buscar`.
+- `distanciaKm` solo tiene valor en las tarjetas de `buscar_precios`, cuando el pedido trae `lat` y `lng` y la botica registró ubicación; si no, `null`. Mismo cálculo que en `GET /productos/buscar`. El parámetro `cerca=true` solo cambia el orden (de la más cercana a la más lejana).
+- Las tarjetas de `buscar_alternativas` llevan siempre `distanciaKm: null`, aunque el pedido traiga ubicación: `AlternativasService` no calcula distancias. Lo mismo las de los productos propios del dueño.
 - Los resultados de `buscar_medicamento` (catálogo maestro) solo aparecen en el texto: no generan tarjetas ni una lista aparte, porque no son productos de una botica.
 
 **Herramientas del asistente, según el rol del token.** El modelo solo decide los parámetros de la tabla. El usuario, su botica y la ubicación los pone el servidor a partir del token y del pedido, nunca el modelo.
@@ -711,8 +785,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 | `buscar_en_mi_catalogo` | `DUENO_BOTICA` | Buscar un producto en su propio catálogo (precio y stock) | `texto` | `CatalogoService.listar(usuarioId, texto, false)` (`GET /boticas/mia/productos?q=`) |
 | `buscar_medicamento` | `DUENO_BOTICA` | Buscar en el catálogo maestro (DIGEMID) | `texto` (mínimo 2 caracteres) | `MedicamentoService.buscar` (`GET /medicamentos?q=`) |
 
-- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (nombre, presentación, precio, stock, botica, distrito y distancia en km). Nunca coordenadas ni datos de personas.
-- Por pregunta hay como máximo 2 rondas de llamadas a herramientas (en una ronda el modelo puede pedir una o varias a la vez). Si después de la segunda pide más, el servidor le exige responder con lo que ya tiene. Así una pregunta usa como máximo 3 llamadas a Gemini: 2 rondas de herramientas más la respuesta.
+- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (`productoId`, nombre, principio activo, presentación, precio, stock, botica, distrito y distancia en km). El `productoId` va porque el modelo lo necesita para pedir `buscar_alternativas`; es un dato del producto, no de una persona. Nunca coordenadas ni datos de personas.
+- Por pregunta hay como máximo 2 rondas de llamadas a herramientas (en una ronda el modelo puede pedir una o varias a la vez; el servidor ejecuta como máximo 3 por ronda y a las demás les responde con un error). Si después de la segunda pide más, el servidor le exige responder con lo que ya tiene. Así una pregunta usa como máximo 3 llamadas a Gemini: 2 rondas de herramientas más la respuesta.
 - Si el dueño aún no registró su botica, sus herramientas devuelven "sin botica registrada" y el asistente lo explica: no es un error.
 - Las búsquedas del asistente **no** se registran en los reportes de búsquedas (H62) ni en el de comparaciones (H42): el texto lo escribe el modelo, no el usuario.
 
@@ -720,6 +794,20 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 - Solo responde sobre BotiCompara: precios, disponibilidad, boticas, alternativas y, para el dueño, su catálogo.
 - No diagnostica, no da dosis y no recomienda medicamentos por síntomas: deriva al químico farmacéutico o al médico. Ante una emergencia indica llamar al SAMU (106).
 - Estos casos responden `200` con `productos: []`; no son errores.
+
+**Crisis y números de ayuda.** El asistente no es un servicio de salud, pero alguien puede escribirle en un mal momento. Hay dos capas que **no dependen de Gemini**:
+
+1. **Filtro previo.** Después de validar el pedido y de pasar los límites (la pregunta cuenta en ellos), y antes de llamar a Gemini, el servidor busca en `mensaje` frases claras de riesgo. Si encuentra una, responde `200` al instante con un texto fijo, `productos: []`, `"respaldo": false` y `"ayuda": true`. No llama a Gemini: no gasta cuota ni depende de su latencia. El texto se compara en minúsculas y sin tildes. Solo se revisa `mensaje`, no el `historial`.
+
+   | Grupo | Frases que lo activan | Texto de la respuesta |
+   |---|---|---|
+   | Autolesión | "hacerme daño", "matarme", "quiero matarme", "suicid…" (suicidio, suicidarme), "quitarme la vida", "no quiero vivir", "no quiero seguir viviendo", "quiero morir", "me quiero morir", "acabar con mi vida", "cortarme las venas", "hacerme cortes" | "Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento." |
+   | Emergencia física | "no puedo respirar", "no puedo respirar bien", "me falta el aire", "dolor de pecho", "dolor en el pecho", "me duele el pecho", "intoxicación", "envenenamiento", "convulsión", "desmayo" | "Llama al SAMU al 106 de inmediato. BotiCompara solo compara precios de medicamentos y no puede atender una emergencia: ahora lo más importante es tu salud." |
+
+   - Si el mensaje tiene frases de los dos grupos, responde el de autolesión.
+   - La lista es corta a propósito. Un falso positivo solo muestra números de ayuda, pero no debe activarse con frases comunes: "me duele la cabeza", "dolor de cabeza" o "cortarme el pelo" siguen su camino normal.
+   - Si el filtro no detecta nada, todo sigue igual: responde Gemini con sus instrucciones, que también indican el SAMU 106 y la Línea 113.
+2. **Red de seguridad en los errores.** Todos los mensajes de error propios del chat (429, 503 y 504) terminan con: "Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5." Así, aunque el asistente no pueda responder, nadie se queda sin esos números. Los 400 y el 401 no lo llevan.
 
 **Límite de uso:**
 - **Por usuario:** por defecto 3 preguntas por minuto y 15 por día. Al pasarlo → 429.
@@ -733,7 +821,11 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 - **Por llamada a Gemini:** plazo de 25 segundos. **Por pregunta completa:** plazo total de 50 segundos, contado desde que el servidor empieza a atender el pedido. Cada llamada espera lo que sea menor: 25 s o lo que falte para los 50 s.
 - **Reintento:** si Google responde 500 o 503, la llamada se reintenta **una sola vez**, y solo si todavía queda tiempo dentro de los 50 s. Otros errores de Google (por ejemplo, cuota agotada) no se reintentan.
 - **Respaldo:** si las herramientas ya devolvieron productos en esta pregunta, pero la llamada final a Gemini falla (también después del reintento) o no llega a tiempo, el servidor responde `200` con un texto armado por él a partir de esas tarjetas y `"respaldo": true`. Ejemplo: "Encontré 3 opciones. La más barata es Paracetamol Genérico a 2 soles con 20 en FarmaVida, Lurigancho-Chosica." Sigue las reglas de `respuesta` (texto plano, precios como se dicen, hasta 600 caracteres).
-- El texto de respaldo **solo describe productos** (cuántos hay, el más barato, la botica y el distrito): nunca da consejos de salud.
+- El texto de respaldo **solo describe productos**: nunca da consejos de salud. Depende de la herramienta que devolvió las tarjetas:
+  - `buscar_precios` y `buscar_alternativas`: cuántos hay, el más barato, su botica y su distrito ("Encontré 3 opciones. La más barata es…"; con uno solo, "Encontré 1 opción: …").
+  - `ver_stock_bajo`: "Tienes N productos con stock bajo. Los ves en las tarjetas." (con uno solo, "Tienes 1 producto con stock bajo. Lo ves en la tarjeta.").
+  - `buscar_en_mi_catalogo`: "Encontré N productos en tu catálogo. Los ves en las tarjetas." (con uno solo, "Encontré 1 producto en tu catálogo. Lo ves en la tarjeta."). También si las tarjetas salieron de `ver_stock_bajo` y de `buscar_en_mi_catalogo` a la vez.
+  - Si se mezclan tarjetas del catálogo propio con las de una búsqueda entre boticas, se usa el texto de la más barata.
 - Si no hubo productos de herramientas, no hay respaldo: se responde 503 si Gemini falla y 504 si se acaba el tiempo, como antes.
 - **Clientes:** la web (`fetch`) y la app (`readTimeout` de Retrofit) deben esperar **al menos 60 segundos** la respuesta de `POST /chat`, más que los 50 s del servidor, y mostrar un indicador ("Escribiendo…") mientras tanto. Con el plazo por defecto del cliente, el pedido podría cortarse antes de que el servidor responda.
 
@@ -746,11 +838,12 @@ Errores:
 | 400 | `historial` con un `rol` distinto de `usuario` o `asistente`, o un `texto` vacío o de más de 1000 caracteres | "El historial no es válido" |
 | 400 | Solo una de `lat` y `lng`, o coordenadas fuera de rango | Los mismos mensajes que `GET /productos/buscar` |
 | 401 | El token no es válido o la cuenta no está habilitada (dada de baja o suspendida) | El mismo que el resto de la API |
-| 429 | Se pasó el límite por minuto o por día | "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar" o "Llegaste al límite de preguntas de hoy. Vuelve mañana" |
-| 503 | Se llegó al tope global del día (`chat.limite.global-por-dia`); no se llama a Gemini | "El asistente alcanzó su límite de hoy. Intenta mañana." |
-| 503 | Gemini no responde, devuelve un error (también después del reintento), se agotó la cuota gratis del proyecto, o falta `GEMINI_API_KEY`, y no hay productos de herramientas para el respaldo | "El asistente no está disponible en este momento. Intenta más tarde" |
-| 504 | Se pasan los 50 segundos de la pregunta y no hay productos de herramientas para el respaldo | "El asistente tardó demasiado en responder. Intenta de nuevo" |
+| 429 | Se pasó el límite por minuto o por día | "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar. " o "Llegaste al límite de preguntas de hoy. Vuelve mañana. ", seguido de los números de ayuda |
+| 503 | Se llegó al tope global del día (`chat.limite.global-por-dia`); no se llama a Gemini | "El asistente alcanzó su límite de hoy. Intenta mañana. " seguido de los números de ayuda |
+| 503 | Gemini no responde, devuelve un error (también después del reintento), se agotó la cuota gratis del proyecto, o falta `GEMINI_API_KEY`, y no hay productos de herramientas para el respaldo | "El asistente no está disponible en este momento. Intenta más tarde. " seguido de los números de ayuda |
+| 504 | Se pasan los 50 segundos de la pregunta y no hay productos de herramientas para el respaldo | "El asistente tardó demasiado en responder. Intenta de nuevo. " seguido de los números de ayuda |
 
+- **Números de ayuda:** los mensajes del 429, del 503 y del 504 terminan siempre con "Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5." (ver "Crisis y números de ayuda"). Ejemplo completo: "El asistente tardó demasiado en responder. Intenta de nuevo. Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5."
 - El 429 trae el header `Retry-After` con los segundos que faltan para poder preguntar otra vez.
 - **Cuentas suspendidas:** el 401 para una cuenta suspendida depende de que `JwtAuthFilter` también rechace `suspendido_hasta > now()`. Ese cambio es parte de H91 (Alexander, anotado como pendiente en el PR #79) y es requisito de este contrato. Mientras no esté, un JWT vigente de una cuenta suspendida sigue entrando, como en el resto de la API.
 - Salvo el tope global, el 503 y el 504 no dicen la causa interna (clave, cuota, modelo): eso va solo al log del servidor.
@@ -768,7 +861,7 @@ Errores:
 
 El comprador aparta un producto para recogerlo en la botica. La reserva **aparta unidades pero no descuenta el stock**: mientras está activa resta de la cantidad disponible, y el stock se descuenta recién cuando el dueño la entrega (sección 10).
 
-**Cantidad disponible** de un producto = `producto.stock` − la suma de `cantidad` de sus reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`). Ejemplo: stock 5 y una reserva `CONFIRMADA` de 2 → disponible 3. Al entregarse esa reserva, el stock baja a 3 y la reserva deja de estar activa: el disponible sigue en 3. Se calcula con `select coalesce(sum(cantidad), 0) from reserva where producto_id = :id and estado in ('PENDIENTE', 'CONFIRMADA', 'LISTA')` (índice `idx_reserva_producto`). Todos los endpoints piden token de `COMPRADOR`; con otro rol responden 403. El usuario sale siempre del token (`UsuarioAutenticado.id`), nunca del cuerpo.
+**Cantidad disponible** de un producto = `producto.stock` − la suma de `cantidad` de sus reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`). Ejemplo: stock 5 y una reserva `CONFIRMADA` de 2 → disponible 3. Al entregarse esa reserva, el stock baja a 3 y la reserva deja de estar activa: el disponible sigue en 3. Nunca es negativo: si la resta da menos de 0, se toma 0. Se calcula con `select coalesce(sum(cantidad), 0) from reserva where producto_id = :id and estado in ('PENDIENTE', 'CONFIRMADA', 'LISTA')` (índice `idx_reserva_producto`). Todos los endpoints piden token de `COMPRADOR`; con otro rol responden 403. El usuario sale siempre del token (`UsuarioAutenticado.id`), nunca del cuerpo.
 
 **Estados de una reserva** (`chk_reserva_estado` en `reserva`):
 
@@ -878,6 +971,13 @@ Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `COMPRADOR`
 
 Las reservas vistas desde la botica. Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). La botica sale del token: es la botica cuyo `usuario_id` es el del token. Solo se ven y cambian reservas de productos de **esa** botica (`reserva.producto_id → producto.botica_id`). Si el dueño todavía no registró botica → 404 "Todavía no registraste tu botica" (como `GET /boticas/mia`).
 
+**Unidades comprometidas** de un producto = la suma de `cantidad` de sus reservas `CONFIRMADA` y `LISTA`. Son las que el dueño ya aceptó: **el dueño no puede comprometer stock que no tiene**, porque aceptar un pedido sin stock sería engañar al comprador. Por eso:
+- Solo se puede confirmar un pedido que el stock alcanza a cubrir (ver `PATCH /pedidos/{id}/estado`).
+- El stock de un producto nunca puede quedar por debajo de sus unidades comprometidas, ni al editarlo (`PUT /productos/{id}`) ni en la carga masiva (sección 4).
+- No se puede dar de baja un producto con reservas `CONFIRMADA` o `LISTA` (`DELETE /productos/{id}`, sección 4).
+
+Se calcula con `select coalesce(sum(cantidad), 0) from reserva where producto_id = :id and estado in ('CONFIRMADA', 'LISTA')`.
+
 **Formato de un pedido:**
 ```json
 {
@@ -891,6 +991,7 @@ Las reservas vistas desde la botica. Todos los endpoints piden token de `DUENO_B
   "precioUnitario": 2.20,
   "total": 4.40,
   "stockActual": 90,
+  "disponible": 85,
   "compradorNombre": "Carlos R.",
   "motivoRechazo": null,
   "venceEn": "2026-11-13T15:30:00.123456Z",
@@ -900,6 +1001,7 @@ Las reservas vistas desde la botica. Todos los endpoints piden token de `DUENO_B
 ```
 - Del comprador **solo** se muestra `compradorNombre`, con la misma regla que `autor` en las reseñas (sección 11): **nombre de pila más la inicial del apellido** (`"Carlos Ramírez"` → `"Carlos R."`). Nunca su correo, teléfono ni dirección. Si el comprador eliminó su cuenta, sale `"Usuario eliminado"` (el nombre anonimizado de H19).
 - `stockActual`: el stock de hoy del producto, para que el dueño sepa si puede atender antes de confirmar.
+- `disponible`: **solo en `PENDIENTE`**; en los demás estados es `null`. Es `producto.stock` − la suma de `cantidad` de las **otras** reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) del producto, **sin contar este pedido**. Es el mismo número que se valida al confirmar: si `disponible < cantidad`, confirmar dará 409, y la web lo usa para avisar al dueño antes de que lo intente (y sugerirle rechazarlo con un motivo). En el ejemplo: stock 90 y otras reservas activas por 5 → `disponible` 85. **Nunca es negativo:** si la resta da menos de 0 (por ejemplo, el dueño bajó el stock por debajo de reservas aún `PENDIENTE`), se devuelve 0. Ejemplo: stock 2 y otras reservas `PENDIENTE` por 5 → 2 − 5 = −3 → `disponible` 0.
 - `precioUnitario`, `total` y `motivoRechazo`: igual que en la sección 9.
 
 ### `GET /pedidos?estado=PENDIENTE` 🔒 — H77, H81
@@ -910,7 +1012,7 @@ Pedidos de la botica, del más reciente al más antiguo (por `creadoEn`), máxim
   { "id": 15, "codigo": "BC-7K2QXM", "estado": "PENDIENTE", "productoId": 9,
     "nombreComercial": "Paracetamol Genérico", "presentacion": "Tableta 500 mg x 10",
     "cantidad": 2, "precioUnitario": 2.20, "total": 4.40, "stockActual": 90,
-    "compradorNombre": "Carlos R.", "motivoRechazo": null,
+    "disponible": 85, "compradorNombre": "Carlos R.", "motivoRechazo": null,
     "venceEn": "2026-11-13T15:30:00.123456Z", "creadoEn": "2026-11-12T15:30:00.123456Z",
     "actualizadoEn": "2026-11-12T15:30:00.123456Z" }
 ]
@@ -933,17 +1035,31 @@ Respuesta: 200 con el pedido actualizado.
 
 | Desde | Hacia | Qué más pasa |
 |---|---|---|
-| `PENDIENTE` | `CONFIRMADA` | Se vuelve a validar el stock (ver abajo); `venceEn` no cambia |
-| `CONFIRMADA` | `LISTA` | `vence_en = ahora + 48 h` (plazo para recoger) y `recordatorio_enviado = false` |
+| `PENDIENTE` | `CONFIRMADA` | Se valida lo disponible (ver abajo); `venceEn` no cambia. Desde aquí sus unidades quedan comprometidas |
+| `CONFIRMADA` | `LISTA` | `vence_en = ahora + 48 h` (plazo para recoger) y `recordatorio_enviado = false`. No se valida stock: ya está garantizado |
 | `LISTA` | `ENTREGADA` | Se descuenta `cantidad` del stock del producto, en la misma transacción |
 
 - Cualquier otro cambio (saltarse un paso, volver atrás, salir de un estado final, o enviar `RECHAZADA`, `CANCELADA`, `VENCIDA` o `PENDIENTE`) → 409 "No se puede pasar de {actual} a {nuevo}". Para rechazar se usa `PATCH /pedidos/{id}/rechazar`.
-- **Descuento de stock:** `update producto set stock = stock - :cantidad where id = :id and stock >= :cantidad`. Si no actualiza ninguna fila → 409 "Stock insuficiente: quedan {stock} unidades" y el pedido sigue en `LISTA`. Así dos entregas a la vez no dejan el stock en negativo. El producto se descuenta aunque esté dado de baja (la venta ocurrió). Si queda en 0, deja de verse en la búsqueda.
-- **Validación al confirmar:** el stock debe cubrir este pedido y las demás reservas activas del producto: `producto.stock` − (suma de `cantidad` de las **otras** reservas `PENDIENTE`, `CONFIRMADA` y `LISTA` del producto) ≥ `cantidad`. Si no → 409 "No alcanza el stock para confirmar: hay {disponible} unidades disponibles y el pedido es de {cantidad}" y el pedido sigue en `PENDIENTE`. Puede pasar si el dueño bajó el stock en su catálogo después de que se creó la reserva. Ejemplo: stock 3, otra reserva `CONFIRMADA` de 2 y este pedido de 2 → disponible 3 − 2 = 1, menor que 2 → 409.
+- **Validación al confirmar (`PENDIENTE` → `CONFIRMADA`):** **el dueño no puede aceptar un pedido que no puede cumplir.** Con la fila del producto bloqueada (`select ... from producto where id = :id for update`), se calcula lo disponible igual que el campo `disponible`: `producto.stock` − (suma de `cantidad` de las **otras** reservas `PENDIENTE`, `CONFIRMADA` y `LISTA` del producto), y si da menos de 0 se toma 0. Debe ser ≥ `cantidad`. Si no → 409 "No hay stock suficiente para aceptar este pedido: disponible {n}, pedido {m}. Recházalo con un motivo." y el pedido sigue en `PENDIENTE`; el dueño debe rechazarlo con `PATCH /pedidos/{id}/rechazar`. Puede pasar si el dueño bajó el stock en su catálogo después de que se creó la reserva. Ejemplo: stock 3, otra reserva `CONFIRMADA` de 2 y este pedido de 2 → disponible 3 − 2 = 1, menor que 2 → 409 "No hay stock suficiente para aceptar este pedido: disponible 1, pedido 2. Recházalo con un motivo."
+- **Producto dado de baja (H79):** al confirmar, con la misma fila del producto bloqueada y **antes** de calcular lo disponible, si el producto tiene `activo = false` → 409 "Este producto ya no está disponible en tu catálogo. Rechaza el pedido con un motivo." y el pedido sigue en `PENDIENTE`; el dueño lo rechaza con `PATCH /pedidos/{id}/rechazar`. Pasa cuando el dueño dio de baja el producto con reservas `PENDIENTE` (`DELETE /productos/{id}`, sección 4). Solo afecta al paso a `CONFIRMADA`: `CONFIRMADA` y `LISTA` no pueden existir en un producto dado de baja, porque la baja se bloquea si las tiene.
+- **`LISTA` y `ENTREGADA` ya tienen el stock garantizado:** al confirmar, el pedido quedó cubierto, y desde entonces el stock no puede bajar de las unidades comprometidas (sección 4). Por eso al pasar a `LISTA` no se valida stock.
+- **Descuento de stock al entregar (respaldo):** `update producto set stock = stock - :cantidad where id = :id and stock >= :cantidad`. Con la regla anterior siempre debería actualizar la fila; la condición `stock >= :cantidad` queda **solo como respaldo** por si algo inconsistente pasara (por ejemplo, un cambio hecho directo en la base). Si no actualiza ninguna fila → 409 "Stock insuficiente: quedan {stock} unidades" y el pedido sigue en `LISTA`. El producto se descuenta aunque esté dado de baja (la venta ocurrió). Si queda en 0, deja de verse en la búsqueda.
 - Si `venceEn` ya pasó → 409 "La reserva ya venció".
 - Correo al comprador **solo** al pasar a `LISTA`. Al pasar a `CONFIRMADA` o `ENTREGADA` no se envía correo: el estado se ve en la app (ver "Correos").
 
-Errores: 400 (falta `estado` o no es uno de los 7 estados), 401, 403, 404 (no tiene botica o el pedido no es suyo), 409 (cambio no permitido, stock insuficiente al confirmar o al entregar, o reserva vencida).
+Errores:
+
+| Código | Cuándo | `mensaje` |
+|---|---|---|
+| 400 | Falta `estado` o no es uno de los 7 estados | El mismo que el resto de la API |
+| 401 | Sin token | El mismo que el resto de la API |
+| 403 | El rol no es `DUENO_BOTICA` | El mismo que el resto de la API |
+| 404 | No tiene botica, o el pedido no existe o no es suyo | "Todavía no registraste tu botica" o el mismo que `GET /pedidos/{id}` |
+| 409 | Cambio no permitido | "No se puede pasar de {actual} a {nuevo}" |
+| 409 | Al confirmar, el producto está dado de baja | "Este producto ya no está disponible en tu catálogo. Rechaza el pedido con un motivo." |
+| 409 | Al confirmar, lo disponible no alcanza | "No hay stock suficiente para aceptar este pedido: disponible {n}, pedido {m}. Recházalo con un motivo." |
+| 409 | Al entregar, inconsistencia de stock (respaldo) | "Stock insuficiente: quedan {stock} unidades" |
+| 409 | `venceEn` ya pasó | "La reserva ya venció" |
 
 ### `PATCH /pedidos/{id}/rechazar` 🔒 — H80
 ```json
@@ -989,14 +1105,16 @@ Una reserva que llega a recogerse usa los 3 (nueva, lista y recordatorio); una r
 
 ### Decisiones a confirmar con Alexander (sección 10)
 1. **Plazo de 48 h** para recoger, contado desde que pasa a `LISTA`.
-2. **El stock se descuenta al pasar a `ENTREGADA`** (no al crear ni al confirmar), con un `update` condicionado para no quedar en negativo; si no alcanza, 409.
-3. **Validación al confirmar:** al pasar a `CONFIRMADA`, stock − otras reservas activas debe alcanzar para el pedido; si no, 409 y sigue en `PENDIENTE`.
+2. **El stock se descuenta al pasar a `ENTREGADA`** (no al crear ni al confirmar), con un `update` condicionado que queda como respaldo; si no alcanza, 409.
+3. **Validación al confirmar:** al pasar a `CONFIRMADA`, stock − otras reservas activas debe alcanzar para el pedido; si no, 409 y sigue en `PENDIENTE` (el dueño lo rechaza con un motivo).
 4. **Sin saltos:** no se puede ir de `PENDIENTE` o `CONFIRMADA` directo a `ENTREGADA`.
 5. **Rechazo solo desde `PENDIENTE` o `CONFIRMADA`**, no desde `LISTA`.
 6. **Proceso cada 5 minutos** para vencer y recordar; el recordatorio se marca como enviado aunque falle el correo.
 7. **Correos: máximo 3 por reserva** (nueva al dueño, `LISTA` o `RECHAZADA` al comprador, y el recordatorio). Ninguno en `CONFIRMADA`, `ENTREGADA`, `CANCELADA` ni `VENCIDA`. Si un correo falla, la reserva o el cambio de estado siguen igual (solo log). Alcanza para unas 33 reservas al día, sin contar verificación, recuperación y alertas de precio.
 8. **`compradorNombre`** con nombre de pila más la inicial del apellido (`"Carlos R."`), igual que `autor` en las reseñas.
 9. **`stockActual`** en el pedido y **máximo 100** pedidos en la lista, sin paginación.
+10. **Stock comprometido (13/11/2026, H79, H80):** el dueño no puede comprometer stock que no tiene; aceptar un pedido sin stock sería engañar al comprador. Unidades comprometidas = suma de `cantidad` de las reservas `CONFIRMADA` y `LISTA`. Solo se confirma si lo disponible alcanza (si no, 409 y se rechaza con motivo); `PUT /productos/{id}` y la carga masiva no dejan el stock por debajo de lo comprometido (409, o error de esa fila en la carga masiva). El pedido trae `disponible` (solo en `PENDIENTE`) para avisar antes de confirmar. Con esto `LISTA` y `ENTREGADA` tienen el stock garantizado y la validación al entregar queda solo como respaldo. Mensaje del 409 en singular o plural: "Tienes 1 unidad comprometida…" o "Tienes {n} unidades comprometidas…". `disponible` nunca es negativo: si la resta da menos de 0, se devuelve 0.
+11. **Baja de un producto con pedidos (14/11/2026, H79, H80):** `DELETE /productos/{id}` responde 409 "No puedes dar de baja un producto con pedidos confirmados o listos para recoger. Atiéndelos o recházalos primero." si el producto tiene reservas `CONFIRMADA` o `LISTA` (el dueño ya se comprometió con el comprador). Las `PENDIENTE` no bloquean la baja, pero al dar de baja el producto ya no se pueden confirmar: el dueño las rechaza con un motivo.
 
 ---
 

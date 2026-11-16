@@ -2,10 +2,10 @@ package com.boticompara.app.data.repository
 
 import android.content.Context
 import com.boticompara.app.data.local.TokenManager
-import com.boticompara.app.data.remote.AlternativasResponse
-import com.boticompara.app.data.remote.ProductoDetalleResponse
-import com.boticompara.app.data.remote.ProductoResponse
 import com.boticompara.app.data.remote.RetrofitClient
+import com.boticompara.app.data.remote.dto.AlternativasResponse
+import com.boticompara.app.data.remote.dto.ProductoDetalleResponse
+import com.boticompara.app.data.remote.dto.ProductoResponse
 import kotlin.coroutines.cancellation.CancellationException
 
 // Resultado de la búsqueda, sin depender de Retrofit en el ViewModel

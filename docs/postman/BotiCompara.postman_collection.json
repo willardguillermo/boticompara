@@ -5642,6 +5642,318 @@
           }
         }
       ]
+    },
+    {
+      "name": "10. Asistente con Gemini (H68)",
+      "description": "POST /chat (docs/API.md, sección 8). Ejecuta la carpeta con Run folder, en orden. Los pasos 3 y 4 llaman a Gemini: necesitan GEMINI_API_KEY en el .env del backend, gastan cuota del plan gratis (2 o 3 llamadas cada uno) y cuentan en el límite de 15 preguntas por día del usuario; sin clave responden 503 y sus pruebas fallan. El paso 5 lo responde el filtro de crisis sin Gemini: pasa siempre. Ninguno escribe en la base: las búsquedas del asistente no se registran (H42, H62).",
+      "item": [
+        {
+          "name": "1. Login de Carlos (COMPRADOR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"tokenCarlos\", j.token);",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"carlos@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2. Login de Rosa (DUENO, APROBADO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Devuelve token Bearer\", function () { pm.expect(j.token).to.be.a(\"string\"); pm.expect(j.tipo).to.eql(\"Bearer\"); });",
+                  "pm.collectionVariables.set(\"tokenRosa\", j.token);",
+                  "pm.test(\"Responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"rosa@boticompara.nissidev.dev\",\n  \"password\": \"Boti2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3. Carlos pregunta precios cerca de él (COMPRADOR, gasta cuota)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Tiene respuesta, productos, respaldo y ayuda\", function () {",
+                  "  pm.expect(j.respuesta).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(j.respuesta.length).to.be.at.most(600);",
+                  "  pm.expect(j.productos).to.be.an(\"array\");",
+                  "  pm.expect(j.productos.length).to.be.at.most(10);",
+                  "  pm.expect(j.respaldo).to.be.a(\"boolean\");",
+                  "  pm.expect(j.ayuda).to.be.a(\"boolean\");",
+                  "});",
+                  "pm.test(\"Texto plano, sin markdown ni enlaces\", function () { pm.expect(j.respuesta).to.not.match(/[*`#]|https?:\\/\\//); });",
+                  "pm.test(\"No es una respuesta del filtro de crisis\", function () { pm.expect(j.ayuda).to.eql(false); });",
+                  "pm.test(\"Las tarjetas traen los campos del contrato\", function () {",
+                  "  j.productos.forEach(function (p) {",
+                  "    pm.expect(p).to.have.all.keys(\"productoId\", \"nombreComercial\", \"principioActivo\", \"presentacion\", \"precio\", \"stock\", \"stockMinimo\", \"boticaId\", \"boticaNombre\", \"boticaDistrito\", \"distanciaKm\");",
+                  "    pm.expect(p.stockMinimo).to.eql(null);",
+                  "  });",
+                  "});",
+                  "pm.test(\"Responde en menos de 50 s (plazo del chat)\", function () { pm.expect(pm.response.responseTime).to.be.below(50000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mensaje\": \"Paracetamol cerca de mí\",\n  \"historial\": [\n    {\n      \"rol\": \"usuario\",\n      \"texto\": \"Hola\"\n    },\n    {\n      \"rol\": \"asistente\",\n      \"texto\": \"Hola, soy el asistente de BotiCompara. ¿Qué medicamento buscas?\"\n    }\n  ],\n  \"lat\": -12.045,\n  \"lng\": -77.093\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4. Rosa pregunta por su stock bajo (DUENO, gasta cuota)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Tiene respuesta, productos, respaldo y ayuda\", function () {",
+                  "  pm.expect(j.respuesta).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(j.respuesta.length).to.be.at.most(600);",
+                  "  pm.expect(j.productos).to.be.an(\"array\");",
+                  "  pm.expect(j.productos.length).to.be.at.most(10);",
+                  "  pm.expect(j.respaldo).to.be.a(\"boolean\");",
+                  "  pm.expect(j.ayuda).to.be.a(\"boolean\");",
+                  "});",
+                  "pm.test(\"Texto plano, sin markdown ni enlaces\", function () { pm.expect(j.respuesta).to.not.match(/[*`#]|https?:\\/\\//); });",
+                  "pm.test(\"No es una respuesta del filtro de crisis\", function () { pm.expect(j.ayuda).to.eql(false); });",
+                  "pm.test(\"Las tarjetas son de su propia botica, con stockMinimo\", function () {",
+                  "  const boticas = new Set(j.productos.map(function (p) { return p.boticaNombre; }));",
+                  "  pm.expect(boticas.size).to.be.at.most(1);",
+                  "  j.productos.forEach(function (p) { pm.expect(p.stockMinimo).to.be.a(\"number\"); pm.expect(p.stock).to.be.at.most(p.stockMinimo); });",
+                  "});",
+                  "pm.test(\"Responde en menos de 50 s (plazo del chat)\", function () { pm.expect(pm.response.responseTime).to.be.below(50000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRosa}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mensaje\": \"¿Qué productos tengo con stock bajo?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5. Carlos escribe una frase de crisis (sin Gemini)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", function () { pm.response.to.have.status(200); });",
+                  "const j = pm.response.json();",
+                  "pm.test(\"Tiene respuesta, productos, respaldo y ayuda\", function () {",
+                  "  pm.expect(j.respuesta).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(j.respuesta.length).to.be.at.most(600);",
+                  "  pm.expect(j.productos).to.be.an(\"array\");",
+                  "  pm.expect(j.productos.length).to.be.at.most(10);",
+                  "  pm.expect(j.respaldo).to.be.a(\"boolean\");",
+                  "  pm.expect(j.ayuda).to.be.a(\"boolean\");",
+                  "});",
+                  "pm.test(\"Texto plano, sin markdown ni enlaces\", function () { pm.expect(j.respuesta).to.not.match(/[*`#]|https?:\\/\\//); });",
+                  "pm.test(\"Responde el filtro de crisis: ayuda true y sin tarjetas\", function () {",
+                  "  pm.expect(j.ayuda).to.eql(true);",
+                  "  pm.expect(j.respaldo).to.eql(false);",
+                  "  pm.expect(j.productos).to.eql([]);",
+                  "});",
+                  "pm.test(\"Da el SAMU 106 y la Línea 113, opción 5\", function () {",
+                  "  pm.expect(j.respuesta).to.include(\"106\");",
+                  "  pm.expect(j.respuesta).to.include(\"Línea 113, opción 5\");",
+                  "});",
+                  "pm.test(\"No llama a Gemini: responde en menos de 2 s (H26)\", function () { pm.expect(pm.response.responseTime).to.be.below(2000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCarlos}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mensaje\": \"Últimamente pienso en hacerme daño\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   ]
 }

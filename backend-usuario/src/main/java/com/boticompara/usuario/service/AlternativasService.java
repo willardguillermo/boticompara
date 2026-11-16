@@ -51,6 +51,16 @@ public class AlternativasService {
      * se usa el mismo principio activo, sin distinguir mayúsculas ni espacios de más (PRINCIPIO_ACTIVO).
      */
     public AlternativasResponse alternativas(Long id, Long usuarioId) {
+        AlternativasResponse respuesta = alternativasSinRegistro(id);
+        registrarConsulta(id, usuarioId);
+        return respuesta;
+    }
+
+    /**
+     * H68: el mismo cálculo, sin registrar la consulta (H42). Lo usa el asistente, porque ahí el producto lo
+     * elige el modelo y no el usuario. Lee de la misma vista, así que ve exactamente lo mismo que el comprador.
+     */
+    public AlternativasResponse alternativasSinRegistro(Long id) {
         Consultado consultado = consultado(id);
         List<AlternativaResponse> filas = consultado.grupoId() != null
                 ? delGrupo(consultado)
@@ -58,9 +68,7 @@ public class AlternativasService {
         List<AlternativaResponse> alternativas = filas.stream()
                 .map(a -> a.conAhorro(Ahorro.porcentaje(consultado.precio(), a.precio())))
                 .toList();
-        AlternativasResponse respuesta = new AlternativasResponse(id, alternativas.isEmpty(), alternativas);
-        registrarConsulta(id, usuarioId);
-        return respuesta;
+        return new AlternativasResponse(id, alternativas.isEmpty(), alternativas);
     }
 
     /**

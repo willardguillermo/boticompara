@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router'
 import { useAuth } from '../context/AuthContext.jsx'
 import { BoticaProvider, useBotica } from '../context/BoticaContext.jsx'
 import Alerta from './Alerta.jsx'
+import AsistenteChat from './AsistenteChat.jsx'
 import Cargando from './Cargando.jsx'
 import Icono from './Icono.jsx'
 import Marca from './Marca.jsx'
@@ -23,10 +24,14 @@ function Cabecera() {
             <NavLink to="/panel/catalogo">
               <Icono nombre={aprobada ? 'caja' : 'candado'} /> Catálogo
             </NavLink>
+            <NavLink to="/panel/pedidos">
+              <Icono nombre="pedido" /> Pedidos
+            </NavLink>
           </nav>
         )}
         <div className="usuario-sesion">
           <span className="nombre-usuario texto-suave">{usuario.nombre}</span>
+          <AsistenteChat />
           <button type="button" className="btn btn-secundario btn-icono" onClick={cerrarSesion}>
             <Icono nombre="salir" /> Salir
           </button>

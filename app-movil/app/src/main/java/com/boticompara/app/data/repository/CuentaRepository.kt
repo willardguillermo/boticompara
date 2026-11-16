@@ -2,9 +2,9 @@ package com.boticompara.app.data.repository
 
 import android.content.Context
 import com.boticompara.app.data.local.TokenManager
-import com.boticompara.app.data.remote.RecuperarRequest
-import com.boticompara.app.data.remote.RestablecerRequest
 import com.boticompara.app.data.remote.RetrofitClient
+import com.boticompara.app.data.remote.dto.RecuperarRequest
+import com.boticompara.app.data.remote.dto.RestablecerRequest
 
 // Resultado de las operaciones de cuenta, sin depender de Retrofit en el ViewModel
 sealed interface ResultadoCuenta {

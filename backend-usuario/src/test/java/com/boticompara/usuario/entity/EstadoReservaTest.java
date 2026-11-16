@@ -25,4 +25,26 @@ class EstadoReservaTest {
         assertFalse(EstadoReserva.CANCELADA.estaActiva());
         assertFalse(EstadoReserva.VENCIDA.estaActiva());
     }
+
+    @Test
+    void elDuenoSoloAvanzaPorLaCadenaPendienteConfirmadaListaEntregada() {
+        assertTrue(EstadoReserva.PENDIENTE.puedePasarPorEstadoA(EstadoReserva.CONFIRMADA));
+        assertTrue(EstadoReserva.CONFIRMADA.puedePasarPorEstadoA(EstadoReserva.LISTA));
+        assertTrue(EstadoReserva.LISTA.puedePasarPorEstadoA(EstadoReserva.ENTREGADA));
+
+        assertFalse(EstadoReserva.PENDIENTE.puedePasarPorEstadoA(EstadoReserva.ENTREGADA));
+        assertFalse(EstadoReserva.CONFIRMADA.puedePasarPorEstadoA(EstadoReserva.PENDIENTE));
+        assertFalse(EstadoReserva.LISTA.puedePasarPorEstadoA(EstadoReserva.CONFIRMADA));
+    }
+
+    @Test
+    void losEstadosFinalesNoSalenConNingunCambioDelDueno() {
+        for (EstadoReserva final_ : new EstadoReserva[] {
+                EstadoReserva.ENTREGADA, EstadoReserva.RECHAZADA,
+                EstadoReserva.CANCELADA, EstadoReserva.VENCIDA}) {
+            for (EstadoReserva nuevo : EstadoReserva.values()) {
+                assertFalse(final_.puedePasarPorEstadoA(nuevo), final_ + " -> " + nuevo);
+            }
+        }
+    }
 }

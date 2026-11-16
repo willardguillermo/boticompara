@@ -32,6 +32,12 @@ val SobreSuperficieVarianteClaro = Color(0xFF3F4947)
 val ContornoClaro = Color(0xFF6F7977)
 val ContornoVarianteClaro = Color(0xFFBEC9C6)
 
+val SurfaceContainerLowestClaro = Color(0xFFFFFFFF)
+val SurfaceContainerLowClaro = Color(0xFFEFF5F3)
+val SurfaceContainerClaro = Color(0xFFE9EFEF)
+val SurfaceContainerHighClaro = Color(0xFFE3E9E7)
+val SurfaceContainerHighestClaro = Color(0xFFDDE4E1)
+
 // ---- Tema oscuro ----
 val VerdePrimarioOscuro = Color(0xFF53DBC9)
 val SobreVerdePrimarioOscuro = Color(0xFF003731)
@@ -59,3 +65,9 @@ val SuperficieVarianteOscuro = Color(0xFF3F4947)
 val SobreSuperficieVarianteOscuro = Color(0xFFBEC9C6)
 val ContornoOscuro = Color(0xFF899390)
 val ContornoVarianteOscuro = Color(0xFF3F4947)
+
+val SurfaceContainerLowestOscuro = Color(0xFF0A0F0E)
+val SurfaceContainerLowOscuro = Color(0xFF131B1A)
+val SurfaceContainerOscuro = Color(0xFF17201E)
+val SurfaceContainerHighOscuro = Color(0xFF222B29)
+val SurfaceContainerHighestOscuro = Color(0xFF2D3634)
