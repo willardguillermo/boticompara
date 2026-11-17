@@ -17,6 +17,13 @@ interface ApiService {
     @POST("auth/restablecer")   // H17: 200 si el código es válido, 400 si no
     suspend fun restablecer(@Body request: RestablecerRequest): Response<MensajeResponse>
 
+    // H70: asistente de texto. El servidor no guarda la conversación: la app envía el historial
+    @POST("chat")
+    suspend fun enviarMensajeChat(
+        @Header("Authorization") auth: String,
+        @Body request: ChatRequest
+    ): Response<ChatResponse>
+
     @GET("usuarios/me")
     suspend fun obtenerPerfil(@Header("Authorization") auth: String): Response<PerfilResponse>
 
