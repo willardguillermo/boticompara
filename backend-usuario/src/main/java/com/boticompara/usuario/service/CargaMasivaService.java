@@ -6,6 +6,8 @@ import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
+import com.boticompara.usuario.entity.EstadoReserva;
+import com.boticompara.usuario.repository.ReservaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
 import com.boticompara.usuario.service.MedicamentoService.EnlaceMedicamento;
 import com.boticompara.usuario.util.CsvProductoParser;
@@ -32,6 +34,7 @@ public class CargaMasivaService {
     private final MedicamentoService medicamentos;
     private final AlertaService alertas;
     private final ApplicationEventPublisher eventos;
+    private final ReservaRepository reservas;
 
     /**
      * H11: crea los productos nuevos y actualiza precio y stock de los que ya existen (mismo nombre y
@@ -68,6 +71,12 @@ public class CargaMasivaService {
             }
             Producto p = existentes.get(f.clave());
             if (p != null) {
+                productos.bloquearPorId(p.getId());
+                long comprometidas = reservas.unidadesComprometidas(p.getId(), EstadoReserva.COMPROMETIDAS);
+                if (f.stock() < comprometidas) {
+                    errores.add(new ErrorFila(f.fila(), StockComprometido.mensaje(comprometidas)));
+                    continue;
+                }
                 preciosAntes.putIfAbsent(p, p.getPrecio());
                 p.setPrecio(f.precio());
                 p.setStock(f.stock());

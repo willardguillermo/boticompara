@@ -3,16 +3,18 @@ package com.boticompara.usuario.service;
 import com.boticompara.usuario.dto.ErrorFila;
 import com.boticompara.usuario.dto.ResultadoCarga;
 import com.boticompara.usuario.entity.Botica;
+import com.boticompara.usuario.entity.EstadoReserva;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
-import org.mockito.InOrder;
+import com.boticompara.usuario.repository.ReservaRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,35 +29,37 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CargaMasivaServiceTest {
 
     private static final String CAB = "nombreComercial,principioActivo,presentacion,precio,stock,stockMinimo";
-
-    @Mock
-    BoticaRepository boticas;
-
-    @Mock
-    ProductoRepository productos;
-
-    @Mock
-    AlertaService alertas;
-
     private static final String CAB_MED = CAB + ",medicamentoId";
 
-    @Mock
-    MedicamentoService medicamentos;
-
-    @Mock
-    ApplicationEventPublisher eventos;
+    @Mock BoticaRepository boticas;
+    @Mock ProductoRepository productos;
+    @Mock AlertaService alertas;
+    @Mock MedicamentoService medicamentos;
+    @Mock ApplicationEventPublisher eventos;
+    @Mock ReservaRepository reservas;
 
     @Captor
     ArgumentCaptor<List<Producto>> guardados;
 
-    @InjectMocks
     CargaMasivaService service;
+
+    @BeforeEach
+    void crearServicio() {
+        // Orden del constructor: boticas, productos, medicamentos, alertas, eventos, reservas
+        service = new CargaMasivaService(boticas, productos, medicamentos, alertas, eventos, reservas);
+    }
 
     private static byte[] csv(String... lineas) {
         return String.join("\n", lineas).getBytes(StandardCharsets.UTF_8);
@@ -202,6 +206,27 @@ class CargaMasivaServiceTest {
         verifyNoInteractions(productos);
     }
 
+    // ---------- Stock comprometido (API.md, sección 4) ----------
+
+    @Test
+    void stockMenorQueLasComprometidas_esErrorDeEsaFilaYLasDemasSeGuardan() {
+        conBotica("APROBADO");
+        conCatalogo(producto(7L, "Panadol", "Tableta 500 mg x 10", "8.50", 40, 5));
+        when(reservas.unidadesComprometidas(7L, EstadoReserva.COMPROMETIDAS)).thenReturn(5L);
+
+        ResultadoCarga r = service.cargar(10L, csv(CAB,
+                "Panadol,Paracetamol,Tableta 500 mg x 10,8.50,3,",
+                "Ibuprofeno,Ibuprofeno,Tableta 400 mg x 10,3.20,100,10"));
+
+        assertEquals(List.of(new ErrorFila(2,
+                        "Tienes 5 unidades comprometidas en pedidos confirmados o listos para recoger; el stock no puede ser menor")),
+                r.errores());
+        assertEquals(1, r.creados());
+        verify(productos).saveAll(guardados.capture());
+        assertEquals(1, guardados.getValue().size());
+        assertEquals("Ibuprofeno", guardados.getValue().get(0).getNombreComercial());
+    }
+
     // ---------- H59: alertas cuando baja el precio ----------
 
     @Test
@@ -255,6 +280,8 @@ class CargaMasivaServiceTest {
         assertEquals(2, evento.getValue().alertas().size());
         assertTrue(evento.getValue().alertas().containsAll(List.of(a1, a2)));
     }
+
+    // ---------- H11, D2 y H31: medicamentoId ----------
 
     @Test
     void conMedicamentoId_enlazaElProductoNuevoYCopiaElPrincipioActivo() {
