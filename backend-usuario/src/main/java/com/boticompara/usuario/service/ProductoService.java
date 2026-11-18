@@ -4,6 +4,8 @@ import com.boticompara.usuario.dto.ProductoRequest;
 import com.boticompara.usuario.dto.ProductoResponse;
 import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Producto;
+import com.boticompara.usuario.entity.EstadoReserva;
+import com.boticompara.usuario.repository.ReservaRepository;
 import com.boticompara.usuario.error.ApiException;
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,6 +26,7 @@ public class ProductoService {
     private final MedicamentoService medicamentos;
     private final AlertaService alertas;
     private final ApplicationEventPublisher eventos;
+    private final ReservaRepository reservas;
 
     /** H8 */
     @Transactional
@@ -40,7 +43,11 @@ public class ProductoService {
     @Transactional
     public ProductoResponse actualizar(Long usuarioId, Long id, ProductoRequest r) {
         Botica botica = boticaAprobada(usuarioId);
-        Producto p = propio(id, botica);
+        Producto p = propioBloqueado(id, botica);
+        long comprometidas = reservas.unidadesComprometidas(p.getId(), EstadoReserva.COMPROMETIDAS);
+        if (r.stock() < comprometidas) {
+            throw ApiException.conflict(StockComprometido.mensaje(comprometidas));
+        }
         BigDecimal precioAnterior = p.getPrecio();
         String principioDelMedicamento = r.medicamentoId() != null
                 ? principioDelMedicamento(r)
@@ -64,7 +71,11 @@ public class ProductoService {
     @Transactional
     public void eliminar(Long usuarioId, Long id) {
         Botica botica = boticaAprobada(usuarioId);
-        Producto p = propio(id, botica);
+        Producto p = propioBloqueado(id, botica);
+        if (reservas.existsByProductoIdAndEstadoIn(p.getId(), EstadoReserva.COMPROMETIDAS)) {
+            throw ApiException.conflict("No puedes dar de baja un producto con pedidos confirmados o listos para recoger. "
+                    + "Atiéndelos o recházalos primero.");
+        }
         p.setActivo(false);
         productos.save(p);
     }
@@ -81,6 +92,13 @@ public class ProductoService {
     /** 404 si no existe, ya fue dado de baja o es de otra botica. */
     private Producto propio(Long id, Botica botica) {
         return productos.findByIdAndBoticaIdAndActivoTrue(id, botica.getId())
+                .orElseThrow(() -> ApiException.notFound("Producto no encontrado"));
+    }
+
+    /** Igual que propio, pero bloquea la fila del producto hasta el commit (select ... for update). */
+    private Producto propioBloqueado(Long id, Botica botica) {
+        return productos.bloquearPorId(id)
+                .filter(p -> p.getBoticaId().equals(botica.getId()))
                 .orElseThrow(() -> ApiException.notFound("Producto no encontrado"));
     }
 
