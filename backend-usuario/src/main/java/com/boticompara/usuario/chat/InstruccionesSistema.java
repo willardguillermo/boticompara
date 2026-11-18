@@ -32,9 +32,14 @@ public class InstruccionesSistema {
 
     private static String leer(String ruta) {
         try (InputStream in = new ClassPathResource(ruta).getInputStream()) {
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8).strip();
+            return normalizarSaltos(new String(in.readAllBytes(), StandardCharsets.UTF_8)).strip();
         } catch (IOException e) {
             throw new UncheckedIOException("No se pudo leer " + ruta, e);
         }
+    }
+
+    /** En Windows (core.autocrlf=true) los .txt pueden llegar con \r\n: Gemini debe recibir el mismo texto siempre. */
+    static String normalizarSaltos(String texto) {
+        return texto.replace("\r\n", "\n").replace('\r', '\n');
     }
 }
