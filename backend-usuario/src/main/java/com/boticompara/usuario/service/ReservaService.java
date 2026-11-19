@@ -111,7 +111,7 @@ public class ReservaService {
     /** H75: el comprador cancela su reserva si todavía está activa y no venció. */
     @Transactional
     public ReservaResponse cancelar(Long usuarioId, Long id) {
-        Reserva r = reservas.findByIdAndUsuarioId(id, usuarioId)
+        Reserva r = reservas.bloquearPropia(id, usuarioId)
                 .orElseThrow(() -> ApiException.notFound("La reserva no existe"));
         if (!r.getEstado().estaActiva()) {
             throw ApiException.conflict("No se puede cancelar una reserva " + r.getEstado());
