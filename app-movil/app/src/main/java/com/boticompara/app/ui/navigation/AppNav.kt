@@ -22,6 +22,7 @@ import com.boticompara.app.ui.busqueda.SearchScreen
 import com.boticompara.app.ui.detalle.ProductoDetalleScreen
 import com.boticompara.app.ui.favoritos.FavoritosScreen
 import com.boticompara.app.ui.perfil.ProfileScreen
+import com.boticompara.app.ui.chat.ChatScreen
 
 @Composable
 fun AppNav(
@@ -52,6 +53,7 @@ fun AppNav(
         composable("favoritos") { FavoritosScreen(navController) }
         composable("alertas") { AlertasScreen(navController, alertasViewModel) }
         composable("perfil") { ProfileScreen(navController) }
+        composable("chat") { ChatScreen(navController) }
 
         composable(
             route = "detalle/{productoId}",

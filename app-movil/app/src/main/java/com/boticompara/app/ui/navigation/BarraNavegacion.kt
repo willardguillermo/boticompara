@@ -20,6 +20,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
+import androidx.compose.material.icons.automirrored.rounded.Chat
+import androidx.compose.material.icons.rounded.ChatBubbleOutline
 
 private data class DestinoInferior(
     val ruta: String,
@@ -32,6 +34,7 @@ private val destinos = listOf(
     DestinoInferior("busqueda", "Buscar", Icons.Outlined.Search, Icons.Rounded.Search),
     DestinoInferior("favoritos", "Favoritos", Icons.Rounded.FavoriteBorder, Icons.Rounded.Favorite),
     DestinoInferior("alertas", "Alertas", Icons.Rounded.NotificationsNone, Icons.Rounded.Notifications),
+    DestinoInferior("chat", "Asistente", Icons.Rounded.ChatBubbleOutline, Icons.AutoMirrored.Rounded.Chat),
     DestinoInferior("perfil", "Perfil", Icons.Outlined.Person, Icons.Rounded.Person)
 )
 
