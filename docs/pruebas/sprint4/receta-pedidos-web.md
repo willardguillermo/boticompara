@@ -15,8 +15,9 @@
 | 2 | Jorge | Detalle del mismo pedido | Aviso amarillo "Pide la receta médica antes de entregar" junto a los botones de acción | Correcto |
 | 3 | Jorge | Confirmar el pedido y pasarlo a **Lista para recoger** | Cambia de estado normalmente; la etiqueta y el recordatorio se mantienen | Correcto |
 | 4 | Jorge | Pulsar **Entregado** y revisar el diálogo de confirmación (se canceló sin entregar) | En el diálogo sale el recordatorio de la receta; al cancelar, el pedido sigue en `LISTA` | Correcto |
+| 5 | Jorge | Texto de la etiqueta en el detalle y en la tabla del mismo pedido de Amoxicilina Genérica (después del ajuste del texto) | En el detalle: "Requiere receta médica"; en la tabla: "Requiere receta" (versión corta por espacio) | Correcto |
 
-**Resultado:** 4 de 4 casos correctos.
+**Resultado:** 5 de 5 casos correctos.
 
 > **No probado a mano:** el **modo simulado** (`VITE_USE_MOCK=true`). En `src/services/api.mock.js` los
 > pedidos traen `condicionVenta` según el medicamento enlazado (los mismos valores que
