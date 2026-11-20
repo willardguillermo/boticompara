@@ -89,3 +89,13 @@ class DarBajaForm(forms.Form):
     """H93: el motivo es obligatorio. La confirmación es un segundo envío con confirmado=si."""
     motivo = campo_motivo(True, f'De {usuarios.MOTIVO_MIN} a {usuarios.MOTIVO_MAX} caracteres. '
                                 'Queda en el historial de la cuenta.')
+
+
+class OcultarResenaForm(forms.Form):
+    """H89: el motivo es obligatorio (chk_resena_motivo_ocultamiento), de 10 a 300 caracteres."""
+    motivo = campo_motivo(True, f'De {usuarios.MOTIVO_MIN} a {usuarios.MOTIVO_MAX} caracteres. Lo ven solo los '
+                                'administradores; queda en el historial de la reseña.')
+
+
+class MostrarResenaForm(forms.Form):
+    """H89: sin campos; la página pide confirmar antes de volver a mostrarla."""
