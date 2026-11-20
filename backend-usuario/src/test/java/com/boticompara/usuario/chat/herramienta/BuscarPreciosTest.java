@@ -60,8 +60,31 @@ class BuscarPreciosTest {
 
         assertEquals(1, r.paraModelo().get("total"));
         assertEquals(new ChatProducto(9L, "Paracetamol 9", "Paracetamol", "Tableta 500 mg x 10",
-                new BigDecimal("2.20"), 90, null, 2L, "FarmaVida", "Lurigancho-Chosica", new BigDecimal("1.25")),
-                r.tarjetas().get(0));
+                new BigDecimal("2.20"), 90, null, 2L, "FarmaVida", "Lurigancho-Chosica", new BigDecimal("1.25"),
+                null), r.tarjetas().get(0));
+    }
+
+    @Test
+    void laCondicionDeVentaLlegaAlModeloYALaTarjeta() throws Exception {
+        when(busqueda.buscar("clonazepam", "nombre", "precio_asc", null, null, null)).thenReturn(List.of(
+                new BusquedaResponse(139L, "Clonazepam Genérico", "Clonazepam", "Tableta 2 mg x 30",
+                        new BigDecimal("8.00"), 20, 1L, "Botica Salud Total", "Av. Lima 123", "Lurigancho-Chosica",
+                        null, null, null, "RECETA_RETENIDA")));
+
+        ResultadoHerramienta r = herramienta.ejecutar(SIN_UBICACION, args("{\"texto\":\"clonazepam\"}"));
+
+        assertEquals("RECETA_RETENIDA", r.tarjetas().get(0).condicionVenta());
+        assertTrue(JSON.writeValueAsString(r.paraModelo()).contains("\"condicionVenta\":\"RECETA_RETENIDA\""));
+    }
+
+    @Test
+    void sinCondicionDeVentaElModeloNoRecibeElCampo() throws Exception {
+        when(busqueda.buscar("panadol", "nombre", "precio_asc", null, null, null)).thenReturn(List.of(fila(3, null)));
+
+        ResultadoHerramienta r = herramienta.ejecutar(SIN_UBICACION, args("{\"texto\":\"panadol\"}"));
+
+        assertNull(r.tarjetas().get(0).condicionVenta());
+        assertFalse(JSON.writeValueAsString(r.paraModelo()).contains("condicionVenta"));
     }
 
     @Test

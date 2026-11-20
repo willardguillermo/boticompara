@@ -248,8 +248,8 @@ class ChatServiceTest {
         assertEquals("El más barato está en FarmaVida, a 2 soles con 20.", r.respuesta());
         assertFalse(r.respaldo());
         assertEquals(List.of(new ChatProducto(9L, "Paracetamol 9", "Paracetamol", "Tableta 500 mg x 10",
-                new BigDecimal("2.20"), 90, null, 2L, "FarmaVida", "Lurigancho-Chosica", new BigDecimal("1.25"))),
-                r.productos());
+                new BigDecimal("2.20"), 90, null, 2L, "FarmaVida", "Lurigancho-Chosica", new BigDecimal("1.25"),
+                null)), r.productos());
         List<Turno> turnos = gemini.pedidos.get(1).turnos();
         assertEquals(3, turnos.size());
         assertSame(paso.contenido(), ((Turno.Modelo) turnos.get(1)).contenido());
@@ -788,9 +788,9 @@ class ChatServiceTest {
     void elRespaldoDelStockBajoDelDuenoNoHablaDeLaMasBarata() {
         stockBajoDeRosa = List.of(
                 new ChatProducto(4L, "Amoxicilina", "Amoxicilina", "Cápsula 500 mg x 10", new BigDecimal("6.00"), 3, 5,
-                        1L, "Botica Salud Total", "Lurigancho-Chosica", null),
+                        1L, "Botica Salud Total", "Lurigancho-Chosica", null, null),
                 new ChatProducto(6L, "Loratadina", "Loratadina", "Tableta 10 mg x 10", new BigDecimal("3.50"), 5, 5,
-                        1L, "Botica Salud Total", "Lurigancho-Chosica", null));
+                        1L, "Botica Salud Total", "Lurigancho-Chosica", null, null));
         gemini.guion.add(pide(new LlamadaHerramienta("c1", "ver_stock_bajo", JSON.createObjectNode())));
         gemini.guion.add(GeminiException.tiempoAgotado("timeout"));
 
