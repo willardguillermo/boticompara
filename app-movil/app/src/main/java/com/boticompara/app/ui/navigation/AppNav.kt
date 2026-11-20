@@ -21,6 +21,9 @@ import com.boticompara.app.ui.auth.VerificarCorreoScreen
 import com.boticompara.app.ui.busqueda.SearchScreen
 import com.boticompara.app.ui.detalle.ProductoDetalleScreen
 import com.boticompara.app.ui.favoritos.FavoritosScreen
+import com.boticompara.app.ui.reservas.MisReservasScreen
+import com.boticompara.app.ui.reservas.RUTA_RESERVA
+import com.boticompara.app.ui.reservas.ReservaDetalleScreen
 import com.boticompara.app.ui.perfil.ProfileScreen
 
 @Composable
@@ -59,6 +62,22 @@ fun AppNav(
         ) { backStackEntry ->
             val productoId = backStackEntry.arguments?.getLong("productoId") ?: 0L
             ProductoDetalleScreen(productoId = productoId, navController = navController)
+        }
+
+        // H76: historial de reservas; H73, H75, H76: detalle (nueva = true al acabar de crearla)
+        composable("reservas") { MisReservasScreen(navController) }
+        composable(
+            route = RUTA_RESERVA,
+            arguments = listOf(
+                navArgument("reservaId") { type = NavType.LongType },
+                navArgument("nueva") { type = NavType.BoolType; defaultValue = false }
+            )
+        ) { backStackEntry ->
+            ReservaDetalleScreen(
+                reservaId = backStackEntry.arguments?.getLong("reservaId") ?: 0L,
+                nueva = backStackEntry.arguments?.getBoolean("nueva") ?: false,
+                navController = navController
+            )
         }
     }
 }
