@@ -412,7 +412,7 @@ Cada medicamento del catálogo maestro puede tener su **condición de venta** (c
 | `condicionVenta` | Significa | En la app del comprador |
 |---|---|---|
 | `"SIN_RECETA"` | Venta libre | Sin aviso |
-| `"CON_RECETA"` | Se vende con receta médica | Etiqueta "Con receta". Se puede reservar; al reservar la app avisa: "Presenta tu receta médica al recoger; sin ella la botica no puede entregarlo" |
+| `"CON_RECETA"` | Se vende con receta médica | Etiqueta "Requiere receta médica". Se puede reservar; al reservar la app avisa: "Presenta tu receta médica al recoger; sin ella la botica no puede entregarlo" |
 | `"RECETA_RETENIDA"` | Psicofármacos y estupefacientes: la botica se queda con la receta | Etiqueta "Receta retenida". **No se puede reservar** (`POST /reservas` → 409, sección 9) |
 | `null` | Sin información | Sin etiqueta; se reserva como cualquier producto |
 
