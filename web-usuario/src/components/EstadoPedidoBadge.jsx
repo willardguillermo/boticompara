@@ -11,9 +11,12 @@ export default function EstadoPedidoBadge({ estado }) {
   )
 }
 
-/** H72: "Requiere receta" o "Receta retenida", con el mismo estilo que el estado. */
-export function RecetaPedidoBadge({ pedido }) {
-  const etiqueta = etiquetaReceta(pedido)
+/**
+ * H72: "Requiere receta" (o "Requiere receta médica" con completa) o "Receta retenida",
+ * con el mismo estilo que el estado.
+ */
+export function RecetaPedidoBadge({ pedido, completa = false }) {
+  const etiqueta = etiquetaReceta(pedido, { completa })
   if (!etiqueta) return null
   return (
     <span className="estado estado-pedido estado-pedido-receta">

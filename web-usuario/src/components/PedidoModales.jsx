@@ -76,7 +76,7 @@ export function DetallePedidoModal({ pedido, ahora, onCerrar, onActualizado, onA
       <div className="formulario">
         <p className="etiquetas-pedido">
           <EstadoPedidoBadge estado={pedido.estado} />
-          <RecetaPedidoBadge pedido={pedido} />
+          <RecetaPedidoBadge pedido={pedido} completa />
         </p>
         <dl className="detalle-pedido">
           <div>

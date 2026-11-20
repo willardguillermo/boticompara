@@ -44,11 +44,16 @@ export const MOTIVO_SIN_STOCK = 'Sin stock disponible'
  * pero una reserva anterior a esa condición sí puede existir.
  */
 const ETIQUETAS_RECETA = {
-  CON_RECETA: 'Requiere receta',
-  RECETA_RETENIDA: 'Receta retenida',
+  // En la tabla va la versión corta por espacio; en el detalle, la completa
+  CON_RECETA: { corta: 'Requiere receta', completa: 'Requiere receta médica' },
+  RECETA_RETENIDA: { corta: 'Receta retenida', completa: 'Receta retenida' },
 }
 
-export const etiquetaReceta = (pedido) => ETIQUETAS_RECETA[pedido.condicionVenta] ?? null
+export const etiquetaReceta = (pedido, { completa = false } = {}) => {
+  const etiquetas = ETIQUETAS_RECETA[pedido.condicionVenta]
+  if (!etiquetas) return null
+  return completa ? etiquetas.completa : etiquetas.corta
+}
 
 /** El recordatorio solo tiene sentido mientras el pedido aún se puede entregar. */
 export const pedirReceta = (pedido) => etiquetaReceta(pedido) !== null && ACTIVOS.includes(pedido.estado)
