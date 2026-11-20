@@ -113,4 +113,31 @@ interface ApiService {
     suspend fun marcarTodasLeidas(
         @Header("Authorization") auth: String
     ): Response<Unit>
+
+    // H72, H73, H74: reservar un producto (201 con la reserva PENDIENTE y su código)
+    @POST("reservas")
+    suspend fun crearReserva(
+        @Header("Authorization") auth: String,
+        @Body request: ReservaRequest
+    ): Response<ReservaResponse>
+
+    // H76: historial de reservas del comprador, de la más reciente a la más antigua (máx. 100)
+    @GET("reservas/mias")
+    suspend fun obtenerMisReservas(
+        @Header("Authorization") auth: String
+    ): Response<List<ReservaResponse>>
+
+    // H76: detalle de una reserva propia
+    @GET("reservas/{id}")
+    suspend fun obtenerReserva(
+        @Header("Authorization") auth: String,
+        @Path("id") id: Long
+    ): Response<ReservaResponse>
+
+    // H75: cancelar una reserva PENDIENTE, CONFIRMADA o LISTA (sin cuerpo)
+    @PATCH("reservas/{id}/cancelar")
+    suspend fun cancelarReserva(
+        @Header("Authorization") auth: String,
+        @Path("id") id: Long
+    ): Response<ReservaResponse>
 }

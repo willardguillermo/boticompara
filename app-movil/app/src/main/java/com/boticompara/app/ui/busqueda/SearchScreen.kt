@@ -395,7 +395,8 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                                             boticaDistrito = producto.boticaDistrito,
                                             distanciaKm = producto.distanciaKm,
                                             esMasBarato = if (vm.ordenCercanas) producto.precio == precioMinimo else indice == 0,
-                                            onClick = { navController.navigate("detalle/${producto.productoId}") }
+                                            onClick = { navController.navigate("detalle/${producto.productoId}") },
+                                            condicionVenta = producto.condicionVenta
                                         )
                                     }
                                 }

@@ -69,6 +69,18 @@ class ProductoDetalleViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    // H74: vuelve a leer el producto sin la pantalla de carga (por ejemplo, tras un 409 de stock
+    // al reservar) para que la etiqueta de stock muestre el valor actual
+    fun actualizarProducto(productoId: Long) {
+        viewModelScope.launch {
+            when (val resultado = repository.obtenerDetalle(productoId)) {
+                is ResultadoDetalle.Exito -> productoDetalle = resultado.producto
+                ResultadoDetalle.SesionVencida -> sesionVencida = true
+                else -> Unit   // se mantiene lo que ya se ve; el mensaje del 409 ya está en la hoja
+            }
+        }
+    }
+
     private suspend fun cargarAlternativas(productoId: Long) {
         cargandoAlternativas = true
         errorAlternativas = false
