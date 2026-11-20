@@ -65,7 +65,7 @@ class AlternativasServiceTest {
 
     private static AlternativaResponse alt(long id, String precio, String tipo) {
         return new AlternativaResponse(id, "Producto " + id, "Paracetamol", "Tableta 500 mg x 10",
-                new BigDecimal(precio), 10, id, "Botica " + id, "Av. " + id, "Chosica", tipo, null);
+                new BigDecimal(precio), 10, id, "Botica " + id, "Av. " + id, "Chosica", tipo, null, null);
     }
 
     private void consultadoEs(List<Consultado> filas) {
@@ -96,12 +96,14 @@ class AlternativasServiceTest {
         when(rs.getString("botica_nombre")).thenReturn("FarmaVida");
         when(rs.getString("botica_direccion")).thenReturn("Jr. Trujillo 210");
         when(rs.getString("botica_distrito")).thenReturn("Lurigancho-Chosica");
+        when(rs.getString("condicion_venta")).thenReturn("CON_RECETA");
         return rs;
     }
 
     private static AlternativaResponse esperada(String tipo) {
         return new AlternativaResponse(13L, "Paracetamol Genérico", "Paracetamol", "Tableta 500 mg x 10",
-                new BigDecimal("2.20"), 90, 2L, "FarmaVida", "Jr. Trujillo 210", "Lurigancho-Chosica", tipo, null);
+                new BigDecimal("2.20"), 90, 2L, "FarmaVida", "Jr. Trujillo 210", "Lurigancho-Chosica", tipo, null,
+                "CON_RECETA");
     }
 
     @Test

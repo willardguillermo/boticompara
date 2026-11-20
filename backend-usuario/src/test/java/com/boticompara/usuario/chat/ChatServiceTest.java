@@ -191,7 +191,7 @@ class ChatServiceTest {
     private static BusquedaResponse fila(long id) {
         return new BusquedaResponse(id, "Paracetamol " + id, "Paracetamol", "Tableta 500 mg x 10",
                 new BigDecimal("2.20"), 90, 2L, "FarmaVida", "Jr. Trujillo 210", "Lurigancho-Chosica",
-                new BigDecimal("-11.940001"), new BigDecimal("-76.700002"), new BigDecimal("1.25"));
+                new BigDecimal("-11.940001"), new BigDecimal("-76.700002"), new BigDecimal("1.25"), null);
     }
 
     private void laBusquedaDevuelve(String texto, long desde, long hasta) {
@@ -368,7 +368,7 @@ class ChatServiceTest {
     void lasAlternativasNoSeRegistranEnElReporteDeComparaciones() {
         when(alternativas.alternativasSinRegistro(7L)).thenReturn(new AlternativasResponse(7L, false, List.of(
                 new AlternativaResponse(13L, "Paracetamol Genérico", "Paracetamol", "Tableta", new BigDecimal("2.20"),
-                        90, 2L, "FarmaVida", "Jr. Trujillo 210", "Chosica", "EQUIVALENTE", new BigDecimal("12.0")))));
+                        90, 2L, "FarmaVida", "Jr. Trujillo 210", "Chosica", "EQUIVALENTE", new BigDecimal("12.0"), null))));
         gemini.guion.add(pide(new LlamadaHerramienta("c1", "buscar_alternativas",
                 JSON.createObjectNode().put("productoId", 7))));
         gemini.guion.add(texto("Hay una alternativa."));

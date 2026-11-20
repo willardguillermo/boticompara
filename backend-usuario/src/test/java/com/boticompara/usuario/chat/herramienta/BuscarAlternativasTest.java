@@ -41,7 +41,7 @@ class BuscarAlternativasTest {
     private static AlternativaResponse alt(long id) {
         return new AlternativaResponse(id, "Producto " + id, "Paracetamol", "Tableta 500 mg x 10",
                 new BigDecimal("2.20"), 10, 2L, "FarmaVida", "Jr. Trujillo 210", "Chosica", "EQUIVALENTE",
-                new BigDecimal("12.0"));
+                new BigDecimal("12.0"), null);
     }
 
     @Test

@@ -38,6 +38,7 @@ public class PedidoService {
     private final ProductoRepository productos;
     private final ReservaRepository reservas;
     private final UsuarioRepository usuarios;
+    private final CondicionVentaService condiciones;
 
     /** H77, H81: pedidos de la botica del dueño. estado vacío = todos. */
     @Transactional(readOnly = true)
@@ -166,6 +167,8 @@ public class PedidoService {
         Map<Long, Usuario> users = usuarios.findAllById(
                         lista.stream().map(Reserva::getUsuarioId).distinct().toList())
                 .stream().collect(Collectors.toMap(Usuario::getId, Function.identity()));
+        Map<Long, String> conds = condiciones.deMedicamentos(
+                prods.values().stream().map(Producto::getMedicamentoId).toList());
         return lista.stream()
                 .map(r -> {
                     Producto p = prods.get(r.getProductoId());
@@ -173,7 +176,8 @@ public class PedidoService {
                     Long disponible = (r.getEstado() == EstadoReserva.PENDIENTE && p != null)
                             ? disponibleParaPedido(p, r)
                             : null;
-                    return PedidoResponse.from(r, p, u == null ? null : u.getNombre(), disponible);
+                    return PedidoResponse.from(r, p, u == null ? null : u.getNombre(), disponible,
+                            p == null ? null : conds.get(p.getMedicamentoId()));
                 })
                 .toList();
     }
