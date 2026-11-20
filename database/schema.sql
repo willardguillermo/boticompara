@@ -126,6 +126,9 @@ create unique index if not exists uq_principio_activo_nombre
 -- MEDICAMENTO: catálogo maestro. Los productos de cada botica pueden
 -- enlazarse a un medicamento con producto.medicamento_id.
 -- oculto = true lo retira de la búsqueda sin borrarlo.
+-- condicion_venta (H72, DIGEMID): SIN_RECETA, CON_RECETA o RECETA_RETENIDA
+-- (psicofármacos y estupefacientes, no se reservan); null = sin información.
+-- En la BD que ya existe se agregó con v6_receta.sql.
 -- ---------------------------------------------------------------------
 create table if not exists medicamento (
   id                         bigserial primary key,
@@ -140,8 +143,11 @@ create table if not exists medicamento (
   forma_farmaceutica         varchar(100),                 -- H46
   titular                    varchar(200),                 -- H46
   codigo_digemid             varchar(30),                  -- H46
+  condicion_venta            varchar(20),                  -- H72
   -- Destino de la FK compuesta de medicamento_grupo
-  constraint uq_medicamento_id_principio unique (id, principio_activo_id)
+  constraint uq_medicamento_id_principio unique (id, principio_activo_id),
+  constraint chk_medicamento_condicion_venta
+    check (condicion_venta in ('SIN_RECETA', 'CON_RECETA', 'RECETA_RETENIDA'))
 );
 
 create index if not exists idx_medicamento_principio on medicamento(principio_activo_id);
@@ -439,7 +445,8 @@ select
   (m.fecha_vencimiento_registro >= current_date) as registro_vigente,
   coalesce(m.oculto, false)                      as oculto,
   b.latitud                                      as botica_latitud,
-  b.longitud                                     as botica_longitud
+  b.longitud                                     as botica_longitud,
+  m.condicion_venta                              as condicion_venta  -- H72
 from producto p
 join botica b on b.id = p.botica_id
 join usuario u on u.id = b.usuario_id
