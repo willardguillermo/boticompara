@@ -20,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -33,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.dto.ReservaResponse
 import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.theme.BotiComparaTheme
 import com.boticompara.app.ui.theme.Dimens
 
 // H73 (código al crearla), H75 (cancelar) y H76 (detalle de una reserva)
@@ -290,10 +292,15 @@ private fun ContenidoReserva(
 @Composable
 private fun TarjetaCodigo(reserva: ReservaResponse, nueva: Boolean, estado: EstadoReserva?) {
     val activa = estado?.cancelable == true
+    val colores = coloresDe(
+        ReglasReserva.tonoTarjetaCodigo(reserva.estado),
+        MaterialTheme.colorScheme,
+        BotiComparaTheme.extendedColors
+    )
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        colors = CardDefaults.cardColors(containerColor = colores.fondo),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -314,7 +321,7 @@ private fun TarjetaCodigo(reserva: ReservaResponse, nueva: Boolean, estado: Esta
                     "¡Listo! Tu reserva fue enviada",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = colores.contenido,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.semantics { heading() }
                 )
@@ -323,16 +330,16 @@ private fun TarjetaCodigo(reserva: ReservaResponse, nueva: Boolean, estado: Esta
             Text(
                 "Código de reserva",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                color = colores.contenido
             )
             Spacer(Modifier.height(Dimens.Space4))
-            SelectionContainerCodigo(reserva.codigo)
+            SelectionContainerCodigo(reserva.codigo, colores.contenido)
             Spacer(Modifier.height(Dimens.Space4))
             Text(
-                "Muestra este código en la botica",
+                ReglasReserva.mensajeCodigo(reserva.estado),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = colores.contenido,
                 textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(Dimens.Space16))
@@ -345,7 +352,7 @@ private fun TarjetaCodigo(reserva: ReservaResponse, nueva: Boolean, estado: Esta
                     icono = Icons.Rounded.Schedule,
                     texto = if (activa) "Válida hasta el ${FechaLima.formatear(vence)}"
                     else "Venció el ${FechaLima.formatear(vence)}",
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = colores.contenido,
                     estilo = MaterialTheme.typography.bodyMedium,
                     peso = FontWeight.SemiBold
                 )
@@ -355,7 +362,7 @@ private fun TarjetaCodigo(reserva: ReservaResponse, nueva: Boolean, estado: Esta
 }
 
 @Composable
-private fun SelectionContainerCodigo(codigo: String) {
+private fun SelectionContainerCodigo(codigo: String, color: Color) {
     // Para TalkBack se lee carácter por carácter: "B C guion 7 K 2 Q X M"
     val lectura = codigo.map { if (it == '-') "guion" else it.toString() }.joinToString(" ")
     androidx.compose.foundation.text.selection.SelectionContainer {
@@ -365,7 +372,7 @@ private fun SelectionContainerCodigo(codigo: String) {
             fontWeight = FontWeight.Bold,
             fontSize = 36.sp,
             letterSpacing = 2.sp,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            color = color,
             textAlign = TextAlign.Center,
             modifier = Modifier.semantics { contentDescription = "Código $lectura" }
         )

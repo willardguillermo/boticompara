@@ -14,7 +14,7 @@ import kotlin.coroutines.cancellation.CancellationException
 sealed interface ResultadoReserva {
     data class Exito(val reserva: ReservaResponse) : ResultadoReserva
     data object SesionVencida : ResultadoReserva                     // 401: token vencido
-    data class Rechazada(val mensaje: String) : ResultadoReserva     // 400, 403, 404, 409: mensaje del servidor
+    data class Rechazada(val mensaje: String, val codigoHttp: Int) : ResultadoReserva   // 400, 403, 404, 409: mensaje del servidor
     data object ErrorServidor : ResultadoReserva                     // cualquier otro código HTTP
     data object SinConexion : ResultadoReserva                       // no se pudo llegar al backend
 }
@@ -83,7 +83,7 @@ class ReservaRepository(context: Context) {
                     ResultadoReserva.SesionVencida
                 }
                 response.code() in CODIGOS_CON_MENSAJE ->
-                    ResultadoReserva.Rechazada(mensajeDelServidor(response) ?: mensajePorDefecto)
+                    ResultadoReserva.Rechazada(mensajeDelServidor(response) ?: mensajePorDefecto, response.code())
                 else -> ResultadoReserva.ErrorServidor
             }
         } catch (e: CancellationException) {

@@ -78,6 +78,18 @@ fun ProductoDetalleScreen(
         }
     }
 
+    // H74: tras un 409 al reservar se recarga el stock del producto
+    LaunchedEffect(reservarVm.recargarProducto) {
+        if (reservarVm.recargarProducto) {
+            reservarVm.productoRecargado()
+            vm.actualizarProducto(productoId)
+        }
+    }
+
+    LaunchedEffect(vm.productoDetalle?.stock) {
+        vm.productoDetalle?.let { reservarVm.ajustarAlStock(it.stock) }
+    }
+
     LaunchedEffect(vm.mensajeFavorito) {
         vm.mensajeFavorito?.let {
             snackbarHostState.showSnackbar(it)

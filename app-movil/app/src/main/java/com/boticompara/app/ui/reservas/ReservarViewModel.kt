@@ -27,6 +27,10 @@ class ReservarViewModel(application: Application) : AndroidViewModel(application
     var sesionVencida by mutableStateOf(false)
         private set
 
+    // H74: tras un 409 el stock del detalle puede estar desactualizado; la pantalla lo recarga
+    var recargarProducto by mutableStateOf(false)
+        private set
+
     fun iniciar() {
         cantidad = CantidadReserva.MINIMA
         mensajeError = null
@@ -35,6 +39,11 @@ class ReservarViewModel(application: Application) : AndroidViewModel(application
     fun aumentar(stock: Int) {
         cantidad = CantidadReserva.aumentar(cantidad, stock)
         mensajeError = null
+    }
+
+    // Si el stock bajó al recargar el detalle, la cantidad elegida no puede quedar por encima
+    fun ajustarAlStock(stock: Int) {
+        cantidad = CantidadReserva.limitar(cantidad, stock)
     }
 
     fun disminuir(stock: Int) {
@@ -52,12 +61,19 @@ class ReservarViewModel(application: Application) : AndroidViewModel(application
                 is ResultadoReserva.Exito -> reservaCreada = resultado.reserva
                 ResultadoReserva.SesionVencida -> sesionVencida = true
                 // 404 y 409: "Solo hay 2 unidades disponibles…", "Ya tienes una reserva activa…"
-                is ResultadoReserva.Rechazada -> mensajeError = resultado.mensaje
+                is ResultadoReserva.Rechazada -> {
+                    mensajeError = resultado.mensaje
+                    if (resultado.codigoHttp == 409) recargarProducto = true
+                }
                 ResultadoReserva.SinConexion -> mensajeError = "No se pudo conectar con el servidor"
                 ResultadoReserva.ErrorServidor -> mensajeError = "No se pudo crear la reserva. Inténtalo de nuevo."
             }
             enviando = false
         }
+    }
+
+    fun productoRecargado() {
+        recargarProducto = false
     }
 
     fun reservaCreadaMostrada() {

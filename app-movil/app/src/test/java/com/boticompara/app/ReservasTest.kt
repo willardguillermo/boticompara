@@ -95,6 +95,35 @@ class ReservasTest {
         assertEquals(TonoEstado.ERROR, EstadoReserva.RECHAZADA.tono)
     }
 
+    // ---- H73, H76: tarjeta del código según el estado ----
+
+    @Test
+    fun elTextoDeLaTarjetaDependeDelEstado() {
+        listOf("PENDIENTE", "CONFIRMADA", "LISTA").forEach {
+            assertEquals("Muestra este código en la botica", ReglasReserva.mensajeCodigo(it))
+        }
+        assertEquals("Esta reserva fue rechazada", ReglasReserva.mensajeCodigo("RECHAZADA"))
+        assertEquals("Cancelaste esta reserva", ReglasReserva.mensajeCodigo("CANCELADA"))
+        assertEquals("Esta reserva venció", ReglasReserva.mensajeCodigo("VENCIDA"))
+        assertEquals("Ya recogiste este pedido", ReglasReserva.mensajeCodigo("ENTREGADA"))
+        assertEquals("Esta reserva ya no está activa", ReglasReserva.mensajeCodigo("OTRO"))
+    }
+
+    @Test
+    fun laTarjetaUsaColorDeExitoSoloSiEstaActiva() {
+        val esquema = lightColorScheme()
+        fun colores(estado: String) = coloresDe(ReglasReserva.tonoTarjetaCodigo(estado), esquema, LightExtendedColors)
+
+        listOf("PENDIENTE", "CONFIRMADA", "LISTA").forEach {
+            assertEquals(esquema.primaryContainer, colores(it).fondo)
+            assertEquals(esquema.onPrimaryContainer, colores(it).contenido)
+        }
+        listOf("RECHAZADA", "CANCELADA", "VENCIDA", "ENTREGADA", "OTRO").forEach {
+            assertEquals("Fondo neutro para $it", esquema.surfaceContainerHighest, colores(it).fondo)
+            assertEquals(esquema.onSurfaceVariant, colores(it).contenido)
+        }
+    }
+
     // ---- H75: cuándo se puede cancelar ----
 
     private val ahora = FechaLima.aMilis("2026-11-12T20:00:00Z")!!
