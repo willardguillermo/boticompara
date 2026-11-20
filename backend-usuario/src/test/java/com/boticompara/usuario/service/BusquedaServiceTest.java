@@ -49,7 +49,7 @@ class BusquedaServiceTest {
     private ProductoDetalleResponse ejemplo() {
         return new ProductoDetalleResponse(9L, "Paracetamol Genérico", "Paracetamol", "Tableta 500 mg x 10",
                 new BigDecimal("2.20"), 90, 2L, "FarmaVida", "Jr. Trujillo 210", "Lurigancho-Chosica",
-                "014567890");
+                "014567890", "SIN_RECETA");
     }
 
     private void vistaDevuelve(List<ProductoDetalleResponse> filas) {
@@ -109,13 +109,14 @@ class BusquedaServiceTest {
         when(rs.getString("botica_nombre")).thenReturn("FarmaVida");
         when(rs.getString("botica_direccion")).thenReturn("Jr. Trujillo 210");
         when(rs.getString("botica_distrito")).thenReturn("Lurigancho-Chosica");
-        // botica_telefono sin stub: el mock devuelve null, como una botica sin teléfono
+        when(rs.getString("condicion_venta")).thenReturn("RECETA_RETENIDA");
+        when(rs.getString("botica_telefono")).thenReturn(null); // una botica sin teléfono
 
         ProductoDetalleResponse r = mapper.getValue().mapRow(rs, 0);
 
         assertEquals(new ProductoDetalleResponse(9L, "Paracetamol Genérico", "Paracetamol",
                 "Tableta 500 mg x 10", new BigDecimal("2.20"), 90, 2L, "FarmaVida",
-                "Jr. Trujillo 210", "Lurigancho-Chosica", null), r);
+                "Jr. Trujillo 210", "Lurigancho-Chosica", null, "RECETA_RETENIDA"), r);
     }
 
     // ---------- H27: búsqueda por cercanía ----------
@@ -141,7 +142,7 @@ class BusquedaServiceTest {
     private static BusquedaResponse fila(long id, String precio, String lat, String lng) {
         return new BusquedaResponse(id, "Paracetamol " + id, "Paracetamol", "Tableta 500 mg x 10",
                 new BigDecimal(precio), 10, id, "Botica " + id, "Av. " + id, "Chosica",
-                lat == null ? null : new BigDecimal(lat), lng == null ? null : new BigDecimal(lng), null);
+                lat == null ? null : new BigDecimal(lat), lng == null ? null : new BigDecimal(lng), null, null);
     }
 
     /** La base ya devuelve las filas ordenadas por precio ascendente. */
@@ -205,12 +206,41 @@ class BusquedaServiceTest {
         when(rs.getBigDecimal("precio")).thenReturn(new BigDecimal("2.20"));
         when(rs.getBigDecimal("botica_latitud")).thenReturn(new BigDecimal("-11.937200"));
         when(rs.getBigDecimal("botica_longitud")).thenReturn(new BigDecimal("-76.695800"));
+        // Los demás textos no importan aquí: solo condicion_venta tiene valor
+        when(rs.getString(anyString()))
+                .thenAnswer(inv -> "condicion_venta".equals(inv.getArgument(0)) ? "CON_RECETA" : null);
 
         BusquedaResponse fila = mapperBusqueda.getValue().mapRow(rs, 0);
 
         assertEquals(new BigDecimal("-11.937200"), fila.boticaLatitud());
         assertEquals(new BigDecimal("-76.695800"), fila.boticaLongitud());
         assertNull(fila.distanciaKm());
+        assertEquals("CON_RECETA", fila.condicionVenta());
+    }
+
+    @Test
+    void buscarYDetalle_leenLaCondicionDeVentaDeLaVista() {
+        baseDevuelve();
+        service.buscar("clonazepam", "nombre", null, null, null, null);
+        vistaDevuelve(List.of(ejemplo()));
+        service.detalle(9L);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc, org.mockito.Mockito.times(2)).query(sql.capture(), any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<Object>>any());
+        sql.getAllValues().forEach(s -> assertTrue(s.contains("condicion_venta from v_producto_busqueda"), s));
+    }
+
+    @Test
+    void buscar_conUbicacion_conservaLaCondicionDeVenta() {
+        baseDevuelve(new BusquedaResponse(1L, "Clonazepam Genérico", "Clonazepam", "Tableta 2 mg x 30",
+                new BigDecimal("8.00"), 10, 1L, "Salud Total", "Av. 1", "Chosica",
+                new BigDecimal("-11.942500"), new BigDecimal("-76.689000"), null, "RECETA_RETENIDA"));
+
+        List<BusquedaResponse> r = service.buscar("clona", "nombre", null, LAT, LNG, null);
+
+        assertEquals(new BigDecimal("1.09"), r.get(0).distanciaKm());
+        assertEquals("RECETA_RETENIDA", r.get(0).condicionVenta());
     }
 
     @Test

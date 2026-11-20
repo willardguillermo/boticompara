@@ -6,15 +6,17 @@ import java.math.BigDecimal;
  * H36: producto que el comprador puede usar en lugar del consultado.
  * tipoCoincidencia: EQUIVALENTE (mismo grupo de equivalencia) o PRINCIPIO_ACTIVO (respaldo por texto).
  * ahorroPorcentaje (H37): null si no es más barato que el consultado.
+ * condicionVenta (H72): la de su propio medicamento enlazado (null si no está enlazada).
  */
 public record AlternativaResponse(Long productoId, String nombreComercial, String principioActivo,
                                   String presentacion, BigDecimal precio, Integer stock,
                                   Long boticaId, String boticaNombre, String boticaDireccion,
                                   String boticaDistrito, String tipoCoincidencia,
-                                  BigDecimal ahorroPorcentaje) {
+                                  BigDecimal ahorroPorcentaje, String condicionVenta) {
 
     public AlternativaResponse conAhorro(BigDecimal ahorro) {
         return new AlternativaResponse(productoId, nombreComercial, principioActivo, presentacion, precio, stock,
-                boticaId, boticaNombre, boticaDireccion, boticaDistrito, tipoCoincidencia, ahorro);
+                boticaId, boticaNombre, boticaDireccion, boticaDistrito, tipoCoincidencia, ahorro,
+                condicionVenta);
     }
 }

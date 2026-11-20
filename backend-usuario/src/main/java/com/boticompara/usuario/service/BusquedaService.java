@@ -66,7 +66,7 @@ public class BusquedaService {
         }
 
         String sql = "select producto_id, nombre_comercial, principio_activo, presentacion, precio, stock, "
-                + "botica_id, botica_nombre, botica_direccion, botica_distrito, botica_latitud, botica_longitud "
+                + "botica_id, botica_nombre, botica_direccion, botica_distrito, botica_latitud, botica_longitud, condicion_venta "
                 + "from v_producto_busqueda where lower(" + columna + ") like :patron "
                 + "and " + FILTRO_VISIBLE + " "
                 + "order by precio " + direccion + ", botica_nombre asc";
@@ -87,7 +87,8 @@ public class BusquedaService {
                         rs.getString("botica_distrito"),
                         rs.getBigDecimal("botica_latitud"),
                         rs.getBigDecimal("botica_longitud"),
-                        null));
+                        null,
+                        rs.getString("condicion_venta")));
 
         if (!conUbicacion) {
             return filas;
@@ -163,7 +164,7 @@ public class BusquedaService {
     @Transactional(readOnly = true)
     public ProductoDetalleResponse detalle(Long id) {
         String sql = "select producto_id, nombre_comercial, principio_activo, presentacion, precio, stock, "
-                + "botica_id, botica_nombre, botica_direccion, botica_distrito, botica_telefono "
+                + "botica_id, botica_nombre, botica_direccion, botica_distrito, botica_telefono, condicion_venta "
                 + "from v_producto_busqueda where producto_id = :id and " + FILTRO_VISIBLE;
 
         List<ProductoDetalleResponse> filas = jdbc.query(sql, new MapSqlParameterSource("id", id),
@@ -178,7 +179,8 @@ public class BusquedaService {
                         rs.getString("botica_nombre"),
                         rs.getString("botica_direccion"),
                         rs.getString("botica_distrito"),
-                        rs.getString("botica_telefono")));
+                        rs.getString("botica_telefono"),
+                        rs.getString("condicion_venta")));
 
         if (filas.isEmpty()) {
             throw ApiException.notFound("Producto no encontrado");

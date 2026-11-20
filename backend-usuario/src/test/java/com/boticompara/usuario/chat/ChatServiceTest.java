@@ -191,7 +191,7 @@ class ChatServiceTest {
     private static BusquedaResponse fila(long id) {
         return new BusquedaResponse(id, "Paracetamol " + id, "Paracetamol", "Tableta 500 mg x 10",
                 new BigDecimal("2.20"), 90, 2L, "FarmaVida", "Jr. Trujillo 210", "Lurigancho-Chosica",
-                new BigDecimal("-11.940001"), new BigDecimal("-76.700002"), new BigDecimal("1.25"));
+                new BigDecimal("-11.940001"), new BigDecimal("-76.700002"), new BigDecimal("1.25"), null);
     }
 
     private void laBusquedaDevuelve(String texto, long desde, long hasta) {
@@ -248,8 +248,8 @@ class ChatServiceTest {
         assertEquals("El más barato está en FarmaVida, a 2 soles con 20.", r.respuesta());
         assertFalse(r.respaldo());
         assertEquals(List.of(new ChatProducto(9L, "Paracetamol 9", "Paracetamol", "Tableta 500 mg x 10",
-                new BigDecimal("2.20"), 90, null, 2L, "FarmaVida", "Lurigancho-Chosica", new BigDecimal("1.25"))),
-                r.productos());
+                new BigDecimal("2.20"), 90, null, 2L, "FarmaVida", "Lurigancho-Chosica", new BigDecimal("1.25"),
+                null)), r.productos());
         List<Turno> turnos = gemini.pedidos.get(1).turnos();
         assertEquals(3, turnos.size());
         assertSame(paso.contenido(), ((Turno.Modelo) turnos.get(1)).contenido());
@@ -368,7 +368,7 @@ class ChatServiceTest {
     void lasAlternativasNoSeRegistranEnElReporteDeComparaciones() {
         when(alternativas.alternativasSinRegistro(7L)).thenReturn(new AlternativasResponse(7L, false, List.of(
                 new AlternativaResponse(13L, "Paracetamol Genérico", "Paracetamol", "Tableta", new BigDecimal("2.20"),
-                        90, 2L, "FarmaVida", "Jr. Trujillo 210", "Chosica", "EQUIVALENTE", new BigDecimal("12.0")))));
+                        90, 2L, "FarmaVida", "Jr. Trujillo 210", "Chosica", "EQUIVALENTE", new BigDecimal("12.0"), null))));
         gemini.guion.add(pide(new LlamadaHerramienta("c1", "buscar_alternativas",
                 JSON.createObjectNode().put("productoId", 7))));
         gemini.guion.add(texto("Hay una alternativa."));
@@ -788,9 +788,9 @@ class ChatServiceTest {
     void elRespaldoDelStockBajoDelDuenoNoHablaDeLaMasBarata() {
         stockBajoDeRosa = List.of(
                 new ChatProducto(4L, "Amoxicilina", "Amoxicilina", "Cápsula 500 mg x 10", new BigDecimal("6.00"), 3, 5,
-                        1L, "Botica Salud Total", "Lurigancho-Chosica", null),
+                        1L, "Botica Salud Total", "Lurigancho-Chosica", null, null),
                 new ChatProducto(6L, "Loratadina", "Loratadina", "Tableta 10 mg x 10", new BigDecimal("3.50"), 5, 5,
-                        1L, "Botica Salud Total", "Lurigancho-Chosica", null));
+                        1L, "Botica Salud Total", "Lurigancho-Chosica", null, null));
         gemini.guion.add(pide(new LlamadaHerramienta("c1", "ver_stock_bajo", JSON.createObjectNode())));
         gemini.guion.add(GeminiException.tiempoAgotado("timeout"));
 
