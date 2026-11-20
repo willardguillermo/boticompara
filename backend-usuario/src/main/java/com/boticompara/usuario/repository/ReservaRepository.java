@@ -58,4 +58,13 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     long unidadesApartadasSinEsta(@Param("productoId") Long productoId,
                                   @Param("estados") Collection<EstadoReserva> estados,
                                   @Param("id") Long id);
+
+    /** Unidades comprometidas de un producto: suma de CONFIRMADA y LISTA (API.md, sección 4). */
+    @Query("select coalesce(sum(r.cantidad), 0) from Reserva r "
+            + "where r.productoId = :productoId and r.estado in :estados")
+    long unidadesComprometidas(@Param("productoId") Long productoId,
+                               @Param("estados") Collection<EstadoReserva> estados);
+
+    /** Baja de un producto: hay pedidos confirmados o listos (API.md, sección 4). */
+    boolean existsByProductoIdAndEstadoIn(Long productoId, Collection<EstadoReserva> estados);
 }
