@@ -50,12 +50,15 @@ def rango_de_fechas(fecha_desde, fecha_hasta, ahora=None):
     return desde, hasta, titulo
 
 
-def en_rango(consulta, desde, hasta):
-    """Filtra desde <= fecha < hasta; desde o hasta en None: sin límite por ese lado."""
+def en_rango(consulta, desde, hasta, campo='fecha'):
+    """
+    Filtra desde <= campo < hasta; desde o hasta en None: sin límite por ese lado.
+    campo es la columna de fecha (H95 usa actualizado_en y respondida_en).
+    """
     if desde:
-        consulta = consulta.filter(fecha__gte=desde)
+        consulta = consulta.filter(**{f'{campo}__gte': desde})
     if hasta:
-        consulta = consulta.filter(fecha__lt=hasta)
+        consulta = consulta.filter(**{f'{campo}__lt': hasta})
     return consulta
 
 
