@@ -37,6 +37,29 @@ export const sinStockParaAceptar = (pedido) =>
 export const TEXTO_SIN_STOCK = 'No hay stock suficiente para aceptar este pedido'
 export const MOTIVO_SIN_STOCK = 'Sin stock disponible'
 
+/**
+ * H72: condición de venta del medicamento enlazado (condicionVenta del pedido). Solo las que
+ * piden receta llevan etiqueta; SIN_RECETA y null (sin información) no muestran nada.
+ * RECETA_RETENIDA no debería llegar como pedido (POST /reservas lo impide desde el 20/11/2026),
+ * pero una reserva anterior a esa condición sí puede existir.
+ */
+const ETIQUETAS_RECETA = {
+  // En la tabla va la versión corta por espacio; en el detalle, la completa
+  CON_RECETA: { corta: 'Requiere receta', completa: 'Requiere receta médica' },
+  RECETA_RETENIDA: { corta: 'Receta retenida', completa: 'Receta retenida' },
+}
+
+export const etiquetaReceta = (pedido, { completa = false } = {}) => {
+  const etiquetas = ETIQUETAS_RECETA[pedido.condicionVenta]
+  if (!etiquetas) return null
+  return completa ? etiquetas.completa : etiquetas.corta
+}
+
+/** El recordatorio solo tiene sentido mientras el pedido aún se puede entregar. */
+export const pedirReceta = (pedido) => etiquetaReceta(pedido) !== null && ACTIVOS.includes(pedido.estado)
+
+export const TEXTO_RECETA = 'Pide la receta médica antes de entregar'
+
 export const MOTIVO_MIN = 10
 export const MOTIVO_MAX = 300
 
