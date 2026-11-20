@@ -1,5 +1,7 @@
 package com.boticompara.app.ui.reservas
 
+import com.boticompara.app.ui.components.ReglasCondicionVenta
+
 // Tono de color de cada estado. El color concreto sale del tema (EstadoReservaChip.kt)
 enum class TonoEstado { ALERTA, INFORMACION, EXITO, PRIMARIO, ERROR, NEUTRO, VENCIDO }
 
@@ -36,6 +38,11 @@ object ReglasReserva {
     // H73, H76: la tarjeta del código usa el color de éxito solo si la reserva sigue activa
     fun tonoTarjetaCodigo(estado: String?): TonoEstado =
         if (EstadoReserva.desde(estado)?.cancelable == true) TonoEstado.PRIMARIO else TonoEstado.NEUTRO
+
+    // H72: aviso de la receta en la reserva, solo si es CON_RECETA y sigue activa
+    fun mostrarAvisoReceta(estado: String?, condicionVenta: String?): Boolean =
+        EstadoReserva.desde(estado)?.cancelable == true &&
+            ReglasCondicionVenta.pideReceta(condicionVenta)
 
     // H75: solo se cancela desde PENDIENTE, CONFIRMADA o LISTA y si venceEn no pasó
     // (el servidor responde 409 "La reserva ya venció" aunque aún no la haya marcado VENCIDA)

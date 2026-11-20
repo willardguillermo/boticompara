@@ -139,6 +139,7 @@ fun ProductoDetalleScreen(
                 boticaNombre = productoReserva.boticaNombre,
                 precioUnitario = productoReserva.precio,
                 stock = productoReserva.stock,
+                condicionVenta = productoReserva.condicionVenta,
                 cantidad = reservarVm.cantidad,
                 enviando = reservarVm.enviando,
                 mensajeError = reservarVm.mensajeError,
@@ -195,6 +196,10 @@ fun ProductoDetalleScreen(
                                 Spacer(Modifier.height(Dimens.Space12))
 
                                 Etiqueta(texto = producto.principioActivo, icono = Icons.Rounded.Medication)
+                                if (ReglasCondicionVenta.etiqueta(producto.condicionVenta) != null) {
+                                    Spacer(Modifier.height(Dimens.Space8))
+                                    EtiquetaCondicionVenta(producto.condicionVenta)
+                                }
 
                                 if (!producto.fabricante.isNullOrEmpty()) {
                                     Spacer(Modifier.height(Dimens.Space8))
@@ -227,8 +232,11 @@ fun ProductoDetalleScreen(
                                     EtiquetaStock(producto.stock)
                                 }
 
-                                // H72: solo se reserva si hay stock
-                                if (producto.stock > 0) {
+                                // H72: solo se reserva si hay stock y no es de receta retenida
+                                if (ReglasCondicionVenta.esRecetaRetenida(producto.condicionVenta)) {
+                                    Spacer(Modifier.height(Dimens.Space16))
+                                    AvisoReceta(ReglasCondicionVenta.AVISO_RECETA_RETENIDA, retenida = true)
+                                } else if (ReglasCondicionVenta.sePuedeReservar(producto.stock, producto.condicionVenta)) {
                                     Spacer(Modifier.height(Dimens.Space16))
                                     BotiButton(
                                         text = "Reservar",
@@ -401,6 +409,10 @@ private fun AlternativaCard(alternativa: AlternativaResponse, onClick: () -> Uni
                 Etiqueta(texto = "Genérico equivalente", icono = Icons.Rounded.CheckCircle)
             } else {
                 Etiqueta(texto = "Mismo principio activo", icono = Icons.Rounded.Medication)
+            }
+            if (ReglasCondicionVenta.etiqueta(alternativa.condicionVenta) != null) {
+                Spacer(Modifier.height(Dimens.Space8))
+                EtiquetaCondicionVenta(alternativa.condicionVenta)
             }
             Spacer(Modifier.height(Dimens.Space12))
 

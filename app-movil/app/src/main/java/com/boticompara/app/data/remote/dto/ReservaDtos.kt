@@ -22,7 +22,8 @@ data class ReservaResponse(
     val motivoRechazo: String? = null,     // solo en RECHAZADA
     val venceEn: String? = null,
     val creadoEn: String,
-    val actualizadoEn: String? = null
+    val actualizadoEn: String? = null,
+    val condicionVenta: String? = null    // H72: la actual del medicamento enlazado
 )
 
 // Formato de error común de la API: se usa para mostrar el mensaje del servidor (404, 409)

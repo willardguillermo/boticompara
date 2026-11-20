@@ -36,8 +36,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.boticompara.app.ui.components.AvisoReceta
 import com.boticompara.app.ui.components.BotiButton
 import com.boticompara.app.ui.components.LineaConIcono
+import com.boticompara.app.ui.components.ReglasCondicionVenta
 import com.boticompara.app.ui.theme.Dimens
 
 // H72, H74: hoja inferior para elegir la cantidad (1 a 10) y confirmar la reserva
@@ -49,6 +51,7 @@ fun HojaReserva(
     boticaNombre: String,
     precioUnitario: Double,
     stock: Int,
+    condicionVenta: String?,
     cantidad: Int,
     enviando: Boolean,
     mensajeError: String?,
@@ -147,6 +150,12 @@ fun HojaReserva(
                 texto = "Apartas las unidades por 24 horas. Sigue el estado en Mis reservas.",
                 estilo = MaterialTheme.typography.bodySmall
             )
+
+            // H72: CON_RECETA se reserva, pero hay que llevar la receta
+            if (ReglasCondicionVenta.pideReceta(condicionVenta)) {
+                Spacer(Modifier.height(Dimens.Space12))
+                AvisoReceta(ReglasCondicionVenta.AVISO_CON_RECETA, retenida = false)
+            }
 
             if (mensajeError != null) {
                 Spacer(Modifier.height(Dimens.Space12))

@@ -165,6 +165,11 @@ private fun ContenidoReserva(
     ) {
         TarjetaCodigo(reserva = reserva, nueva = nueva, estado = estado)
 
+        if (ReglasReserva.mostrarAvisoReceta(reserva.estado, reserva.condicionVenta)) {
+            Spacer(Modifier.height(Dimens.Space16))
+            AvisoReceta(ReglasCondicionVenta.AVISO_CON_RECETA, retenida = false)
+        }
+
         if (estado == EstadoReserva.RECHAZADA) {
             Spacer(Modifier.height(Dimens.Space16))
             Card(
