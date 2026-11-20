@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Cargando from '../components/Cargando.jsx'
-import EstadoPedidoBadge from '../components/EstadoPedidoBadge.jsx'
+import EstadoPedidoBadge, { RecetaPedidoBadge } from '../components/EstadoPedidoBadge.jsx'
 import Icono from '../components/Icono.jsx'
 import {
   ConfirmarEntregaModal,
@@ -22,8 +22,10 @@ import { api } from '../services/index.js'
 import { formatoFechaHora, formatoSoles } from '../utils/formato.js'
 import {
   ESTADOS_PEDIDO,
+  TEXTO_RECETA,
   TEXTO_SIN_STOCK,
   esEstadoPedido,
+  pedirReceta,
   sePuedeRechazar,
   siguienteAccion,
   sinStockParaAceptar,
@@ -74,6 +76,8 @@ function TablaPedidos({ pedidos, ahora, procesando, onVer, onAvanzar, onRechazar
                 <span className="producto-pedido">
                   {p.nombreComercial}
                   <span className="texto-suave">{p.presentacion}</span>
+                  <RecetaPedidoBadge pedido={p} />
+                  {pedirReceta(p) && <span className="aviso-receta">{TEXTO_RECETA}</span>}
                 </span>
               </td>
               <td data-etiqueta="Cantidad" className="numero">

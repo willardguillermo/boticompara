@@ -9,14 +9,16 @@ import {
   MOTIVO_MAX,
   MOTIVO_MIN,
   MOTIVO_SIN_STOCK,
+  TEXTO_RECETA,
   TEXTO_SIN_STOCK,
+  pedirReceta,
   sePuedeRechazar,
   siguienteAccion,
   sinStockParaAceptar,
   tiempoParaVencer,
 } from '../utils/pedidos.js'
 import Alerta from './Alerta.jsx'
-import EstadoPedidoBadge from './EstadoPedidoBadge.jsx'
+import EstadoPedidoBadge, { RecetaPedidoBadge } from './EstadoPedidoBadge.jsx'
 import Icono from './Icono.jsx'
 import Modal from './Modal.jsx'
 
@@ -72,8 +74,9 @@ export function DetallePedidoModal({ pedido, ahora, onCerrar, onActualizado, onA
   return (
     <Modal titulo={`Pedido ${pedido.codigo}`} onCerrar={onCerrar}>
       <div className="formulario">
-        <p>
+        <p className="etiquetas-pedido">
           <EstadoPedidoBadge estado={pedido.estado} />
+          <RecetaPedidoBadge pedido={pedido} />
         </p>
         <dl className="detalle-pedido">
           <div>
@@ -162,6 +165,14 @@ export function DetallePedidoModal({ pedido, ahora, onCerrar, onActualizado, onA
           </p>
         )}
 
+        {pedirReceta(pedido) && (
+          <Alerta tipo="aviso">
+            <p id="detalle-receta">
+              <strong>{TEXTO_RECETA}.</strong> Si el comprador no la trae, no lo entregues.
+            </p>
+          </Alerta>
+        )}
+
         <Alerta tipo="error">{error && <p>{error}</p>}</Alerta>
 
         <div className="acciones-form">
@@ -184,7 +195,10 @@ export function DetallePedidoModal({ pedido, ahora, onCerrar, onActualizado, onA
               className="btn btn-primario btn-icono"
               onClick={avanzar}
               disabled={guardando || sinStock}
-              aria-describedby={sinStock ? 'detalle-sin-stock' : undefined}
+              aria-describedby={
+                [sinStock && 'detalle-sin-stock', pedirReceta(pedido) && 'detalle-receta'].filter(Boolean).join(' ') ||
+                undefined
+              }
             >
               <Icono nombre={accion.icono} /> {guardando ? 'Guardando...' : accion.texto}
             </button>
@@ -224,6 +238,13 @@ export function ConfirmarEntregaModal({ pedido, onCerrar, onConfirmar }) {
           Se descontarán <strong>{pedido.cantidad}</strong> {pedido.cantidad === 1 ? 'unidad' : 'unidades'} del stock
           {quedara >= 0 ? ` (quedarán ${quedara}).` : '.'} Este cambio no se puede deshacer.
         </p>
+        {pedirReceta(pedido) && (
+          <Alerta tipo="aviso">
+            <p>
+              <strong>{TEXTO_RECETA}.</strong> Este medicamento se vende con receta médica.
+            </p>
+          </Alerta>
+        )}
         <Alerta tipo="error">{error && <p>{error}</p>}</Alerta>
         <div className="acciones-form">
           <button type="button" className="btn btn-secundario" onClick={onCerrar} disabled={guardando}>
