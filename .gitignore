@@ -55,3 +55,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Cuenta de servicio de Firebase (backend): nunca al repo
+firebase-adminsdk*.json
+*-service-account*.json
