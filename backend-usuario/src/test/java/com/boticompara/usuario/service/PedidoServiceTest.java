@@ -96,7 +96,7 @@ class PedidoServiceTest {
     /** Deja que el servicio encuentre el pedido como si fuera de la botica del dueño. */
     private void pedidoDeMiBotica(Reserva r) {
         when(boticas.findByUsuarioId(DUENO)).thenReturn(Optional.of(botica()));
-        when(reservas.pedidoDeBotica(ID, BOTICA)).thenReturn(Optional.of(r));
+        when(reservas.bloquearPedidoDeBotica(ID, BOTICA)).thenReturn(Optional.of(r));
     }
 
     private void guardaLoQueRecibe() {
