@@ -11,6 +11,7 @@ import com.boticompara.usuario.service.AuthService;
 import com.boticompara.usuario.service.RecuperacionService;
 import com.boticompara.usuario.service.VerificacionService;
 import jakarta.validation.Valid;
+import com.boticompara.usuario.dto.GoogleLoginRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -38,6 +39,12 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return auth.login(request);
+    }
+
+    /** H67: login o alta con Google. El token lo verifica Firebase en el servidor. */
+    @PostMapping("/google")
+    public LoginResponse loginGoogle(@RequestBody GoogleLoginRequest request) {
+        return auth.loginGoogle(request.idToken());
     }
 
     /** H17: siempre responde 200, exista o no el correo. */

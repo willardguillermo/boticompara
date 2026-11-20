@@ -7,7 +7,9 @@ import com.boticompara.usuario.dto.UsuarioResponse;
 import com.boticompara.usuario.entity.Usuario;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.UsuarioRepository;
+import com.boticompara.usuario.security.GoogleIdentidad;
 import com.boticompara.usuario.security.JwtService;
+import com.boticompara.usuario.security.VerificadorGoogle;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class AuthService {
     private final UsuarioRepository usuarios;
     private final PasswordEncoder encoder;
     private final JwtService jwt;
+    private final VerificadorGoogle verificador;
 
     /** H1, H15: la contraseña se guarda siempre con BCrypt. */
     @Transactional
@@ -58,6 +61,48 @@ public class AuthService {
             throw ApiException.forbidden("Tu cuenta está suspendida hasta " + fechaLima(u.getSuspendidoHasta()));
         }
         return new LoginResponse(jwt.generar(u), "Bearer", UsuarioResponse.from(u));
+    }
+
+    /**
+     * H67: login o alta con Google (API.md, sección 1).
+     * El token se verifica primero. Si la cuenta ya está vinculada por google_uid, se valida su estado.
+     * Si no existe, se crea solo si el correo no tiene ninguna cuenta: no se vinculan cuentas existentes.
+     */
+    @Transactional
+    public LoginResponse loginGoogle(String idToken) {
+        GoogleIdentidad g = verificador.verificar(idToken);
+        Usuario u = usuarios.findByGoogleUid(g.uid())
+                .orElseGet(() -> crearDesdeGoogle(g));
+        if (!u.isActivo()) {
+            throw ApiException.forbidden("Tu cuenta fue dada de baja");
+        }
+        if (u.estaSuspendido()) {
+            throw ApiException.forbidden("Tu cuenta está suspendida hasta " + fechaLima(u.getSuspendidoHasta()));
+        }
+        return new LoginResponse(jwt.generar(u), "Bearer", UsuarioResponse.from(u));
+    }
+
+    private Usuario crearDesdeGoogle(GoogleIdentidad g) {
+        String correo = g.correo().trim().toLowerCase(Locale.ROOT);
+        if (usuarios.findByCorreoIgnoreCase(correo).isPresent()) {
+            throw ApiException.conflict("Ya existe una cuenta con este correo. Inicia sesión con tu contraseña");
+        }
+        Usuario u = new Usuario();
+        u.setNombre(nombreDe(g));
+        u.setCorreo(correo);
+        u.setPasswordHash(null);
+        u.setRol("COMPRADOR");
+        u.setGoogleUid(g.uid());
+        u.setCorreoVerificado(true);
+        return usuarios.save(u);
+    }
+
+    /** Nombre del claim name; si no viene, la parte del correo antes de la @ (API.md). */
+    static String nombreDe(GoogleIdentidad g) {
+        if (g.nombre() != null && !g.nombre().isBlank()) {
+            return g.nombre().trim();
+        }
+        return g.correo().substring(0, g.correo().indexOf('@'));
     }
 
     /** dd/MM/yyyy en hora de Lima, como pide el contrato. */
