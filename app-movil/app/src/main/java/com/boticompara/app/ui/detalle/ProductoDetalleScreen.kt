@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.LocalPharmacy
@@ -37,6 +38,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.dto.AlternativaResponse
 import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.reservas.HojaReserva
+import com.boticompara.app.ui.reservas.ReservarViewModel
 import com.boticompara.app.ui.theme.Dimens
 import java.util.Locale
 
@@ -45,9 +48,12 @@ import java.util.Locale
 fun ProductoDetalleScreen(
     productoId: Long,
     navController: NavController,
-    detalleViewModel: ProductoDetalleViewModel = viewModel()
+    detalleViewModel: ProductoDetalleViewModel = viewModel(),
+    reservarViewModel: ReservarViewModel = viewModel()
 ) {
     val vm = detalleViewModel
+    val reservarVm = reservarViewModel
+    var mostrarHojaReserva by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -55,11 +61,20 @@ fun ProductoDetalleScreen(
         vm.cargarDetalle(productoId)
     }
 
-    LaunchedEffect(vm.sesionVencida) {
-        if (vm.sesionVencida) {
+    LaunchedEffect(vm.sesionVencida, reservarVm.sesionVencida) {
+        if (vm.sesionVencida || reservarVm.sesionVencida) {
             navController.navigate("login") {
                 popUpTo(navController.graph.id) { inclusive = true }
             }
+        }
+    }
+
+    // H73: al crearse la reserva se abre su pantalla con el código de confirmación
+    LaunchedEffect(reservarVm.reservaCreada) {
+        reservarVm.reservaCreada?.let { reserva ->
+            mostrarHojaReserva = false
+            reservarVm.reservaCreadaMostrada()
+            navController.navigate("reserva/${reserva.id}?nueva=true")
         }
     }
 
@@ -104,6 +119,24 @@ fun ProductoDetalleScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
+        val productoReserva = vm.productoDetalle
+        if (mostrarHojaReserva && productoReserva != null) {
+            HojaReserva(
+                nombreProducto = productoReserva.nombreComercial,
+                presentacion = productoReserva.presentacion,
+                boticaNombre = productoReserva.boticaNombre,
+                precioUnitario = productoReserva.precio,
+                stock = productoReserva.stock,
+                cantidad = reservarVm.cantidad,
+                enviando = reservarVm.enviando,
+                mensajeError = reservarVm.mensajeError,
+                onDisminuir = { reservarVm.disminuir(productoReserva.stock) },
+                onAumentar = { reservarVm.aumentar(productoReserva.stock) },
+                onConfirmar = { reservarVm.reservar(productoReserva.productoId) },
+                onDismiss = { mostrarHojaReserva = false }
+            )
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -180,6 +213,20 @@ fun ProductoDetalleScreen(
                                     }
                                     Spacer(Modifier.weight(1f))
                                     EtiquetaStock(producto.stock)
+                                }
+
+                                // H72: solo se reserva si hay stock
+                                if (producto.stock > 0) {
+                                    Spacer(Modifier.height(Dimens.Space16))
+                                    BotiButton(
+                                        text = "Reservar",
+                                        onClick = {
+                                            reservarVm.iniciar()
+                                            mostrarHojaReserva = true
+                                        },
+                                        icon = Icons.Rounded.EventAvailable,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
                                 }
                             }
                         }
