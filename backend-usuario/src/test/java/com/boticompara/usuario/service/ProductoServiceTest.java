@@ -3,21 +3,20 @@ package com.boticompara.usuario.service;
 import com.boticompara.usuario.dto.ProductoRequest;
 import com.boticompara.usuario.dto.ProductoResponse;
 import com.boticompara.usuario.entity.Botica;
+import com.boticompara.usuario.entity.EstadoReserva;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.error.ApiException;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.HttpStatus;
-import org.mockito.InOrder;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
+import com.boticompara.usuario.repository.ReservaRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -26,32 +25,32 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ProductoServiceTest {
 
-    @Mock
-    BoticaRepository boticas;
+    @Mock BoticaRepository boticas;
+    @Mock ProductoRepository productos;
+    @Mock MedicamentoService medicamentos;
+    @Mock AlertaService alertas;
+    @Mock ApplicationEventPublisher eventos;
+    @Mock ReservaRepository reservas;
 
-    @Mock
-    ProductoRepository productos;
-
-    @Mock
-    MedicamentoService medicamentos;
-
-    @Mock
-    AlertaService alertas;
-
-    @Mock
-    ApplicationEventPublisher eventos;
-
-    @InjectMocks
     ProductoService service;
+
+    @BeforeEach
+    void crearServicio() {
+        // Orden del constructor: boticas, productos, medicamentos, alertas, eventos, reservas
+        service = new ProductoService(boticas, productos, medicamentos, alertas, eventos, reservas);
+    }
 
     private void conBoticaAprobada() {
         Botica b = new Botica();
@@ -70,6 +69,16 @@ class ProductoServiceTest {
                 new BigDecimal("8.50"), 40, stockMinimo, medicamentoId);
     }
 
+    private ProductoRequest requestConPrincipio(String principioActivo, Long medicamentoId) {
+        return new ProductoRequest("Panadol", principioActivo, "Tableta 500 mg x 10",
+                new BigDecimal("8.50"), 40, null, medicamentoId);
+    }
+
+    private ProductoRequest requestConPrecio(String precio) {
+        return new ProductoRequest("Panadol", "Paracetamol", "Tableta 500 mg x 10",
+                new BigDecimal(precio), 40, null, null);
+    }
+
     private Producto productoExistente(int stockMinimo) {
         Producto p = new Producto();
         p.setId(7L);
@@ -82,6 +91,8 @@ class ProductoServiceTest {
         p.setStockMinimo(stockMinimo);
         return p;
     }
+
+    // ---------- H8, H12: stock mínimo ----------
 
     @Test
     void crearSinStockMinimoUsaElValorPorDefecto() {
@@ -107,7 +118,7 @@ class ProductoServiceTest {
     @Test
     void actualizarSinStockMinimoConservaElActual() {
         conBoticaAprobada();
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(productoExistente(9)));
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
 
         ProductoResponse r = service.actualizar(10L, 7L, request(null));
@@ -119,12 +130,43 @@ class ProductoServiceTest {
     @Test
     void actualizarConStockMinimoLoCambia() {
         conBoticaAprobada();
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(productoExistente(9)));
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
 
         ProductoResponse r = service.actualizar(10L, 7L, request(20));
 
         assertEquals(20, r.stockMinimo());
+    }
+
+    // ---------- Stock comprometido (API.md, sección 4) ----------
+
+    @Test
+    void actualizarConStockMenorQueLasComprometidas_responde409() {
+        conBoticaAprobada();
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(productoExistente(9)));
+        when(reservas.unidadesComprometidas(7L, EstadoReserva.COMPROMETIDAS)).thenReturn(5L);
+        ProductoRequest pocoStock = new ProductoRequest("Panadol", "Paracetamol", "Tableta 500 mg x 10",
+                new BigDecimal("8.50"), 3, null, null);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.actualizar(10L, 7L, pocoStock));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("Tienes 5 unidades comprometidas en pedidos confirmados o listos para recoger; el stock no puede ser menor",
+                ex.getMessage());
+        verify(productos, never()).save(any(Producto.class));
+    }
+
+    @Test
+    void eliminarUnProductoConPedidosConfirmadosOListos_responde409() {
+        conBoticaAprobada();
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(productoExistente(9)));
+        when(reservas.existsByProductoIdAndEstadoIn(7L, EstadoReserva.COMPROMETIDAS)).thenReturn(true);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.eliminar(10L, 7L));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertTrue(ex.getMessage().startsWith("No puedes dar de baja un producto con pedidos confirmados"));
+        verify(productos, never()).save(any(Producto.class));
     }
 
     // ---------- H31: enlace con el catálogo maestro ----------
@@ -168,7 +210,7 @@ class ProductoServiceTest {
         conBoticaAprobada();
         Producto existente = productoExistente(9);
         existente.setMedicamentoId(12L);
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(existente));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(existente));
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
 
         ProductoResponse r = service.actualizar(10L, 7L, request(null));
@@ -181,7 +223,7 @@ class ProductoServiceTest {
         conBoticaAprobada();
         Producto existente = productoExistente(9);
         existente.setMedicamentoId(12L);
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(existente));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(existente));
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
 
         ProductoResponse r = service.actualizar(10L, 7L, request(null, 15L));
@@ -191,11 +233,6 @@ class ProductoServiceTest {
     }
 
     // ---------- D2: al enlazar se copia el principio activo del medicamento ----------
-
-    private ProductoRequest requestConPrincipio(String principioActivo, Long medicamentoId) {
-        return new ProductoRequest("Panadol", principioActivo, "Tableta 500 mg x 10",
-                new BigDecimal("8.50"), 40, null, medicamentoId);
-    }
 
     @Test
     void crearConMedicamento_copiaElPrincipioActivoDelMedicamento() {
@@ -211,7 +248,7 @@ class ProductoServiceTest {
     @Test
     void actualizarConMedicamento_copiaElPrincipioActivoDelMedicamento() {
         conBoticaAprobada();
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(productoExistente(9)));
         when(medicamentos.principioActivoEnlazable(15L)).thenReturn("Ibuprofeno");
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -235,7 +272,7 @@ class ProductoServiceTest {
         conBoticaAprobada();
         Producto existente = productoExistente(9);
         existente.setMedicamentoId(12L);
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(existente));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(existente));
         when(medicamentos.principioActivoDe(12L)).thenReturn("Paracetamol");
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -249,7 +286,7 @@ class ProductoServiceTest {
     @Test
     void actualizarSinMedicamento_sinEnlace_usaElPrincipioActivoEnviado() {
         conBoticaAprobada();
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(productoExistente(9)));
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
 
         ProductoResponse r = service.actualizar(10L, 7L, requestConPrincipio("Amoxicilina", null));
@@ -257,6 +294,8 @@ class ProductoServiceTest {
         assertEquals("Amoxicilina", r.principioActivo());
         verify(medicamentos, never()).principioActivoDe(any());
     }
+
+    // ---------- H31: quitar el enlace (DELETE /productos/{id}/medicamento) ----------
 
     @Test
     void desenlazarMedicamento_conservaElPrincipioActivoCopiado() {
@@ -271,9 +310,6 @@ class ProductoServiceTest {
         assertNull(existente.getMedicamentoId());
         assertEquals("Ibuprofeno", existente.getPrincipioActivo());
     }
-
-
-    // ---------- H31: quitar el enlace (DELETE /productos/{id}/medicamento) ----------
 
     @Test
     void desenlazarMedicamento_quitaElEnlaceYConservaElProducto() {
@@ -322,22 +358,15 @@ class ProductoServiceTest {
         ApiException ex = assertThrows(ApiException.class, () -> service.desenlazarMedicamento(10L, 7L));
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
-        verify(productos, never()).findByIdAndBoticaIdAndActivoTrue(any(), any());
-        verify(productos, never()).save(any(Producto.class));
+        verifyNoInteractions(productos);
     }
-
 
     // ---------- H59: alertas cuando baja el precio ----------
-
-    private ProductoRequest requestConPrecio(String precio) {
-        return new ProductoRequest("Panadol", "Paracetamol", "Tableta 500 mg x 10",
-                new BigDecimal(precio), 40, null, null);
-    }
 
     @Test
     void actualizarBajandoElPrecio_registraLaBajaDespuesDeGuardar() {
         conBoticaAprobada();
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(productoExistente(9)));
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
 
         service.actualizar(10L, 7L, requestConPrecio("7.50"));
@@ -351,7 +380,7 @@ class ProductoServiceTest {
     @Test
     void actualizarSinBajarElPrecio_noRegistraAlertas() {
         conBoticaAprobada();
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(productoExistente(9)));
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
 
         service.actualizar(10L, 7L, requestConPrecio("8.50"));
@@ -360,10 +389,11 @@ class ProductoServiceTest {
         verifyNoInteractions(alertas);
         verify(productos, never()).flush();
     }
+
     @Test
     void actualizarBajandoElPrecio_publicaElEventoConLasAlertasCreadas() {
         conBoticaAprobada();
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(productoExistente(9)));
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
         AlertaService.AlertaCreada creada = new AlertaService.AlertaCreada(1L, 42L, 7L,
                 new BigDecimal("8.50"), new BigDecimal("7.50"));
@@ -377,7 +407,7 @@ class ProductoServiceTest {
     @Test
     void actualizarBajandoElPrecio_sinAlertasCreadas_noPublicaEvento() {
         conBoticaAprobada();
-        when(productos.findByIdAndBoticaIdAndActivoTrue(7L, 1L)).thenReturn(Optional.of(productoExistente(9)));
+        when(productos.bloquearPorId(7L)).thenReturn(Optional.of(productoExistente(9)));
         when(productos.save(any(Producto.class))).thenAnswer(i -> i.getArgument(0));
 
         service.actualizar(10L, 7L, requestConPrecio("7.50"));

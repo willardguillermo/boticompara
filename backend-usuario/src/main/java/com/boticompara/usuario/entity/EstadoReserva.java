@@ -11,6 +11,9 @@ public enum EstadoReserva {
     /** Las que todavía aparten unidades: restan del stock disponible (API.md, sección 9). */
     public static final Set<EstadoReserva> ACTIVAS = EnumSet.of(PENDIENTE, CONFIRMADA, LISTA);
 
+    /** Stock comprometido (API.md, sección 4): lo que el dueño ya aceptó y no puede bajar del stock. */
+    public static final Set<EstadoReserva> COMPROMETIDAS = EnumSet.of(CONFIRMADA, LISTA);
+
     /**
      * Cambios que hace el dueño con PATCH /pedidos/{id}/estado (API.md, sección 10).
      * RECHAZADA (PATCH /pedidos/{id}/rechazar) y CANCELADA (PATCH /reservas/{id}/cancelar)

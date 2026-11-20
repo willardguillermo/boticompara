@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  {# H89: Ocultar si está visible, Mostrar de nuevo si está oculta; sin "Can change resena" no hay botones #}
+  {% for accion in acciones_resena %}
+    <li><a href="{{ accion.url }}"{% if accion.peligrosa %} style="background: var(--delete-button-bg);"{% endif %}>{{ accion.texto }}</a></li>
+  {% endfor %}
+  {# "Histórico" de Django: ahí queda quién la ocultó o la mostró (LogEntry) #}
+  {{ block.super }}
+{% endblock %}

@@ -60,6 +60,7 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
                                   @Param("estados") Collection<EstadoReserva> estados,
                                   @Param("id") Long id);
 
+
     /** H78-H80 (cambios): bloquea la fila de la reserva hasta el commit, solo si es de esa botica. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Reserva r, Producto p "
@@ -70,4 +71,14 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Reserva r where r.id = :id and r.usuarioId = :usuarioId")
     Optional<Reserva> bloquearPropia(@Param("id") Long id, @Param("usuarioId") Long usuarioId);
+
+    /** Unidades comprometidas de un producto: suma de CONFIRMADA y LISTA (API.md, sección 4). */
+    @Query("select coalesce(sum(r.cantidad), 0) from Reserva r "
+            + "where r.productoId = :productoId and r.estado in :estados")
+    long unidadesComprometidas(@Param("productoId") Long productoId,
+                               @Param("estados") Collection<EstadoReserva> estados);
+
+    /** Baja de un producto: hay pedidos confirmados o listos (API.md, sección 4). */
+    boolean existsByProductoIdAndEstadoIn(Long productoId, Collection<EstadoReserva> estados);
+
 }

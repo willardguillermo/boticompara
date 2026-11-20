@@ -171,3 +171,16 @@ EMAIL_HOST_PASSWORD = os.getenv('MAIL_PASSWORD', '')
 EMAIL_USE_TLS = True
 EMAIL_TIMEOUT = 10
 DEFAULT_FROM_EMAIL = os.getenv('MAIL_FROM', 'BotiCompara <no-responder@boticompara.pe>')
+
+
+# H89: palabras que marcan una reseña para que el administrador la revise (filtro "Con palabras
+# a revisar"). Solo sirven para encontrarlas: ninguna reseña se oculta sola. Se comparan en
+# minúsculas y sin tildes, al inicio de cada palabra del comentario: "estafa" también encuentra
+# "estafaron"; "huevon" encuentra "huevón" y "huevones".
+PALABRAS_A_REVISAR = [
+    # Insultos comunes en Perú
+    'cojudo', 'cojuda', 'huevon', 'huevona', 'conchatumadre', 'ctm', 'csm', 'mierda', 'imbecil',
+    'idiota', 'estupido', 'estupida', 'pendejo', 'pendeja', 'basura', 'rata', 'lacra', 'malparido',
+    # Acusaciones que el dueño podría reclamar
+    'estafa', 'estafadores', 'ladron', 'ladrones', 'rateros', 'roban', 'falsificado', 'adulterado',
+]
