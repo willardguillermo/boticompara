@@ -34,7 +34,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.dto.ReservaResponse
 import com.boticompara.app.ui.components.*
-import com.boticompara.app.ui.theme.BotiComparaTheme
 import com.boticompara.app.ui.theme.Dimens
 
 // H73 (código al crearla), H75 (cancelar) y H76 (detalle de una reserva)
@@ -297,11 +296,7 @@ private fun ContenidoReserva(
 @Composable
 private fun TarjetaCodigo(reserva: ReservaResponse, nueva: Boolean, estado: EstadoReserva?) {
     val activa = estado?.cancelable == true
-    val colores = coloresDe(
-        ReglasReserva.tonoTarjetaCodigo(reserva.estado),
-        MaterialTheme.colorScheme,
-        BotiComparaTheme.extendedColors
-    )
+    val colores = coloresDe(ReglasReserva.tonoTarjetaCodigo(reserva.estado), esModoOscuro())
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,

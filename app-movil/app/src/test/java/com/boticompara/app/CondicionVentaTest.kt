@@ -1,6 +1,11 @@
 package com.boticompara.app
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import com.boticompara.app.ui.components.ColoresReceta
 import com.boticompara.app.ui.components.ReglasCondicionVenta
+import com.boticompara.app.ui.reservas.ColoresReserva
+import com.boticompara.app.ui.reservas.TonoEstado
 import com.boticompara.app.ui.reservas.ReglasReserva
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -61,5 +66,31 @@ class CondicionVentaTest {
             "Este medicamento se vende con receta retenida: acércate a la botica con tu receta médica",
             ReglasCondicionVenta.AVISO_RECETA_RETENIDA
         )
+    }
+
+    // ---- Colores: la receta en morado, igual que en la web (--receta y --receta-fondo) ----
+
+    @Test
+    fun laRecetaUsaElMoradoDeLaWeb() {
+        fun hex(c: Color) = "#%06X".format(c.toArgb() and 0xFFFFFF)
+        assertEquals("#F3E8FF", hex(ColoresReceta.fondo(modoOscuro = false)))
+        assertEquals("#6B21A8", hex(ColoresReceta.contenido(modoOscuro = false)))
+    }
+
+    @Test
+    fun elMoradoDeLaRecetaNoSeConfundeConNingunEstado() {
+        listOf(false, true).forEach { oscuro ->
+            TonoEstado.entries.forEach {
+                assertTrue(ColoresReserva.de(it, oscuro).fondo != ColoresReceta.fondo(oscuro))
+            }
+        }
+    }
+
+    @Test
+    fun laRecetaCumpleContrasteAA() {
+        listOf(false, true).forEach { oscuro ->
+            val ratio = contraste(ColoresReceta.fondo(oscuro), ColoresReceta.contenido(oscuro))
+            assertTrue("oscuro=$oscuro: $ratio", ratio >= 4.5)
+        }
     }
 }

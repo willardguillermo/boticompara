@@ -1,6 +1,7 @@
 package com.boticompara.app
 
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.boticompara.app.ui.reservas.CantidadReserva
 import com.boticompara.app.ui.reservas.EstadoReserva
 import com.boticompara.app.ui.reservas.FechaLima
@@ -8,7 +9,6 @@ import com.boticompara.app.ui.reservas.ReglasReserva
 import com.boticompara.app.ui.reservas.TonoEstado
 import com.boticompara.app.ui.reservas.coloresDe
 import com.boticompara.app.ui.reservas.formatearSoles
-import com.boticompara.app.ui.theme.LightExtendedColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -76,23 +76,43 @@ class ReservasTest {
     }
 
     @Test
-    fun cadaEstadoTieneSuColor() {
-        val esquema = lightColorScheme()
-        val ext = LightExtendedColors
-        fun fondo(estado: String) = coloresDe(EstadoReserva.desde(estado)?.tono, esquema, ext).fondo
+    fun cadaEstadoTieneElColorDeLaWeb() {
+        // Hex de web-usuario/src/index.css (.estado-pedido-*): fondo y texto
+        fun claro(estado: String) = coloresDe(EstadoReserva.desde(estado)?.tono, modoOscuro = false)
+        fun hex(c: Color) = "#%06X".format(c.toArgb() and 0xFFFFFF)
 
-        assertEquals(ext.alertaContainer, fondo("PENDIENTE"))
-        assertEquals(esquema.tertiaryContainer, fondo("CONFIRMADA"))
-        assertEquals(ext.exitoContainer, fondo("LISTA"))
-        assertEquals(esquema.primaryContainer, fondo("ENTREGADA"))
-        assertEquals(esquema.errorContainer, fondo("RECHAZADA"))
-        assertEquals(esquema.surfaceContainerHighest, fondo("CANCELADA"))
-        assertEquals(ext.stockBajoContainer, fondo("VENCIDA"))
-        assertEquals(esquema.surfaceContainerHighest, fondo("DESCONOCIDO"))
+        val web = mapOf(
+            "PENDIENTE" to ("#FEF3C7" to "#B45309"),
+            "CONFIRMADA" to ("#DBEAFE" to "#1D4ED8"),
+            "LISTA" to ("#CCFBF1" to "#115E59"),
+            "ENTREGADA" to ("#DCFCE7" to "#15803D"),
+            "RECHAZADA" to ("#FEE2E2" to "#B91C1C"),
+            "CANCELADA" to ("#EEF2F1" to "#557069"),
+            "VENCIDA" to ("#EEF2F1" to "#557069"),
+            "DESCONOCIDO" to ("#EEF2F1" to "#557069")
+        )
+        web.forEach { (estado, colores) ->
+            assertEquals("Fondo de $estado", colores.first, hex(claro(estado).fondo))
+            assertEquals("Texto de $estado", colores.second, hex(claro(estado).contenido))
+        }
 
-        // Los 7 estados usan 7 tonos distintos
-        assertEquals(7, EstadoReserva.entries.map { it.tono }.toSet().size)
+        // Como en la web: 6 colores, Cancelada y Vencida comparten el gris
+        assertEquals(6, EstadoReserva.entries.map { it.tono }.toSet().size)
+        assertEquals(EstadoReserva.CANCELADA.tono, EstadoReserva.VENCIDA.tono)
         assertEquals(TonoEstado.ERROR, EstadoReserva.RECHAZADA.tono)
+    }
+
+    @Test
+    fun cadaEtiquetaDeEstadoCumpleContrasteAA() {
+        listOf(false, true).forEach { oscuro ->
+            TonoEstado.entries.forEach { tono ->
+                val c = coloresDe(tono, oscuro)
+                val ratio = contraste(c.fondo, c.contenido)
+                assertTrue("$tono oscuro=$oscuro: $ratio", ratio >= 4.5)
+            }
+        }
+        // En modo oscuro cada estado conserva un color distinto
+        assertEquals(6, TonoEstado.entries.map { coloresDe(it, modoOscuro = true).fondo }.toSet().size)
     }
 
     // ---- H73, H76: tarjeta del código según el estado ----
@@ -110,17 +130,15 @@ class ReservasTest {
     }
 
     @Test
-    fun laTarjetaUsaColorDeExitoSoloSiEstaActiva() {
-        val esquema = lightColorScheme()
-        fun colores(estado: String) = coloresDe(ReglasReserva.tonoTarjetaCodigo(estado), esquema, LightExtendedColors)
-
-        listOf("PENDIENTE", "CONFIRMADA", "LISTA").forEach {
-            assertEquals(esquema.primaryContainer, colores(it).fondo)
-            assertEquals(esquema.onPrimaryContainer, colores(it).contenido)
-        }
-        listOf("RECHAZADA", "CANCELADA", "VENCIDA", "ENTREGADA", "OTRO").forEach {
-            assertEquals("Fondo neutro para $it", esquema.surfaceContainerHighest, colores(it).fondo)
-            assertEquals(esquema.onSurfaceVariant, colores(it).contenido)
+    fun laTarjetaUsaElVerdeAzuladoSoloSiEstaActiva() {
+        listOf(false, true).forEach { oscuro ->
+            fun colores(estado: String) = coloresDe(ReglasReserva.tonoTarjetaCodigo(estado), oscuro)
+            listOf("PENDIENTE", "CONFIRMADA", "LISTA").forEach {
+                assertEquals(coloresDe(TonoEstado.PRIMARIO, oscuro), colores(it))
+            }
+            listOf("RECHAZADA", "CANCELADA", "VENCIDA", "ENTREGADA", "OTRO").forEach {
+                assertEquals("Fondo neutro para $it", coloresDe(TonoEstado.NEUTRO, oscuro), colores(it))
+            }
         }
     }
 
@@ -176,4 +194,12 @@ class ReservasTest {
             ReglasReserva.ordenarRecientes(fechas) { it }
         )
     }
+}
+
+// Contraste WCAG 2.x entre dos colores opacos
+internal fun contraste(a: Color, b: Color): Double {
+    fun canal(v: Float): Double = if (v <= 0.03928f) v / 12.92 else Math.pow((v + 0.055) / 1.055, 2.4)
+    fun lum(c: Color) = 0.2126 * canal(c.red) + 0.7152 * canal(c.green) + 0.0722 * canal(c.blue)
+    val (claro, oscuro) = listOf(lum(a), lum(b)).sortedDescending()
+    return (claro + 0.05) / (oscuro + 0.05)
 }

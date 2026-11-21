@@ -2,18 +2,19 @@ package com.boticompara.app.ui.reservas
 
 import com.boticompara.app.ui.components.ReglasCondicionVenta
 
-// Tono de color de cada estado. El color concreto sale del tema (EstadoReservaChip.kt)
-enum class TonoEstado { ALERTA, INFORMACION, EXITO, PRIMARIO, ERROR, NEUTRO, VENCIDO }
+// Tono de color de cada estado, el mismo que usa la web del dueño para el pedido.
+// El color concreto está en ColoresReserva (EstadoReservaChip.kt)
+enum class TonoEstado { ALERTA, INFORMACION, PRIMARIO, EXITO, ERROR, NEUTRO }
 
 // H76: los 7 estados de una reserva (docs/API.md, sección 9) con un nombre claro en español
 enum class EstadoReserva(val nombre: String, val tono: TonoEstado, val cancelable: Boolean) {
     PENDIENTE("Pendiente", TonoEstado.ALERTA, cancelable = true),
     CONFIRMADA("Confirmada", TonoEstado.INFORMACION, cancelable = true),
-    LISTA("Lista para recoger", TonoEstado.EXITO, cancelable = true),
-    ENTREGADA("Entregada", TonoEstado.PRIMARIO, cancelable = false),
+    LISTA("Lista para recoger", TonoEstado.PRIMARIO, cancelable = true),
+    ENTREGADA("Entregada", TonoEstado.EXITO, cancelable = false),
     RECHAZADA("Rechazada", TonoEstado.ERROR, cancelable = false),
     CANCELADA("Cancelada", TonoEstado.NEUTRO, cancelable = false),
-    VENCIDA("Vencida", TonoEstado.VENCIDO, cancelable = false);
+    VENCIDA("Vencida", TonoEstado.NEUTRO, cancelable = false);
 
     companion object {
         fun desde(valor: String?): EstadoReserva? =
@@ -35,7 +36,7 @@ object ReglasReserva {
         null -> "Esta reserva ya no está activa"
     }
 
-    // H73, H76: la tarjeta del código usa el color de éxito solo si la reserva sigue activa
+    // H73, H76: la tarjeta del código usa el verde azulado solo si la reserva sigue activa
     fun tonoTarjetaCodigo(estado: String?): TonoEstado =
         if (EstadoReserva.desde(estado)?.cancelable == true) TonoEstado.PRIMARIO else TonoEstado.NEUTRO
 

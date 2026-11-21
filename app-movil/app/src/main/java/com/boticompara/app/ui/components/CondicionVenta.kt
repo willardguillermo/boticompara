@@ -21,11 +21,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.boticompara.app.ui.theme.BotiComparaAppTheme
-import com.boticompara.app.ui.theme.BotiComparaTheme
 import com.boticompara.app.ui.theme.Dimens
 
 // H72: condición de venta DIGEMID del medicamento (docs/API.md, sección 5). null = sin información
@@ -61,27 +62,43 @@ object ReglasCondicionVenta {
     fun pideReceta(condicion: String?): Boolean = CondicionVenta.desde(condicion) == CondicionVenta.CON_RECETA
 }
 
+// H72: la receta va en morado, igual que en la web (--receta y --receta-fondo), distinto de todos los
+// estados. Modo oscuro: el mismo morado con fondo oscuro. Contraste AA: 7.4:1 claro y 11:1 oscuro
+object ColoresReceta {
+    val fondoClaro = Color(0xFFF3E8FF)
+    val contenidoClaro = Color(0xFF6B21A8)
+    val fondoOscuro = Color(0xFF3B0764)
+    val contenidoOscuro = Color(0xFFE9D5FF)
+
+    fun fondo(modoOscuro: Boolean) = if (modoOscuro) fondoOscuro else fondoClaro
+    fun contenido(modoOscuro: Boolean) = if (modoOscuro) contenidoOscuro else contenidoClaro
+}
+
+@Composable
+private fun modoOscuro(): Boolean = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+
 // H72: etiqueta "Requiere receta médica" o "Receta retenida"; no dibuja nada en los demás casos
 @Composable
 fun EtiquetaCondicionVenta(condicion: String?, modifier: Modifier = Modifier) {
     val texto = ReglasCondicionVenta.etiqueta(condicion) ?: return
     val retenida = ReglasCondicionVenta.esRecetaRetenida(condicion)
-    val extendidos = BotiComparaTheme.extendedColors
+    val oscuro = modoOscuro()
+    // Las dos condiciones van en morado; el ícono (candado o documento) y el texto las distinguen
     Etiqueta(
         texto = texto,
         modifier = modifier,
         icono = if (retenida) Icons.Rounded.Lock else Icons.Rounded.Description,
-        fondo = if (retenida) MaterialTheme.colorScheme.errorContainer else extendidos.alertaContainer,
-        color = if (retenida) MaterialTheme.colorScheme.onErrorContainer else extendidos.onAlertaContainer
+        fondo = ColoresReceta.fondo(oscuro),
+        color = ColoresReceta.contenido(oscuro)
     )
 }
 
 // H72: aviso en bloque (hoja de reserva, detalle del producto y de la reserva)
 @Composable
 fun AvisoReceta(texto: String, retenida: Boolean, modifier: Modifier = Modifier) {
-    val extendidos = BotiComparaTheme.extendedColors
-    val fondo = if (retenida) MaterialTheme.colorScheme.errorContainer else extendidos.alertaContainer
-    val contenido = if (retenida) MaterialTheme.colorScheme.onErrorContainer else extendidos.onAlertaContainer
+    val oscuro = modoOscuro()
+    val fondo = ColoresReceta.fondo(oscuro)
+    val contenido = ColoresReceta.contenido(oscuro)
     Row(
         modifier = modifier
             .fillMaxWidth()
