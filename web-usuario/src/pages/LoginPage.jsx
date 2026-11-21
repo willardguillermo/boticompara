@@ -99,7 +99,7 @@ export default function LoginPage() {
                 <Alerta tipo="info">
                   <p>
                     <strong>Modo simulado.</strong> Prueba con <code>rosa@boticompara.nissidev.dev</code>{' '}
-                    (aprobada) o <code>lucia@boticompara.nissidev.dev</code> (pendiente), contraseña{' '}
+                    (aprobada) o <code>lucia@boticompara.nissidev.dev</code> (rechazada), contraseña{' '}
                     <code>Boti2026!</code>
                   </p>
                 </Alerta>

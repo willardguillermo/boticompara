@@ -46,9 +46,7 @@ function TablaPedidos({ pedidos, ahora, procesando, onVer, onAvanzar, onRechazar
     <table className="tabla tabla-pedidos">
       <thead>
         <tr>
-          <th scope="col">Código</th>
-          <th scope="col">Fecha</th>
-          <th scope="col">Comprador</th>
+          <th scope="col">Pedido</th>
           <th scope="col">Producto</th>
           <th scope="col" className="numero">Cant.</th>
           <th scope="col" className="numero">Total</th>
@@ -67,11 +65,14 @@ function TablaPedidos({ pedidos, ahora, procesando, onVer, onAvanzar, onRechazar
           const idAviso = `sin-stock-${p.id}`
           return (
             <tr key={p.id}>
-              <td data-etiqueta="Código" className="celda-nombre">
-                <strong className="codigo-pedido">{p.codigo}</strong>
+              {/* Código, comprador y fecha en una sola celda: la tabla cabe sin scroll horizontal */}
+              <td data-etiqueta="Pedido" className="celda-nombre">
+                <span className="pedido-codigo-fecha">
+                  <strong className="codigo-pedido">{p.codigo}</strong>
+                  <span className="comprador-pedido">{p.compradorNombre}</span>
+                  <span className="texto-suave fecha-pedido">{formatoFechaHora(p.creadoEn)}</span>
+                </span>
               </td>
-              <td data-etiqueta="Fecha">{formatoFechaHora(p.creadoEn)}</td>
-              <td data-etiqueta="Comprador">{p.compradorNombre}</td>
               <td data-etiqueta="Producto">
                 <span className="producto-pedido">
                   {p.nombreComercial}
@@ -94,45 +95,47 @@ function TablaPedidos({ pedidos, ahora, procesando, onVer, onAvanzar, onRechazar
               <td data-etiqueta="Estado">
                 <EstadoPedidoBadge estado={p.estado} />
               </td>
-              <td data-etiqueta="Plazo">
+              <td data-etiqueta="Plazo" className="celda-plazo">
                 <PlazoPedido pedido={p} ahora={ahora} />
               </td>
               <td className="acciones">
-                {sinStock && (
-                  <span id={idAviso} className="aviso-sin-stock">
-                    {TEXTO_SIN_STOCK}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-secundario btn-icono"
-                  onClick={() => onVer(p)}
-                  aria-label={`Ver detalle del pedido ${p.codigo}`}
-                >
-                  <Icono nombre="buscar" /> Detalle
-                </button>
-                {sinStock && sePuedeRechazar(p) && (
+                <div className="acciones-pedido">
+                  {sinStock && (
+                    <span id={idAviso} className="aviso-sin-stock">
+                      {TEXTO_SIN_STOCK}
+                    </span>
+                  )}
                   <button
                     type="button"
-                    className="btn btn-secundario btn-icono boton-eliminar"
-                    onClick={() => onRechazar(p)}
-                    aria-label={`Rechazar el pedido ${p.codigo}`}
+                    className="btn btn-secundario btn-icono"
+                    onClick={() => onVer(p)}
+                    aria-label={`Ver detalle del pedido ${p.codigo}`}
                   >
-                    <Icono nombre="equis" /> Rechazar
+                    <Icono nombre="buscar" /> Detalle
                   </button>
-                )}
-                {accion && (
-                  <button
-                    type="button"
-                    className="btn btn-primario btn-icono"
-                    onClick={() => onAvanzar(p)}
-                    disabled={ocupado || sinStock}
-                    aria-label={`${accion.texto}: pedido ${p.codigo}`}
-                    aria-describedby={sinStock ? idAviso : undefined}
-                  >
-                    <Icono nombre={accion.icono} /> {ocupado ? 'Guardando...' : accion.texto}
-                  </button>
-                )}
+                  {sinStock && sePuedeRechazar(p) && (
+                    <button
+                      type="button"
+                      className="btn btn-secundario btn-icono boton-eliminar"
+                      onClick={() => onRechazar(p)}
+                      aria-label={`Rechazar el pedido ${p.codigo}`}
+                    >
+                      <Icono nombre="equis" /> Rechazar
+                    </button>
+                  )}
+                  {accion && (
+                    <button
+                      type="button"
+                      className="btn btn-primario btn-icono"
+                      onClick={() => onAvanzar(p)}
+                      disabled={ocupado || sinStock}
+                      aria-label={`${accion.texto}: pedido ${p.codigo}`}
+                      aria-describedby={sinStock ? idAviso : undefined}
+                    >
+                      <Icono nombre={accion.icono} /> {ocupado ? 'Guardando...' : accion.texto}
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
           )

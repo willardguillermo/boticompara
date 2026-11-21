@@ -22,6 +22,16 @@
   --error-fondo: #fee2e2;
   --info: #1d4ed8;
   --info-fondo: #dbeafe;
+  /* H72: color propio de la receta, distinto de todos los estados */
+  --receta: #6b21a8;
+  --receta-fondo: #f3e8ff;
+  /* Botones desactivados: gris claro, nunca el color del botón con opacidad */
+  --deshabilitado-fondo: #eef2f1;
+  --deshabilitado-borde: #dbe3e1;
+  --deshabilitado-texto: #8a9c98;
+
+  /* Ancho de la cabecera y del contenido del panel: deja espacio a la tabla de pedidos */
+  --ancho-maximo: 1240px;
 
   --radio: 10px;
   --radio-grande: 16px;
@@ -113,10 +123,6 @@ a {
   outline-offset: 1px;
 }
 
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 
 .btn-primario {
   background: var(--color-primario);
@@ -145,6 +151,16 @@ a {
 
 .btn-peligro:hover:not(:disabled) {
   background: #991b1b;
+}
+
+/* Desactivado: gris claro para cualquier variante (primario, secundario, peligro) */
+.btn:disabled,
+.btn:disabled:hover {
+  background: var(--deshabilitado-fondo);
+  border-color: var(--deshabilitado-borde);
+  color: var(--deshabilitado-texto);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .btn-icono {
@@ -1041,7 +1057,7 @@ a {
 }
 
 .cabecera-contenido {
-  max-width: 1100px;
+  max-width: var(--ancho-maximo);
   margin: 0 auto;
   padding: 0.7rem 1rem;
   display: flex;
@@ -1085,7 +1101,7 @@ a {
 }
 
 .contenido {
-  max-width: 1100px;
+  max-width: var(--ancho-maximo);
   margin: 0 auto;
   padding: 1.75rem 1rem 3rem;
 }
@@ -1286,7 +1302,7 @@ a {
 }
 
 .tabla-contenedor {
-  overflow: hidden;
+  overflow-x: auto;
   padding: 0;
 }
 
@@ -1330,6 +1346,23 @@ a {
 
 .tabla .acciones .btn + .btn {
   margin-left: 0.4rem;
+}
+
+/* Si la tabla no cabe (pantalla angosta o asistente abierto), las acciones quedan fijas a la derecha */
+.tabla td.acciones,
+.tabla th.acciones {
+  position: sticky;
+  right: 0;
+  background: var(--color-superficie);
+  box-shadow: -8px 0 8px -8px rgb(16 48 44 / 18%);
+}
+
+.tabla th.acciones {
+  background: #f8fbfa;
+}
+
+.tabla tbody tr:hover td.acciones {
+  background: #f8fbfa;
 }
 
 .boton-eliminar:hover:not(:disabled) {
@@ -1519,8 +1552,8 @@ a {
 
 /* H72: el medicamento pide receta */
 .estado-pedido-receta {
-  background: var(--info-fondo);
-  color: var(--info);
+  background: var(--receta-fondo);
+  color: var(--receta);
 }
 
 .producto-pedido .estado-pedido-receta {
@@ -1532,7 +1565,7 @@ a {
   margin-top: 0.2rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--aviso);
+  color: var(--receta);
 }
 
 .etiquetas-pedido {
@@ -1558,6 +1591,50 @@ a {
 .tabla-pedidos td {
   vertical-align: middle;
 }
+
+/* Celdas más juntas: nueve columnas caben en 1440 px sin scroll horizontal */
+.tabla-pedidos th,
+.tabla-pedidos td {
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+
+/* Un estado largo ("Cancelado por el comprador") puede ir en dos líneas antes que empujar la tabla */
+.tabla-pedidos td:not(.acciones) .estado-pedido {
+  white-space: normal;
+  border-radius: 12px;
+}
+
+.pedido-codigo-fecha {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.comprador-pedido {
+  font-size: 0.9rem;
+}
+
+/* Acciones apiladas: Detalle y la acción principal siempre a la vista, del mismo ancho */
+.acciones-pedido {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.tabla .acciones-pedido .btn + .btn {
+  margin-left: 0;
+}
+
+/* Fecha y plazo nunca se parten en varias líneas */
+.fecha-pedido,
+.tabla-pedidos .celda-plazo {
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.tabla-pedidos .celda-plazo {
+  font-size: 0.9rem;
+}
+
 
 .codigo-pedido {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -1675,6 +1752,22 @@ a {
     gap: 0.4rem;
   }
 
+  .pedido-codigo-fecha {
+    justify-items: end;
+  }
+
+  .acciones-pedido {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+
+  .tabla-pedidos td:not(.acciones) .estado-pedido {
+    max-width: 13rem;
+    text-align: left;
+  }
+
   .tabla-pedidos .acciones .btn + .btn {
     margin-left: 0;
   }
@@ -1748,6 +1841,12 @@ a {
     display: none;
   }
 
+  /* Fila 1: marca + Asistente + Salir. Fila 2: las tres secciones, cada una en una sola línea */
+  .cabecera-contenido {
+    flex-wrap: wrap;
+    padding: 0.6rem 1rem 0.5rem;
+  }
+
   .navegacion {
     order: 3;
     flex-basis: 100%;
@@ -1756,10 +1855,24 @@ a {
   .navegacion a {
     flex: 1;
     justify-content: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0.4rem;
+    font-size: 0.92rem;
+    white-space: nowrap;
   }
 
   .usuario-sesion {
     margin-left: auto;
+    gap: 0.5rem;
+  }
+
+  .texto-escritorio {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   /* La tabla del catálogo se convierte en tarjetas */
@@ -1804,9 +1917,13 @@ a {
     font-size: 1.05rem;
   }
 
-  .tabla td.acciones {
+  .tabla td.acciones,
+  .tabla tbody tr:hover td.acciones {
+    position: static;
     justify-content: flex-end;
     padding-top: 0.6rem;
+    background: transparent;
+    box-shadow: none;
   }
 
   .tabla td.acciones::before {
@@ -2166,6 +2283,29 @@ a {
 .chat-contador {
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* Escritorio: el asistente es un panel lateral de alto completo y la página se corre a la izquierda,
+   así no tapa las acciones de las tablas */
+@media (min-width: 900px) {
+  body:has(.chat-panel) {
+    padding-right: 420px;
+  }
+
+  .chat-panel {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 420px;
+    height: auto;
+    border-width: 0 0 0 1px;
+    border-radius: 0;
+    box-shadow: -8px 0 24px rgb(16 48 44 / 8%);
+  }
+
+  body:has(.chat-panel) .toasts {
+    right: calc(420px + 1rem);
+  }
 }
 
 @media (max-width: 600px) {
