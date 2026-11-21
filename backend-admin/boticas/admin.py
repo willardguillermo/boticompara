@@ -9,6 +9,7 @@ from django.utils.html import format_html
 from django.utils.text import Truncator
 
 from . import historial, resenas, revision, usuarios
+from .etiquetas import GRIS, NARANJA, ROJO, VERDE, etiqueta
 from .forms import (BoticaRevisionForm, DarBajaForm, MostrarResenaForm, OcultarResenaForm, ReactivarForm,
                     RechazarBoticaForm, SuspenderForm)
 from .models import Botica, BoticaRevision, Producto, Resena, Usuario, UsuarioAccion
@@ -34,9 +35,16 @@ class SoloLecturaAdmin(admin.ModelAdmin):
 
 # H94: naranja para la suspensión, verde para la reactivación y rojo para la baja
 COLORES_ACCION = {
-    UsuarioAccion.Accion.SUSPENDER: '#ef6c00',
-    UsuarioAccion.Accion.REACTIVAR: '#2e7d32',
-    UsuarioAccion.Accion.DAR_BAJA: '#ba2121',
+    UsuarioAccion.Accion.SUSPENDER: NARANJA,
+    UsuarioAccion.Accion.REACTIVAR: VERDE,
+    UsuarioAccion.Accion.DAR_BAJA: ROJO,
+}
+
+# Mismos colores para el estado de la cuenta en la lista y la ficha (A-U1)
+COLORES_ESTADO_USUARIO = {
+    usuarios.ACTIVO: VERDE,
+    usuarios.SUSPENDIDO: NARANJA,
+    usuarios.BAJA: ROJO,
 }
 
 
@@ -49,11 +57,7 @@ class ColumnasAccion:
 
     @admin.display(description='acción', ordering='accion')
     def accion_texto(self, obj):
-        return format_html(
-            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
-            ' white-space: nowrap;">{}</span>',
-            COLORES_ACCION.get(obj.accion, '#757575'), obj.get_accion_display(),
-        )
+        return etiqueta(obj.get_accion_display(), COLORES_ACCION.get(obj.accion, GRIS))
 
     @admin.display(description='motivo')
     def motivo_accion(self, obj):
@@ -116,7 +120,7 @@ class UsuarioAdmin(SoloLecturaAdmin):
 
     @admin.display(description='estado')
     def estado(self, obj):
-        return usuarios.texto_estado(obj)
+        return etiqueta(usuarios.texto_estado(obj), COLORES_ESTADO_USUARIO[usuarios.estado_de(obj)])
 
     @admin.display(description='motivo del estado')
     def motivo(self, obj):
@@ -310,7 +314,7 @@ class PalabrasARevisarFilter(admin.SimpleListFilter):
         return queryset
 
 
-COLORES_ESTADO_RESENA = {False: '#2e7d32', True: '#757575'}
+COLORES_ESTADO_RESENA = {False: VERDE, True: GRIS}
 
 
 @admin.register(Resena)
@@ -361,11 +365,7 @@ class ResenaAdmin(SoloLecturaAdmin):
 
     @admin.display(description='estado', ordering='oculta')
     def estado(self, obj):
-        return format_html(
-            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
-            ' white-space: nowrap;">{}</span>',
-            COLORES_ESTADO_RESENA[obj.oculta], resenas.texto_estado(obj),
-        )
+        return etiqueta(resenas.texto_estado(obj), COLORES_ESTADO_RESENA[obj.oculta])
 
     @admin.display(description='palabras a revisar')
     def palabras(self, obj):
@@ -492,8 +492,15 @@ class ProductoInline(admin.TabularInline):
 
 # H47: mismos colores que la columna de vigencia del catálogo
 COLORES_REVISION = {
-    BoticaRevision.Estado.APROBADO: '#2e7d32',
-    BoticaRevision.Estado.RECHAZADO: '#ba2121',
+    BoticaRevision.Estado.APROBADO: VERDE,
+    BoticaRevision.Estado.RECHAZADO: ROJO,
+}
+
+# Estado de la botica en la lista: los mismos colores que el historial, y naranja si espera revisión (A-B2)
+COLORES_ESTADO_BOTICA = {
+    Botica.Estado.PENDIENTE: NARANJA,
+    Botica.Estado.APROBADO: VERDE,
+    Botica.Estado.RECHAZADO: ROJO,
 }
 
 
@@ -507,11 +514,7 @@ class ColumnasRevision:
 
     @admin.display(description='estado', ordering='estado')
     def estado_revision(self, obj):
-        return format_html(
-            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
-            ' white-space: nowrap;">{}</span>',
-            COLORES_REVISION.get(obj.estado, '#757575'), obj.get_estado_display(),
-        )
+        return etiqueta(obj.get_estado_display(), COLORES_REVISION.get(obj.estado, GRIS))
 
     @admin.display(description='revisado por', ordering='revisado_por')
     def revisado_por_texto(self, obj):
@@ -622,7 +625,8 @@ class RevisionInline(ColumnasRevision, admin.TabularInline):
 @admin.register(Botica)
 class BoticaAdmin(admin.ModelAdmin):
     form = BoticaRevisionForm
-    list_display = ('nombre_comercial', 'ruc', 'correo_dueno', 'distrito', 'estado', 'tiene_licencia', 'creado_en')
+    list_display = ('nombre_comercial', 'ruc', 'correo_dueno', 'distrito', 'estado_etiqueta', 'tiene_licencia',
+                    'creado_en')
     list_filter = ('estado', 'distrito')
     search_fields = ('nombre_comercial', 'ruc', 'usuario__correo')
     list_select_related = ('usuario',)
@@ -642,6 +646,10 @@ class BoticaAdmin(admin.ModelAdmin):
         ('Revisión', {'fields': ('estado', 'motivo_rechazo')}),
         ('Fechas', {'fields': ('creado_en', 'actualizado_en')}),
     )
+
+    @admin.display(description='estado', ordering='estado')
+    def estado_etiqueta(self, obj):
+        return etiqueta(obj.get_estado_display(), COLORES_ESTADO_BOTICA.get(obj.estado, GRIS))
 
     @admin.display(description='correo del dueño', ordering='usuario__correo')
     def correo_dueno(self, obj):
