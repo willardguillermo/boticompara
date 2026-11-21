@@ -22,6 +22,10 @@
   --error-fondo: #fee2e2;
   --info: #1d4ed8;
   --info-fondo: #dbeafe;
+  /* Botones desactivados: gris claro, nunca el color del botón con opacidad */
+  --deshabilitado-fondo: #eef2f1;
+  --deshabilitado-borde: #dbe3e1;
+  --deshabilitado-texto: #8a9c98;
 
   --radio: 10px;
   --radio-grande: 16px;
@@ -113,10 +117,6 @@ a {
   outline-offset: 1px;
 }
 
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 
 .btn-primario {
   background: var(--color-primario);
@@ -145,6 +145,16 @@ a {
 
 .btn-peligro:hover:not(:disabled) {
   background: #991b1b;
+}
+
+/* Desactivado: gris claro para cualquier variante (primario, secundario, peligro) */
+.btn:disabled,
+.btn:disabled:hover {
+  background: var(--deshabilitado-fondo);
+  border-color: var(--deshabilitado-borde);
+  color: var(--deshabilitado-texto);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .btn-icono {
