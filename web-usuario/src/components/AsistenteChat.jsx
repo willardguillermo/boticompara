@@ -10,6 +10,7 @@ import { useChat } from '../hooks/useChat.js'
 import { formatoDistancia, MAX_CARACTERES_CHAT, partirNumerosAyuda } from '../utils/chat.js'
 import { formatoSoles } from '../utils/formato.js'
 import Icono from './Icono.jsx'
+import ShinyText from './reactbits/ShinyText.jsx'
 
 const AVISO = 'No escribas datos personales. El asistente no reemplaza al químico farmacéutico ni al médico.'
 const NOTA_RESPALDO = 'Respuesta resumida: el asistente estaba ocupado.'
@@ -209,7 +210,9 @@ function PanelChat({ chat, onCerrar }) {
         )}
         {esperando && (
           <div className="chat-escribiendo" role="status">
-            <span className="spinner" aria-hidden="true" /> El asistente está buscando…
+            <span className="spinner" aria-hidden="true" />
+            {/* Brillo que recorre el texto mientras espera (Shiny Text); quieto con movimiento reducido */}
+            <ShinyText speed={2.2} delay={0.4}>El asistente está buscando…</ShinyText>
           </div>
         )}
       </div>
