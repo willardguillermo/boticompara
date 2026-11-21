@@ -59,3 +59,7 @@ pnpm-debug.log*
 # Cuenta de servicio de Firebase (backend): nunca al repo
 firebase-adminsdk*.json
 *-service-account*.json
+
+# ===== Docker =====
+# JSON de Firebase (cuenta de servicio) que compose.yaml monta en el contenedor
+secretos/

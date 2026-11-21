@@ -23,10 +23,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,12 +52,13 @@ class PedidoServiceTest {
     @Mock ProductoRepository productos;
     @Mock ReservaRepository reservas;
     @Mock UsuarioRepository usuarios;
+    @Mock CondicionVentaService condiciones;
 
     PedidoService service;
 
     @BeforeEach
     void preparar() {
-        service = new PedidoService(boticas, productos, reservas, usuarios);
+        service = new PedidoService(boticas, productos, reservas, usuarios, condiciones);
     }
 
     private Botica botica() {
@@ -96,7 +99,7 @@ class PedidoServiceTest {
     /** Deja que el servicio encuentre el pedido como si fuera de la botica del dueño. */
     private void pedidoDeMiBotica(Reserva r) {
         when(boticas.findByUsuarioId(DUENO)).thenReturn(Optional.of(botica()));
-        when(reservas.pedidoDeBotica(ID, BOTICA)).thenReturn(Optional.of(r));
+        when(reservas.bloquearPedidoDeBotica(ID, BOTICA)).thenReturn(Optional.of(r));
     }
 
     private void guardaLoQueRecibe() {
@@ -306,5 +309,32 @@ class PedidoServiceTest {
         assertEquals("Carlos R.", resp.compradorNombre());
         assertEquals(0, new BigDecimal("4.40").compareTo(resp.total()));
         assertEquals(10, resp.stockActual());
+    }
+
+    // ---------- H72: condición de venta ----------
+
+    @Test
+    void elPedidoTraeLaCondicionActualDelMedicamentoEnlazado() {
+        when(boticas.findByUsuarioId(DUENO)).thenReturn(Optional.of(botica()));
+        when(reservas.pedidosDeBotica(eq(BOTICA), any(Pageable.class)))
+                .thenReturn(List.of(reserva(EstadoReserva.CONFIRMADA, dentroDeUnDia())));
+        Producto p = producto(10, true);
+        p.setMedicamentoId(40L);
+        when(productos.findAllById(any())).thenReturn(List.of(p));
+        when(condiciones.deMedicamentos(List.of(40L))).thenReturn(Map.of(40L, "CON_RECETA"));
+
+        List<PedidoResponse> lista = service.listar(DUENO, null);
+
+        assertEquals("CON_RECETA", lista.get(0).condicionVenta());
+    }
+
+    @Test
+    void elPedidoDeUnProductoSinEnlazarTraeCondicionNula() {
+        when(boticas.findByUsuarioId(DUENO)).thenReturn(Optional.of(botica()));
+        when(reservas.pedidoDeBotica(ID, BOTICA))
+                .thenReturn(Optional.of(reserva(EstadoReserva.CONFIRMADA, dentroDeUnDia())));
+        when(productos.findAllById(any())).thenReturn(List.of(producto(10, true)));
+
+        assertNull(service.detalle(DUENO, ID).condicionVenta());
     }
 }

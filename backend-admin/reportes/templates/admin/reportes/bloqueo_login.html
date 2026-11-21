@@ -1,0 +1,32 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% comment %}SEC-14: mismo aspecto que admin/login.html, sin formulario.{% endcomment %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/login.css" %}">{% endblock %}
+
+{% block bodyclass %}{{ block.super }} login{% endblock %}
+
+{% block usertools %}{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block nav-sidebar %}{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block nav-breadcrumbs %}{% endblock %}
+
+{% block content %}
+<p class="errornote">Demasiados intentos fallidos de inicio de sesión.</p>
+
+<div id="content-main">
+  <p>Por seguridad, el inicio de sesión con ese usuario quedó bloqueado desde esta conexión.</p>
+  {% if minutos %}
+  <p><strong>Espera {{ minutos }} minuto{{ minutos|pluralize }} y vuelve a intentarlo.</strong>
+     Si lo intentas antes, la espera vuelve a empezar.</p>
+  {% endif %}
+  <div class="submit-row">
+    <a href="{{ url_login }}">Volver al inicio de sesión</a>
+  </div>
+</div>
+{% endblock %}

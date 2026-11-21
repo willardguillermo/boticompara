@@ -23,22 +23,25 @@ const RUCS_SUNAT = {
 }
 
 // H31: catálogo maestro con los mismos ID que la BD (database/seed_v3_catalogo.sql, TEST-001 a TEST-012)
+// H72: condición de venta como en database/datos_prueba_receta.sql
 const MEDICAMENTOS = [
-  [2, 'Panadol', 'Paracetamol', 'Caja x 100 tabletas', '500 mg'],
-  [11, 'Paracetamol Genérico', 'Paracetamol', 'Tableta', '500 mg'],
-  [12, 'Advil', 'Ibuprofeno', 'Tableta', '400 mg'],
-  [23, 'Ibuprofeno Genérico', 'Ibuprofeno', 'Tableta', '400 mg'],
-  [24, 'Amoxil', 'Amoxicilina', 'Caja x 100 cápsulas', '500 mg'],
-  [25, 'Amoxicilina Genérica', 'Amoxicilina', 'Cápsula', '500 mg'],
-  [26, 'Cozaar', 'Losartán', 'Tableta', '50 mg'],
-  [27, 'Losartán Genérico', 'Losartán', 'Tableta', '50 mg'],
-  [28, 'Omeprazol Genérico', 'Omeprazol', 'Cápsula', '20 mg'],
-  [29, 'Nexium', 'Esomeprazol', 'Caja x 14 tabletas', '40 mg'],
-  [30, 'Aspirina Genérica', 'Ácido Acetilsalicílico', 'Tableta', '100 mg'],
-  [31, 'Loratadina Genérica', 'Loratadina', 'Tableta', '10 mg'],
-].map(([id, nombreComercial, principioActivo, presentacion, concentracion]) => ({
-  id, nombreComercial, principioActivo, presentacion, concentracion, oculto: false,
+  [2, 'Panadol', 'Paracetamol', 'Caja x 100 tabletas', '500 mg', 'SIN_RECETA'],
+  [11, 'Paracetamol Genérico', 'Paracetamol', 'Tableta', '500 mg', 'SIN_RECETA'],
+  [12, 'Advil', 'Ibuprofeno', 'Tableta', '400 mg', 'SIN_RECETA'],
+  [23, 'Ibuprofeno Genérico', 'Ibuprofeno', 'Tableta', '400 mg', 'SIN_RECETA'],
+  [24, 'Amoxil', 'Amoxicilina', 'Caja x 100 cápsulas', '500 mg', 'CON_RECETA'],
+  [25, 'Amoxicilina Genérica', 'Amoxicilina', 'Cápsula', '500 mg', 'CON_RECETA'],
+  [26, 'Cozaar', 'Losartán', 'Tableta', '50 mg', 'CON_RECETA'],
+  [27, 'Losartán Genérico', 'Losartán', 'Tableta', '50 mg', 'CON_RECETA'],
+  [28, 'Omeprazol Genérico', 'Omeprazol', 'Cápsula', '20 mg', 'CON_RECETA'],
+  [29, 'Nexium', 'Esomeprazol', 'Caja x 14 tabletas', '40 mg', 'CON_RECETA'],
+  [30, 'Aspirina Genérica', 'Ácido Acetilsalicílico', 'Tableta', '100 mg', 'SIN_RECETA'],
+  [31, 'Loratadina Genérica', 'Loratadina', 'Tableta', '10 mg', 'SIN_RECETA'],
+].map(([id, nombreComercial, principioActivo, presentacion, concentracion, condicionVenta]) => ({
+  id, nombreComercial, principioActivo, presentacion, concentracion, condicionVenta, oculto: false,
 }))
+
+const CONDICIONES_VENTA = ['SIN_RECETA', 'CON_RECETA', 'RECETA_RETENIDA']
 
 const db = {
   medicamentos: MEDICAMENTOS,
@@ -55,7 +58,9 @@ const db = {
   boticas: [
     { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', latitud: -11.942500, longitud: -76.699000, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
     { id: 2, usuarioId: 2, nombreComercial: 'FarmaVida', ruc: '20549871233', razonSocial: 'FarmaVida Perú E.I.R.L.', direccion: 'Jr. Trujillo 210', distrito: 'Lurigancho-Chosica', telefono: '014561234', latitud: -11.935100, longitud: -76.694300, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
-    { id: 3, usuarioId: 3, nombreComercial: 'Botica Nueva Era', ruc: '20712345676', razonSocial: 'Nueva Era Salud S.A.C.', direccion: 'Av. Nicolás Ayllón 980', distrito: 'Ate', telefono: '013459876', latitud: null, longitud: null, tieneLicencia: false, estado: 'PENDIENTE', motivoRechazo: null },
+    // Como en database/seed.sql: Nueva Era (lucia@) rechazada, para probar la corrección y el reenvío (H7)
+    { id: 3, usuarioId: 3, nombreComercial: 'Botica Nueva Era', ruc: '20712345676', razonSocial: 'Nueva Era Salud S.A.C.', direccion: 'Av. Nicolás Ayllón 980', distrito: 'Ate', telefono: '013459876', latitud: null, longitud: null, tieneLicencia: false, estado: 'RECHAZADO',
+      motivoRechazo: 'La dirección no coincide con la ficha RUC. Corrígela y vuelve a enviar.' },
   ],
   productos: [
     [1, 'Panadol', 'Paracetamol', 'Tableta 500 mg x 10', 8.5, 40],
@@ -248,6 +253,8 @@ function pedidoDto(reserva) {
     disponible: estado === 'PENDIENTE' ? Math.max(producto.stock - apartadasPorOtras(reserva), 0) : null,
     compradorNombre: nombreCorto(db.usuarios.find((u) => u.id === reserva.usuarioId)),
     motivoRechazo, venceEn, creadoEn, actualizadoEn,
+    // H72: la condición actual del medicamento enlazado; null si el producto no está enlazado
+    condicionVenta: db.medicamentos.find((m) => m.id === producto.medicamentoId)?.condicionVenta ?? null,
   }
 }
 
@@ -1052,6 +1059,7 @@ function responderChat(usuario, mensaje, { lat, lng }) {
 //   boticomparaMock.pedidos()                      (H77: pedidos de todas las boticas)
 //   boticomparaMock.vencerPedido(1)                (H79: venceEn pasa a ayer, para el 409 "La reserva ya venció")
 //   boticomparaMock.cancelarPedido(1)              (H79: el comprador lo cancela desde el móvil)
+//   boticomparaMock.condicionVenta(24, 'RECETA_RETENIDA')  (H72: cambia la condición de un medicamento; null = sin información)
 export function registrarAyudaConsola() {
   const cambiarEstado = (id, estado, motivoRechazo = null) => {
     const botica = db.boticas.find((b) => b.id === Number(id))
@@ -1070,6 +1078,16 @@ export function registrarAyudaConsola() {
       if (!medicamento) return `No existe el medicamento ${id}`
       medicamento.oculto = oculto
       return `${medicamento.nombreComercial}: ${oculto ? 'oculto' : 'visible'}`
+    },
+    // H72: imita que se cargue en la BD la condición de venta de un medicamento
+    condicionVenta: (id, condicion = null) => {
+      const medicamento = db.medicamentos.find((m) => m.id === Number(id))
+      if (!medicamento) return `No existe el medicamento ${id}`
+      if (condicion !== null && !CONDICIONES_VENTA.includes(condicion)) {
+        return `La condición debe ser una de: ${CONDICIONES_VENTA.join(', ')} o null`
+      }
+      medicamento.condicionVenta = condicion
+      return `${medicamento.nombreComercial}: ${condicion ?? 'sin información'}`
     },
     pedidos: () => db.reservas.map((r) => ({ ...pedidoDto(r), boticaId: db.productos.find((p) => p.id === r.productoId).boticaId })),
     // No cambia el estado: el proceso de H84 lo marca VENCIDA en la siguiente consulta

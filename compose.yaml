@@ -1,0 +1,21 @@
+# Levanta el backend (backend-usuario) en un contenedor en tu Mac.
+# Explicación línea por línea en docs/despliegue/docker.md
+
+services:
+  backend:
+    build:
+      context: ./backend-usuario
+      dockerfile: Dockerfile
+    image: boticompara-backend
+    container_name: boticompara-backend
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+      FIREBASE_CREDENTIALS_PATH: /secretos/firebase.json
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./secretos:/secretos:ro
+    mem_limit: 512m
+    restart: "no"

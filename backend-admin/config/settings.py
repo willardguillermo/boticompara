@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -62,6 +63,8 @@ INSTALLED_APPS = [
     'boticas',
     'catalogo',
     'reportes',
+    # SEC-14: límite de intentos en el login del admin (ajustes AXES_* al final)
+    'axes',
 ]
 
 MIDDLEWARE = [
@@ -72,6 +75,14 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # SEC-14: va al final para convertir el bloqueo en la página "Demasiados intentos"
+    'axes.middleware.AxesMiddleware',
+]
+
+# SEC-14: AxesStandaloneBackend va primero y rechaza el login si el usuario + IP está bloqueado
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -172,6 +183,34 @@ EMAIL_USE_TLS = True
 EMAIL_TIMEOUT = 10
 DEFAULT_FROM_EMAIL = os.getenv('MAIL_FROM', 'BotiCompara <no-responder@boticompara.pe>')
 
+
+# SEC-14: límite de intentos en el login del admin con django-axes.
+# Los intentos se cuentan en la caché, no en la base: no se crea ninguna tabla en Supabase.
+AXES_HANDLER = 'axes.handlers.cache.AxesCacheHandler'
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=15)
+# Se bloquea la combinación usuario + IP: otro usuario desde la misma IP puede seguir entrando
+AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]
+# Un login correcto borra los fallos acumulados
+AXES_RESET_ON_SUCCESS = True
+# Página del bloqueo en español, con el estilo del admin (reportes/bloqueo.py)
+AXES_LOCKOUT_CALLABLE = 'reportes.bloqueo.respuesta_bloqueo'
+AXES_COOLOFF_MESSAGE = 'Demasiados intentos fallidos. Espera 15 minutos y vuelve a intentarlo.'
+# Sin el admin de axes ni sus migraciones: sus modelos (AccessAttempt, AccessLog, ...) no tienen
+# tabla y migrate no debe crearlas en Supabase. En las pruebas, SQLite las crea igual (syncdb).
+AXES_ENABLE_ADMIN = False
+MIGRATION_MODULES = {'axes': None}
+
+# Caché en memoria del proceso: sirve con runserver (un solo proceso). Se reinicia al reiniciar
+# el servidor y no se comparte entre procesos; por eso axes avisa con axes.W001. Con varios
+# procesos (gunicorn) en producción hay que usar Redis o Memcached y quitar el silencio.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'boticompara-admin',
+    }
+}
+SILENCED_SYSTEM_CHECKS = ['axes.W001']
 
 # H89: palabras que marcan una reseña para que el administrador la revise (filtro "Con palabras
 # a revisar"). Solo sirven para encontrarlas: ninguna reseña se oculta sola. Se comparan en

@@ -24,8 +24,9 @@ function validar(datos) {
 
   const precio = datos.precio.trim()
   if (!precio) errores.precio = 'El precio es obligatorio.'
-  else if (!PRECIO_VALIDO.test(precio)) errores.precio = 'Usa un número con hasta 2 decimales (ej. 8.50).'
+  // Primero el signo: con "-3" o "0" el problema es el valor, no el formato
   else if (Number(precio) <= 0) errores.precio = 'El precio debe ser mayor a 0.'
+  else if (!PRECIO_VALIDO.test(precio)) errores.precio = 'Usa un número con hasta 2 decimales (ej. 8.50).'
 
   const stock = datos.stock.trim()
   if (!stock) errores.stock = 'El stock es obligatorio.'
@@ -277,7 +278,7 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado, onEn
             {...propsError('nombreComercial', errores.nombreComercial)}
             value={datos.nombreComercial}
             onChange={cambiar('nombreComercial')}
-            placeholder="Panadol"
+            placeholder="Ej.: Panadol"
             autoFocus
           />
         </Campo>
@@ -304,7 +305,7 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado, onEn
             value={datos.principioActivo}
             onChange={cambiar('principioActivo')}
             readOnly={Boolean(medicamento)}
-            placeholder="Paracetamol"
+            placeholder="Ej.: Paracetamol"
           />
         </Campo>
         <Campo id="presentacion" etiqueta="Presentación" error={errores.presentacion}>
@@ -312,7 +313,7 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado, onEn
             {...propsError('presentacion', errores.presentacion)}
             value={datos.presentacion}
             onChange={cambiar('presentacion')}
-            placeholder="Tableta 500 mg x 10"
+            placeholder="Ej.: Tableta 500 mg x 10"
           />
         </Campo>
         <div className="fila-campos">
@@ -325,7 +326,7 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado, onEn
               step="0.01"
               value={datos.precio}
               onChange={cambiar('precio')}
-              placeholder="8.50"
+              placeholder="Ej.: 8.50"
             />
           </Campo>
           <Campo id="stock" etiqueta="Stock (unidades)" error={errores.stock}>
@@ -337,7 +338,7 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado, onEn
               step="1"
               value={datos.stock}
               onChange={cambiar('stock')}
-              placeholder="40"
+              placeholder="Ej.: 40"
             />
           </Campo>
         </div>
@@ -356,7 +357,7 @@ export default function ProductoFormModal({ producto, onCerrar, onGuardado, onEn
             step="1"
             value={datos.stockMinimo}
             onChange={cambiar('stockMinimo')}
-            placeholder="5"
+            placeholder="Ej.: 5"
           />
         </Campo>
 

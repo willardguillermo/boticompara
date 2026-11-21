@@ -150,7 +150,7 @@ class ChatControllerTest {
         when(busqueda.buscar("paracetamol", "principio", null, null, null, null)).thenReturn(List.of(
                 new BusquedaResponse(9L, "Paracetamol Genérico", "Paracetamol", "Tableta 500 mg x 10",
                         new BigDecimal("2.20"), 90, 2L, "FarmaVida", "Jr. Trujillo 210", "Lurigancho-Chosica",
-                        null, null, null)));
+                        null, null, null, null)));
 
         preguntar("{\"mensaje\":\"paracetamol\"}")
                 .andExpect(status().isServiceUnavailable())

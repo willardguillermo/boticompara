@@ -39,6 +39,7 @@ public class ReservaService {
     private final BoticaRepository boticas;
     private final ReservaRepository reservas;
     private final BusquedaService busqueda;
+    private final CondicionVentaService condiciones;
 
     /**
      * H72-H74: crea la reserva en PENDIENTE. El producto se bloquea dentro de la transacción,
@@ -59,6 +60,13 @@ public class ReservaService {
 
         Producto p = productos.bloquearPorId(productoId)
                 .orElseThrow(() -> ApiException.notFound("El producto no está disponible"));
+
+        // H72: después del 404 y antes de calcular lo disponible. CON_RECETA y null sí se reservan
+        String condicionVenta = condiciones.deMedicamento(p.getMedicamentoId());
+        if (CondicionVentaService.RECETA_RETENIDA.equals(condicionVenta)) {
+            throw ApiException.conflict(
+                    "Este medicamento se vende con receta retenida: acércate a la botica con tu receta médica");
+        }
 
         if (reservas.existsByUsuarioIdAndProductoIdAndEstadoIn(usuarioId, productoId, EstadoReserva.ACTIVAS)) {
             throw ApiException.conflict("Ya tienes una reserva activa de este producto");
@@ -82,7 +90,7 @@ public class ReservaService {
         r.setVenceEn(Instant.now().plus(HORAS_DE_PLAZO, ChronoUnit.HOURS));
 
         Reserva guardada = reservas.save(r);
-        return ReservaResponse.from(guardada, p, boticas.findById(p.getBoticaId()).orElse(null));
+        return ReservaResponse.from(guardada, p, boticas.findById(p.getBoticaId()).orElse(null), condicionVenta);
     }
 
     /** H76: historial del comprador. estado = null devuelve todas. */
@@ -99,19 +107,21 @@ public class ReservaService {
         List<Long> idsBoticas = prods.values().stream().map(Producto::getBoticaId).distinct().toList();
         Map<Long, Botica> bots = boticas.findAllById(idsBoticas).stream()
                 .collect(Collectors.toMap(Botica::getId, Function.identity()));
+        Map<Long, String> conds = condiciones.deMedicamentos(
+                prods.values().stream().map(Producto::getMedicamentoId).toList());
 
         return lista.stream()
                 .map(r -> {
                     Producto p = prods.get(r.getProductoId());
                     Botica b = p == null ? null : bots.get(p.getBoticaId());
-                    return ReservaResponse.from(r, p, b);
+                    return ReservaResponse.from(r, p, b, p == null ? null : conds.get(p.getMedicamentoId()));
                 })
                 .toList();
     }
     /** H75: el comprador cancela su reserva si todavía está activa y no venció. */
     @Transactional
     public ReservaResponse cancelar(Long usuarioId, Long id) {
-        Reserva r = reservas.findByIdAndUsuarioId(id, usuarioId)
+        Reserva r = reservas.bloquearPropia(id, usuarioId)
                 .orElseThrow(() -> ApiException.notFound("La reserva no existe"));
         if (!r.getEstado().estaActiva()) {
             throw ApiException.conflict("No se puede cancelar una reserva " + r.getEstado());
@@ -134,7 +144,7 @@ public class ReservaService {
     private ReservaResponse respuesta(Reserva r) {
         Producto p = productos.findById(r.getProductoId()).orElse(null);
         Botica b = p == null ? null : boticas.findById(p.getBoticaId()).orElse(null);
-        return ReservaResponse.from(r, p, b);
+        return ReservaResponse.from(r, p, b, p == null ? null : condiciones.deMedicamento(p.getMedicamentoId()));
     }
 
     /** H72: BC- + 6 caracteres del alfabeto, sin repetir (hasta 3 intentos). */

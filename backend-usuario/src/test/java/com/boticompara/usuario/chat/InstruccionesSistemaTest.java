@@ -46,6 +46,18 @@ class InstruccionesSistemaTest {
     }
 
     @Test
+    void losDosRolesAvisanLaCondicionDeVentaYNuncaAyudanASaltarseLaReceta() {
+        for (String rol : new String[]{"COMPRADOR", "DUENO_BOTICA"}) {
+            String texto = instrucciones.para(rol, false);
+
+            assertTrue(texto.contains("Si es CON_RECETA, avisa que se necesita\n  receta médica"), rol);
+            assertTrue(texto.contains("Si es RECETA_RETENIDA, avisa que no se puede reservar"), rol);
+            assertTrue(texto.contains("en la botica presentando la receta médica"), rol);
+            assertTrue(texto.contains("Nunca sugieras cómo conseguir un medicamento sin receta."), rol);
+        }
+    }
+
+    @Test
     void losSaltosDeLineaDeWindowsQuedanIgualQueLosDeUnix() {
         String unix = "Línea 113,\n  opción 5\nfin\n";
 
