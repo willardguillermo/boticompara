@@ -750,7 +750,7 @@ class BoticaAdmin(admin.ModelAdmin):
             return []
         acciones = []
         if botica.estado in revision.PUEDE_APROBAR:
-            acciones.append({'texto': 'Aprobar', 'url': self.url_accion(botica, 'aprobar')})
+            acciones.append({'texto': 'Aprobar', 'url': self.url_accion(botica, 'aprobar'), 'color': VERDE})
         if botica.estado in revision.PUEDE_RECHAZAR:
             acciones.append({'texto': 'Rechazar', 'url': self.url_accion(botica, 'rechazar'), 'peligrosa': True})
         return acciones

@@ -71,6 +71,9 @@ class BotonesDeLaFichaTests(ConAdmin):
         ficha = self.client.get(detalle(pendiente))
         self.assertContains(ficha, url_accion(pendiente, 'aprobar'))
         self.assertContains(ficha, url_accion(pendiente, 'rechazar'))
+        # Aprobar es la acción principal en verde; Rechazar va en rojo
+        self.assertContains(ficha, 'class="accion-aprobar" style="background: #2e7d32;')
+        self.assertContains(ficha, 'class="accion-rechazar" style="background: var(--delete-button-bg);')
 
         ficha = self.client.get(detalle(aprobada))
         self.assertNotContains(ficha, url_accion(aprobada, 'aprobar'))
