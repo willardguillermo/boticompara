@@ -59,3 +59,7 @@ pnpm-debug.log*
 # ===== Docker =====
 # JSON de Firebase (cuenta de servicio) que compose.yaml monta en el contenedor
 secretos/
+
+# ===== SonarQube =====
+# Caché local del análisis (sonar-scanner / mvn sonar:sonar)
+.sonar/

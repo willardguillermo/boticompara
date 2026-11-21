@@ -817,7 +817,10 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 - Las búsquedas del asistente **no** se registran en los reportes de búsquedas (H62) ni en el de comparaciones (H42): el texto lo escribe el modelo, no el usuario.
 
 **Límites del asistente:**
-- Solo responde sobre BotiCompara: precios, disponibilidad, boticas, alternativas y, para el dueño, su catálogo.
+- Al comprador solo le responde sobre BotiCompara: precios, disponibilidad, boticas y alternativas.
+- Al dueño también lo ayuda con la gestión de su botica: surtido (incluidos productos que no son medicamentos: aseo y cuidado personal, primeros auxilios, bebé), reposición y rotación de stock, exhibición y orden de la vitrina, atención al cliente, temporadas (por ejemplo, invierno) y precios frente a la competencia. Cuando sirve, se apoya en sus datos reales (`ver_stock_bajo`, `buscar_en_mi_catalogo`, `buscar_precios`). No tiene datos de ventas: no inventa cifras de rotación. Los consejos de surtido hablan de tipos de producto, nunca de qué medicamento tomar para un síntoma.
+- Al dueño, si un nombre de producto parece mal escrito ("amosicilina"), busca con el nombre corregido (amoxicilina) y dice en la respuesta con qué nombre buscó; si hay dos o más nombres posibles, pregunta cuál quiso decir.
+- Ante un tema ajeno a una botica, responde en una frase que no puede ayudar con eso y redirige a lo que sí hace.
 - No diagnostica, no da dosis y no recomienda medicamentos por síntomas: deriva al químico farmacéutico o al médico. Ante una emergencia indica llamar al SAMU (106).
 - **Condición de venta (H72):** si un producto es `CON_RECETA`, avisa que se necesita receta médica; si es `RECETA_RETENIDA`, avisa que no se puede reservar y que se compra en la botica presentando la receta. Nunca sugiere cómo conseguir un medicamento sin receta.
 - Estos casos responden `200` con `productos: []`; no son errores.
