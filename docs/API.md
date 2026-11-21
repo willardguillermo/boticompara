@@ -34,7 +34,7 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 | 401 | Sin token, token vencido o credenciales incorrectas |
 | 403 | Rol sin permiso, botica no aprobada intentando crear productos, acción no permitida por el estado de la botica, o reseña sin una reserva entregada (H85) |
 | 404 | Recurso no existe o no pertenece al usuario |
-| 409 | Duplicado (correo o RUC ya registrado), o conflicto con el estado actual: cambio de estado no permitido de una reserva o pedido, stock insuficiente, reserva activa repetida |
+| 409 | Duplicado (correo o RUC ya registrado), o conflicto con el estado actual: cambio de estado no permitido de una reserva o pedido, stock insuficiente, reserva activa repetida, reserva de un medicamento con receta retenida (H72) |
 | 429 | Demasiados pedidos (solo `POST /chat`) |
 | 503, 504 | El asistente no está disponible o tardó demasiado (solo `POST /chat`) |
 
@@ -406,6 +406,21 @@ No es un endpoint. Todos los días a las 8:00 (hora de Lima) el backend envía a
 
 ## 5. Búsqueda del comprador
 
+### Condición de venta (DIGEMID) — H72
+Cada medicamento del catálogo maestro puede tener su **condición de venta** (columna `medicamento.condicion_venta`, CHECK `chk_medicamento_condicion_venta`). La API la devuelve como `condicionVenta`:
+
+| `condicionVenta` | Significa | En la app del comprador |
+|---|---|---|
+| `"SIN_RECETA"` | Venta libre | Sin aviso |
+| `"CON_RECETA"` | Se vende con receta médica | Etiqueta "Requiere receta médica". Se puede reservar; al reservar la app avisa: "Presenta tu receta médica al recoger; sin ella la botica no puede entregarlo" |
+| `"RECETA_RETENIDA"` | Psicofármacos y estupefacientes: la botica se queda con la receta | Etiqueta "Receta retenida". **No se puede reservar** (`POST /reservas` → 409, sección 9) |
+| `null` | Sin información | Sin etiqueta; se reserva como cualquier producto |
+
+- Sale del medicamento enlazado al producto (H31). Si el producto no está enlazado al catálogo maestro, o el medicamento no tiene la condición registrada, es `null`.
+- Va en `GET /productos/buscar`, `GET /productos/{id}`, cada elemento de `GET /productos/{id}/alternativas`, la reserva (sección 9) y el pedido (sección 10). Siempre es el **último campo** del objeto.
+- **No se suben fotos de recetas.** La receta la valida el químico farmacéutico en la botica, al entregar.
+- La condición es un dato del catálogo maestro, no del producto: se carga en la BD (`database/`) y el dueño de botica no la cambia desde la web ni en la carga masiva.
+
 ### `GET /productos/buscar?q=paracetamol&tipo=nombre&orden=precio_asc` 🔒 — H22, H23, H24, H27, H48, H49
 
 | Parámetro | Valores | Por defecto |
@@ -433,11 +448,14 @@ Solo devuelve productos activos, con stock > 0, de boticas `APROBADO` (vista `v_
     "boticaDistrito": "Lurigancho-Chosica",
     "boticaLatitud": -11.937200,
     "boticaLongitud": -76.695800,
-    "distanciaKm": 1.25
+    "distanciaKm": 1.25,
+    "condicionVenta": "SIN_RECETA"
   }
 ]
 ```
 Sin resultados → `200` con `[]` (la app muestra "No encontramos ese medicamento").
+
+`condicionVenta`: ver "Condición de venta" al inicio de esta sección. Los productos `CON_RECETA` y `RECETA_RETENIDA` **sí** salen en la búsqueda (el comprador puede comparar precios); solo cambia lo que se puede reservar.
 
 **Ubicación de la botica (H48, H49):**
 - `boticaLatitud` y `boticaLongitud`: número con 6 decimales; `null` si la botica no registró ubicación. Van después de `boticaDistrito`.
@@ -468,10 +486,11 @@ Público (no necesita token). Devuelve el detalle de un producto que el comprado
   "boticaNombre": "FarmaVida",
   "boticaDireccion": "Jr. Trujillo 210",
   "boticaDistrito": "Lurigancho-Chosica",
-  "boticaTelefono": "014567890"
+  "boticaTelefono": "014567890",
+  "condicionVenta": "SIN_RECETA"
 }
 ```
-`boticaTelefono` es `null` si la botica no lo registró.
+`boticaTelefono` es `null` si la botica no lo registró. `condicionVenta`: ver "Condición de venta" al inicio de esta sección (`null` si el producto no está enlazado).
 Errores: 400 (`id` no numérico), 404 (el producto no existe, está dado de baja, no tiene stock, su botica no está aprobada, o su medicamento está oculto o con el registro sanitario vencido).
 
 ### `GET /productos/{id}/alternativas` — H36, H37, H38, H41, H42
@@ -495,7 +514,8 @@ Público (no necesita token). Devuelve los productos que el comprador puede usar
       "boticaDireccion": "Jr. Trujillo 210",
       "boticaDistrito": "Lurigancho-Chosica",
       "tipoCoincidencia": "EQUIVALENTE",
-      "ahorroPorcentaje": 73.2
+      "ahorroPorcentaje": 73.2,
+      "condicionVenta": "SIN_RECETA"
     }
   ]
 }
@@ -509,6 +529,8 @@ Público (no necesita token). Devuelve los productos que el comprador puede usar
 **`ahorroPorcentaje` (H37):** `(precio consultado − precio de la alternativa) / precio consultado × 100`, con 1 decimal. Es `null` si la alternativa no es más barata que el consultado.
 
 **`sinEquivalentes` (H41):** `true` cuando `alternativas` viene vacía (la app muestra que no hay equivalentes).
+
+**`condicionVenta` (H72):** la de cada alternativa, de su propio medicamento enlazado (`null` si no está enlazada). Las alternativas no se filtran por condición: una alternativa `RECETA_RETENIDA` sale igual, con su etiqueta.
 
 **Registro de la consulta (H42):** cada consulta de un producto visible queda registrada (producto, fecha y, si la petición trae un token válido, el usuario) para saber qué productos se comparan más. Sin sesión se guarda sin usuario. Si el registro falla, la respuesta no se ve afectada. Las consultas a un producto que no existe o no es visible (404) no se registran.
 
@@ -897,9 +919,11 @@ El comprador aparta un producto para recogerlo en la botica. La reserva **aparta
   "motivoRechazo": null,
   "venceEn": "2026-11-13T15:30:00.123456Z",
   "creadoEn": "2026-11-12T15:30:00.123456Z",
-  "actualizadoEn": "2026-11-12T15:30:00.123456Z"
+  "actualizadoEn": "2026-11-12T15:30:00.123456Z",
+  "condicionVenta": "SIN_RECETA"
 }
 ```
+- `condicionVenta` (H72): la condición de venta **actual** del medicamento enlazado al producto (`producto.medicamento_id → medicamento.condicion_venta`; ver sección 5), `null` si el producto no está enlazado. No se guarda en la reserva. Con `"CON_RECETA"` la app muestra en la reserva: "Presenta tu receta médica al recoger; sin ella la botica no puede entregarlo".
 - `precioUnitario`: el precio del producto **al momento de reservar** (`reserva.precio_unitario`). Si después la botica cambia el precio, la reserva conserva el suyo.
 - `total` = `cantidad × precioUnitario`, con 2 decimales. No se guarda: se calcula al responder.
 - Los datos del producto y la botica se leen de las tablas `producto` y `botica`, no de la vista: una reserva se sigue viendo aunque el producto se quede sin stock o se dé de baja.
@@ -916,6 +940,7 @@ Respuesta: 201 con la reserva (formato de arriba), en estado `PENDIENTE`.
 Validaciones y reglas:
 - `productoId` obligatorio. El producto debe verse en `v_producto_busqueda` con el mismo criterio que `GET /productos/{id}` (activo, con stock, botica `APROBADO`, dueño no suspendido ni dado de baja, sin medicamento oculto ni registro vencido). Si no → 404 "El producto no está disponible".
 - `cantidad` obligatoria, entero de **1 a 10** → si no, 400.
+- **Condición de venta (H72):** si el medicamento enlazado al producto es `RECETA_RETENIDA` → 409 "Este medicamento se vende con receta retenida: acércate a la botica con tu receta médica" y no se crea nada. Se revisa después del 404 y antes de calcular lo disponible. `CON_RECETA` sí se reserva (la app muestra el aviso de la receta antes de confirmar y en la reserva); `SIN_RECETA` y `null` (producto sin enlazar o sin dato) se reservan como siempre. El límite de 10 unidades y la regla de una reserva activa por producto no cambian.
 - `cantidad` no puede pasar de la cantidad disponible (stock menos reservas activas) → 409 "Solo hay {disponible} unidades disponibles de este producto". Si el disponible es 0 → 409 "Todas las unidades de este producto ya están reservadas".
 - **Sin carreras:** dentro de la misma transacción, primero se bloquea la fila del producto (`select ... from producto where id = :id for update`), luego se calcula el disponible y se inserta la reserva. Si dos compradores reservan las últimas unidades a la vez, el segundo espera al primero y ve su reserva en la suma, así que recibe el 409.
 - Un comprador no puede tener dos reservas activas (`PENDIENTE`, `CONFIRMADA` o `LISTA`) del mismo producto → 409 "Ya tienes una reserva activa de este producto" (propuesta, ver decisiones).
@@ -924,7 +949,7 @@ Validaciones y reglas:
 - **Código de confirmación:** `BC-` seguido de 6 caracteres tomados de `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (sin `0`, `O`, `1` ni `I`, para que no se confundan al dictarlo). Se genera con `SecureRandom`; si choca con `uq_reserva_codigo` se genera otro (hasta 3 intentos). Hay 32⁶ ≈ 1 070 millones de combinaciones. El comprador lo muestra al recoger.
 - Al crearse, se avisa por correo al dueño de la botica (ver "Correos" en la sección 10).
 
-Errores: 400 (falta `productoId` o `cantidad`, o `cantidad` fuera de 1 a 10), 401 (sin token), 403 (el rol no es `COMPRADOR`), 404 (el producto no existe o no se ve), 409 (cantidad mayor que la disponible, o ya tiene una reserva activa de ese producto).
+Errores: 400 (falta `productoId` o `cantidad`, o `cantidad` fuera de 1 a 10), 401 (sin token), 403 (el rol no es `COMPRADOR`), 404 (el producto no existe o no se ve), 409 (medicamento con receta retenida, cantidad mayor que la disponible, o ya tiene una reserva activa de ese producto).
 
 ### `GET /reservas/mias?estado=PENDIENTE` 🔒 — H76
 Historial de reservas del comprador, de la más reciente a la más antigua (por `creadoEn`), máximo 100. `estado` es opcional: sin él devuelve todas.
@@ -937,7 +962,8 @@ Historial de reservas del comprador, de la más reciente a la más antigua (por 
     "boticaNombre": "FarmaVida", "boticaDireccion": "Jr. Trujillo 210",
     "boticaDistrito": "Lurigancho-Chosica", "boticaTelefono": "014567890",
     "motivoRechazo": null, "venceEn": "2026-11-13T15:30:00.123456Z",
-    "creadoEn": "2026-11-12T15:30:00.123456Z", "actualizadoEn": "2026-11-12T15:30:00.123456Z" }
+    "creadoEn": "2026-11-12T15:30:00.123456Z", "actualizadoEn": "2026-11-12T15:30:00.123456Z",
+    "condicionVenta": "SIN_RECETA" }
 ]
 ```
 Sin reservas → `200` con `[]`.
@@ -964,6 +990,8 @@ Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `COMPRADOR`
 5. **La reserva aparta unidades:** disponible = stock − reservas activas (`PENDIENTE`, `CONFIRMADA`, `LISTA`). Se valida al crear (con la fila del producto bloqueada con `for update`) y al confirmar (sección 10); el stock se descuenta recién al entregar.
 6. **Reserva con `venceEn` pasado y aún sin marcar** → se trata como vencida (409 al cancelar o cambiar de estado).
 7. **Máximo 100** en el historial, sin paginación (como `GET /alertas`).
+8. **Condición de venta (20/11/2026, H72), según DIGEMID:** columna `medicamento.condicion_venta` (`SIN_RECETA`, `CON_RECETA`, `RECETA_RETENIDA` o `null` = sin información) y campo `condicionVenta` en búsqueda, detalle, alternativas, reserva y pedido. `RECETA_RETENIDA` (psicofármacos y estupefacientes: la botica se queda con la receta) **no se reserva**: 409 "Este medicamento se vende con receta retenida: acércate a la botica con tu receta médica". `CON_RECETA` sí se reserva y la app avisa "Presenta tu receta médica al recoger; sin ella la botica no puede entregarlo". **No se suben fotos de recetas:** la receta la valida el químico farmacéutico en la botica. El límite de 10 y una reserva activa por producto no cambian. `condicionVenta` de la reserva y del pedido es la actual del medicamento (no se guarda en `reserva`); si un medicamento pasa a `RECETA_RETENIDA` con reservas ya creadas, esas reservas siguen su curso y el químico farmacéutico decide al entregar.
+   **Limitación:** los productos sin enlazar al catálogo maestro (`medicamento_id` null) no tienen condición (`condicionVenta: null`): se muestran sin etiqueta y se reservan igual que hoy, aunque en la realidad necesiten receta. La regla solo protege a los productos enlazados.
 
 ---
 
@@ -996,9 +1024,11 @@ Se calcula con `select coalesce(sum(cantidad), 0) from reserva where producto_id
   "motivoRechazo": null,
   "venceEn": "2026-11-13T15:30:00.123456Z",
   "creadoEn": "2026-11-12T15:30:00.123456Z",
-  "actualizadoEn": "2026-11-12T15:30:00.123456Z"
+  "actualizadoEn": "2026-11-12T15:30:00.123456Z",
+  "condicionVenta": "CON_RECETA"
 }
 ```
+- `condicionVenta` (H72): igual que en la reserva (sección 9), la condición actual del medicamento enlazado o `null`. Con `"CON_RECETA"` o `"RECETA_RETENIDA"` la web le recuerda al dueño: "Pide la receta médica antes de entregar". Un pedido `RECETA_RETENIDA` solo puede existir si la reserva se creó antes de que su medicamento tuviera esa condición (desde el 20/11/2026 `POST /reservas` no lo permite).
 - Del comprador **solo** se muestra `compradorNombre`, con la misma regla que `autor` en las reseñas (sección 11): **nombre de pila más la inicial del apellido** (`"Carlos Ramírez"` → `"Carlos R."`). Nunca su correo, teléfono ni dirección. Si el comprador eliminó su cuenta, sale `"Usuario eliminado"` (el nombre anonimizado de H19).
 - `stockActual`: el stock de hoy del producto, para que el dueño sepa si puede atender antes de confirmar.
 - `disponible`: **solo en `PENDIENTE`**; en los demás estados es `null`. Es `producto.stock` − la suma de `cantidad` de las **otras** reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) del producto, **sin contar este pedido**. Es el mismo número que se valida al confirmar: si `disponible < cantidad`, confirmar dará 409, y la web lo usa para avisar al dueño antes de que lo intente (y sugerirle rechazarlo con un motivo). En el ejemplo: stock 90 y otras reservas activas por 5 → `disponible` 85. **Nunca es negativo:** si la resta da menos de 0 (por ejemplo, el dueño bajó el stock por debajo de reservas aún `PENDIENTE`), se devuelve 0. Ejemplo: stock 2 y otras reservas `PENDIENTE` por 5 → 2 − 5 = −3 → `disponible` 0.
@@ -1014,7 +1044,7 @@ Pedidos de la botica, del más reciente al más antiguo (por `creadoEn`), máxim
     "cantidad": 2, "precioUnitario": 2.20, "total": 4.40, "stockActual": 90,
     "disponible": 85, "compradorNombre": "Carlos R.", "motivoRechazo": null,
     "venceEn": "2026-11-13T15:30:00.123456Z", "creadoEn": "2026-11-12T15:30:00.123456Z",
-    "actualizadoEn": "2026-11-12T15:30:00.123456Z" }
+    "actualizadoEn": "2026-11-12T15:30:00.123456Z", "condicionVenta": "CON_RECETA" }
 ]
 ```
 Sin pedidos → `200` con `[]`.
@@ -1115,6 +1145,7 @@ Una reserva que llega a recogerse usa los 3 (nueva, lista y recordatorio); una r
 9. **`stockActual`** en el pedido y **máximo 100** pedidos en la lista, sin paginación.
 10. **Stock comprometido (13/11/2026, H79, H80):** el dueño no puede comprometer stock que no tiene; aceptar un pedido sin stock sería engañar al comprador. Unidades comprometidas = suma de `cantidad` de las reservas `CONFIRMADA` y `LISTA`. Solo se confirma si lo disponible alcanza (si no, 409 y se rechaza con motivo); `PUT /productos/{id}` y la carga masiva no dejan el stock por debajo de lo comprometido (409, o error de esa fila en la carga masiva). El pedido trae `disponible` (solo en `PENDIENTE`) para avisar antes de confirmar. Con esto `LISTA` y `ENTREGADA` tienen el stock garantizado y la validación al entregar queda solo como respaldo. Mensaje del 409 en singular o plural: "Tienes 1 unidad comprometida…" o "Tienes {n} unidades comprometidas…". `disponible` nunca es negativo: si la resta da menos de 0, se devuelve 0.
 11. **Baja de un producto con pedidos (14/11/2026, H79, H80):** `DELETE /productos/{id}` responde 409 "No puedes dar de baja un producto con pedidos confirmados o listos para recoger. Atiéndelos o recházalos primero." si el producto tiene reservas `CONFIRMADA` o `LISTA` (el dueño ya se comprometió con el comprador). Las `PENDIENTE` no bloquean la baja, pero al dar de baja el producto ya no se pueden confirmar: el dueño las rechaza con un motivo.
+12. **Condición de venta en el pedido (20/11/2026, H72):** el pedido trae `condicionVenta` (la actual del medicamento enlazado, `null` si no está enlazado) para que el dueño sepa que debe pedir la receta. No cambia los estados ni las validaciones de esta sección: la receta la revisa el químico farmacéutico al entregar, y si el comprador no la trae, el dueño no entrega: la reserva `LISTA` vence sola a las 48 h (H84), porque desde `LISTA` no se puede rechazar. Ver la decisión 8 de la sección 9.
 
 ---
 
