@@ -281,3 +281,24 @@ docker system prune
    Entonces `FIREBASE_CREDENTIALS_PATH=/etc/secrets/firebase.json` y `FIREBASE_PROJECT_ID=boticompara`.
 6. En el plan gratis, el servicio se duerme tras unos minutos sin visitas; la primera petición después tarda en responder
    mientras arranca Spring.
+
+---
+
+## 8. Prueba local (21/11/2026)
+
+Probado en la Mac de Guillermo con la Opción A (`docker` directo):
+
+| Paso | Resultado |
+|---|---|
+| `docker build -t boticompara-backend ./backend-usuario` | Sin errores. |
+| `docker run -d --name boticompara-backend --env-file .env -p 8080:8080 --memory 512m boticompara-backend` | Arrancó en 4,6 s. En el log: `JAVA_TOOL_OPTIONS` aplicado, proceso corriendo con el usuario `boticompara`, conexión a Supabase correcta y Firebase deshabilitado (esperado: el `.env` de la raíz no tiene `FIREBASE_PROJECT_ID`). |
+| Login de `carlos@boticompara.nissidev.dev` | Devolvió el token. |
+| `GET /api/productos/buscar?q=paracetamol` | 2 productos: Salud Total y FarmaVida, a S/ 2.20. |
+| `docker stop` y `docker rm` | Contenedor detenido y borrado. |
+
+### Pendiente para el escaneo de seguridad
+
+Al arrancar, el log muestra `Using generated security password` (viene de `UserDetailsServiceAutoConfiguration`).
+Spring Boot crea un usuario en memoria con una contraseña al azar porque encuentra Spring Security sin un
+`UserDetailsService` propio. La API usa JWT y no debería necesitarlo, pero hay que revisarlo en el escaneo de
+seguridad antes de cambiar nada (por ejemplo, excluir esa autoconfiguración). **No se cambió en esta rama.**
