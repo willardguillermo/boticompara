@@ -21,7 +21,7 @@
 .panel-tarjetas li { list-style: none; }
 .panel-tarjeta { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; margin: 0;
                  border: 1px solid var(--hairline-color); border-radius: 4px; background: var(--body-bg); }
-.panel-tarjeta.atencion { border-left: 4px solid var(--message-warning-bg, #ffc); }
+.panel-tarjeta.atencion { border-left: 4px solid #9a5b00; background: var(--message-warning-bg, #ffc); }  /* A-R5: naranja de boticas/etiquetas.py */
 .panel-valor { font-size: 1.75rem; font-weight: 600; line-height: 1.1; color: var(--body-fg);
                font-variant-numeric: tabular-nums; }
 .panel-etiqueta { color: var(--body-quiet-color); }
@@ -40,7 +40,10 @@
 .panel-vacio { margin: 0; padding: 12px; color: var(--body-quiet-color); }
 .panel-pie { margin: 0; padding: 8px 12px; border-top: 1px solid var(--hairline-color); }
 
-/* H95: ranking de boticas */
+/* H95: ranking de boticas. Con 9 columnas, en pantallas medianas la tabla se desplaza sola (A-R2) */
+.reporte-desplazable { overflow-x: auto; }
+.reporte-desplazable th { white-space: nowrap; }
+.reporte-desplazable abbr { text-decoration: underline dotted; cursor: help; }
 .reporte-tabla td.puntaje { font-weight: bold; }
 .reporte-tabla td.informativo { color: var(--body-quiet-color); }
 .ranking-formula { margin-top: 16px; max-width: 70em; }
