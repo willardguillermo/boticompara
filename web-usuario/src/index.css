@@ -1517,6 +1517,30 @@ a {
   color: var(--color-texto-suave);
 }
 
+/* H72: el medicamento pide receta */
+.estado-pedido-receta {
+  background: var(--info-fondo);
+  color: var(--info);
+}
+
+.producto-pedido .estado-pedido-receta {
+  justify-self: start;
+  margin-top: 0.3rem;
+}
+
+.aviso-receta {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--aviso);
+}
+
+.etiquetas-pedido {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 .barra-pedidos {
   align-items: flex-end;
   justify-content: space-between;
@@ -1662,6 +1686,10 @@ a {
 
   .producto-pedido {
     justify-items: end;
+  }
+
+  .producto-pedido .estado-pedido-receta {
+    justify-self: end;
   }
 }
 
