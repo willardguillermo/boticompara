@@ -77,6 +77,7 @@ Inicia sesión con Google o crea la cuenta si no existe. No requiere token.
 | 403 | Cuenta suspendida | "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima) |
 | 403 | Cuenta dada de baja | "Tu cuenta fue dada de baja" |
 | 409 | Ya existe una cuenta con contraseña y ese correo | "Ya existe una cuenta con este correo. Inicia sesión con tu contraseña" |
+| 429 | Demasiados intentos fallidos desde ese correo e IP | "Demasiados intentos fallidos. Espera 15 minutos" |
 
 ### `POST /auth/registro` — H1, H15, H20
 Crea un comprador o un dueño de botica.
@@ -116,6 +117,7 @@ El token dura 24 h. Errores:
 
 - **401:** correo o contraseña incorrectos, o cuenta sin contraseña (creada con Google). Es el mismo mensaje en todos los casos, para no revelar qué correos existen.
 - **403:** cuenta dada de baja o suspendida, **solo si la contraseña es correcta**. Responde "Tu cuenta fue dada de baja" o "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima). Sin contraseña correcta no se revela el estado de la cuenta.
+- **429:** demasiados intentos fallidos. Se cuenta por correo e IP: 5 contraseñas incorrectas en 15 minutos bloquean nuevos intentos de ese correo desde esa IP durante 15 minutos. Responde con el header `Retry-After` (segundos restantes) y el mensaje "Demasiados intentos fallidos. Espera 15 minutos". Un login correcto limpia el contador de ese correo e IP.
 
 Una sesión ya abierta sigue funcionando hasta que el token venza o la cuenta quede dada de baja o suspendida: en ese caso, cada petición responde 401 y la app debe cerrar sesión. Al volver a entrar, el login da el 403 correspondiente.
 
