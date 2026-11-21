@@ -104,3 +104,5 @@ src/
 
 Las pantallas solo importan `api` desde `services/index.js`, así que cambiar entre la API simulada y la
 real no requiere tocarlas.
+
+Animaciones de [React Bits](https://reactbits.dev) (variante JS-CSS, copiadas en `src/components/reactbits/`, licencia MIT + Commons Clause en su `LICENSE.md`): Counter (resumen de la carga masiva), Shiny Text (asistente escribiendo), Gradient Text (marca del login y registro), Spotlight Card (tarjeta del login) y Star Border (botón principal de Mi botica). No agregan dependencias y respetan `prefers-reduced-motion`.
