@@ -299,7 +299,7 @@ class ReservaServiceTest {
 
     @Test
     void cancelarUnaReservaPendienteLaPasaACancelada() {
-        when(reservas.findByIdAndUsuarioId(15L, USUARIO))
+        when(reservas.bloquearPropia(15L, USUARIO))
                 .thenReturn(Optional.of(reservaDe(EstadoReserva.PENDIENTE, Instant.now().plus(1, ChronoUnit.DAYS))));
         when(reservas.save(any(Reserva.class))).thenAnswer(inv -> inv.getArgument(0));
         when(productos.findById(PRODUCTO)).thenReturn(Optional.of(producto(3)));
@@ -312,7 +312,7 @@ class ReservaServiceTest {
 
     @Test
     void cancelarUnaReservaEntregadaDa409() {
-        when(reservas.findByIdAndUsuarioId(15L, USUARIO))
+        when(reservas.bloquearPropia(15L, USUARIO))
                 .thenReturn(Optional.of(reservaDe(EstadoReserva.ENTREGADA, Instant.now().plus(1, ChronoUnit.DAYS))));
 
         ApiException ex = assertThrows(ApiException.class, () -> service.cancelar(USUARIO, 15L));
@@ -324,7 +324,7 @@ class ReservaServiceTest {
 
     @Test
     void cancelarUnaReservaYaVencidaDa409() {
-        when(reservas.findByIdAndUsuarioId(15L, USUARIO))
+        when(reservas.bloquearPropia(15L, USUARIO))
                 .thenReturn(Optional.of(reservaDe(EstadoReserva.PENDIENTE, Instant.now().minus(1, ChronoUnit.MINUTES))));
 
         ApiException ex = assertThrows(ApiException.class, () -> service.cancelar(USUARIO, 15L));
@@ -335,7 +335,7 @@ class ReservaServiceTest {
 
     @Test
     void cancelarUnaReservaAjenaEs404() {
-        when(reservas.findByIdAndUsuarioId(15L, USUARIO)).thenReturn(Optional.empty());
+        when(reservas.bloquearPropia(15L, USUARIO)).thenReturn(Optional.empty());
 
         ApiException ex = assertThrows(ApiException.class, () -> service.cancelar(USUARIO, 15L));
 

@@ -62,7 +62,7 @@ public class PedidoService {
     @Transactional
     public PedidoResponse cambiarEstado(Long usuarioId, Long id, String estadoTexto) {
         EstadoReserva nuevo = parsear(estadoTexto);
-        Reserva r = pedidoDeMiBotica(usuarioId, id);
+        Reserva r = pedidoBloqueadoDeMiBotica(usuarioId, id);
 
         if (!r.getEstado().puedePasarPorEstadoA(nuevo)) {
             throw ApiException.conflict("No se puede pasar de " + r.getEstado() + " a " + nuevo);
@@ -92,7 +92,7 @@ public class PedidoService {
         if (motivo.length() < MOTIVO_MIN || motivo.length() > MOTIVO_MAX) {
             throw ApiException.badRequest("El motivo debe tener entre " + MOTIVO_MIN + " y " + MOTIVO_MAX + " caracteres");
         }
-        Reserva r = pedidoDeMiBotica(usuarioId, id);
+        Reserva r = pedidoBloqueadoDeMiBotica(usuarioId, id);
 
         if (r.getEstado() != EstadoReserva.PENDIENTE && r.getEstado() != EstadoReserva.CONFIRMADA) {
             throw ApiException.conflict("No se puede rechazar un pedido " + r.getEstado());
@@ -146,6 +146,13 @@ public class PedidoService {
     private Reserva pedidoDeMiBotica(Long usuarioId, Long id) {
         Botica b = miBotica(usuarioId);
         return reservas.pedidoDeBotica(id, b.getId())
+                .orElseThrow(() -> ApiException.notFound("El pedido no existe"));
+    }
+
+    /** Para cambiar estado o rechazar: bloquea la reserva hasta el commit. */
+    private Reserva pedidoBloqueadoDeMiBotica(Long usuarioId, Long id) {
+        Botica b = miBotica(usuarioId);
+        return reservas.bloquearPedidoDeBotica(id, b.getId())
                 .orElseThrow(() -> ApiException.notFound("El pedido no existe"));
     }
 
