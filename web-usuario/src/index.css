@@ -2068,6 +2068,11 @@ a {
   overflow-y: auto;
   padding: 1rem;
   background: var(--color-fondo);
+  /* Los mensajes se desvanecen arriba al desplazarse: indica que hay más conversación.
+     Ocupa lo mismo que el relleno, así que en reposo no tapa nada. Es una máscara (solo
+     transparencia), no un color. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 1rem);
+  mask-image: linear-gradient(to bottom, transparent, black 1rem);
 }
 
 .chat-vacio {
