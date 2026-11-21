@@ -38,7 +38,11 @@ public class PedidoService {
     private final ProductoRepository productos;
     private final ReservaRepository reservas;
     private final UsuarioRepository usuarios;
+
     private final org.springframework.context.ApplicationEventPublisher eventos;
+
+    private final CondicionVentaService condiciones;
+
 
     /** H77, H81: pedidos de la botica del dueño. estado vacío = todos. */
     @Transactional(readOnly = true)
@@ -62,7 +66,7 @@ public class PedidoService {
     @Transactional
     public PedidoResponse cambiarEstado(Long usuarioId, Long id, String estadoTexto) {
         EstadoReserva nuevo = parsear(estadoTexto);
-        Reserva r = pedidoDeMiBotica(usuarioId, id);
+        Reserva r = pedidoBloqueadoDeMiBotica(usuarioId, id);
 
         if (!r.getEstado().puedePasarPorEstadoA(nuevo)) {
             throw ApiException.conflict("No se puede pasar de " + r.getEstado() + " a " + nuevo);
@@ -96,7 +100,7 @@ public class PedidoService {
         if (motivo.length() < MOTIVO_MIN || motivo.length() > MOTIVO_MAX) {
             throw ApiException.badRequest("El motivo debe tener entre " + MOTIVO_MIN + " y " + MOTIVO_MAX + " caracteres");
         }
-        Reserva r = pedidoDeMiBotica(usuarioId, id);
+        Reserva r = pedidoBloqueadoDeMiBotica(usuarioId, id);
 
         if (r.getEstado() != EstadoReserva.PENDIENTE && r.getEstado() != EstadoReserva.CONFIRMADA) {
             throw ApiException.conflict("No se puede rechazar un pedido " + r.getEstado());
@@ -155,6 +159,13 @@ public class PedidoService {
                 .orElseThrow(() -> ApiException.notFound("El pedido no existe"));
     }
 
+    /** Para cambiar estado o rechazar: bloquea la reserva hasta el commit. */
+    private Reserva pedidoBloqueadoDeMiBotica(Long usuarioId, Long id) {
+        Botica b = miBotica(usuarioId);
+        return reservas.bloquearPedidoDeBotica(id, b.getId())
+                .orElseThrow(() -> ApiException.notFound("El pedido no existe"));
+    }
+
     private boolean venció(Reserva r) {
         return !r.getVenceEn().isAfter(Instant.now());
     }
@@ -173,6 +184,8 @@ public class PedidoService {
         Map<Long, Usuario> users = usuarios.findAllById(
                         lista.stream().map(Reserva::getUsuarioId).distinct().toList())
                 .stream().collect(Collectors.toMap(Usuario::getId, Function.identity()));
+        Map<Long, String> conds = condiciones.deMedicamentos(
+                prods.values().stream().map(Producto::getMedicamentoId).toList());
         return lista.stream()
                 .map(r -> {
                     Producto p = prods.get(r.getProductoId());
@@ -180,7 +193,8 @@ public class PedidoService {
                     Long disponible = (r.getEstado() == EstadoReserva.PENDIENTE && p != null)
                             ? disponibleParaPedido(p, r)
                             : null;
-                    return PedidoResponse.from(r, p, u == null ? null : u.getNombre(), disponible);
+                    return PedidoResponse.from(r, p, u == null ? null : u.getNombre(), disponible,
+                            p == null ? null : conds.get(p.getMedicamentoId()));
                 })
                 .toList();
     }

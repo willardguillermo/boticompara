@@ -33,7 +33,8 @@ function Cabecera() {
           <span className="nombre-usuario texto-suave">{usuario.nombre}</span>
           <AsistenteChat />
           <button type="button" className="btn btn-secundario btn-icono" onClick={cerrarSesion}>
-            <Icono nombre="salir" /> Salir
+            {/* En celular solo se ve el ícono; el texto queda para el lector de pantalla */}
+            <Icono nombre="salir" /> <span className="texto-escritorio">Salir</span>
           </button>
         </div>
       </div>

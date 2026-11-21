@@ -15,9 +15,11 @@ public record ReservaResponse(Long id, String codigo, EstadoReserva estado,
                               Integer cantidad, BigDecimal precioUnitario, BigDecimal total,
                               Long boticaId, String boticaNombre, String boticaDireccion,
                               String boticaDistrito, String boticaTelefono,
-                              String motivoRechazo, Instant venceEn, Instant creadoEn, Instant actualizadoEn) {
+                              String motivoRechazo, Instant venceEn, Instant creadoEn, Instant actualizadoEn,
+                              String condicionVenta) {
 
-    public static ReservaResponse from(Reserva r, Producto p, Botica b) {
+    /** condicionVenta (H72): la actual del medicamento enlazado al producto, o null. No se guarda en la reserva. */
+    public static ReservaResponse from(Reserva r, Producto p, Botica b, String condicionVenta) {
         return new ReservaResponse(
                 r.getId(), r.getCodigo(), r.getEstado(),
                 r.getProductoId(),
@@ -34,6 +36,7 @@ public record ReservaResponse(Long id, String codigo, EstadoReserva estado,
                 r.getMotivoRechazo(),
                 r.getVenceEn(),
                 r.getCreadoEn(),
-                r.getActualizadoEn());
+                r.getActualizadoEn(),
+                condicionVenta);
     }
 }

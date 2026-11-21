@@ -13,13 +13,16 @@ public record PedidoResponse(Long id, String codigo, EstadoReserva estado,
                              Long productoId, String nombreComercial, String presentacion,
                              Integer cantidad, BigDecimal precioUnitario, BigDecimal total,
                              Integer stockActual, Long disponible, String compradorNombre,
-                             String motivoRechazo, Instant venceEn, Instant creadoEn, Instant actualizadoEn) {
+                             String motivoRechazo, Instant venceEn, Instant creadoEn, Instant actualizadoEn,
+                             String condicionVenta) {
 
     /**
      * disponible solo se llena en PENDIENTE (lo calcula el servicio); en los demás estados es null.
      * nombreComprador es el nombre completo de la cuenta; aquí se acorta.
+     * condicionVenta (H72): la actual del medicamento enlazado al producto, o null.
      */
-    public static PedidoResponse from(Reserva r, Producto p, String nombreComprador, Long disponible) {
+    public static PedidoResponse from(Reserva r, Producto p, String nombreComprador, Long disponible,
+                                      String condicionVenta) {
         return new PedidoResponse(
                 r.getId(), r.getCodigo(), r.getEstado(),
                 r.getProductoId(),
@@ -34,6 +37,7 @@ public record PedidoResponse(Long id, String codigo, EstadoReserva estado,
                 r.getMotivoRechazo(),
                 r.getVenceEn(),
                 r.getCreadoEn(),
-                r.getActualizadoEn());
+                r.getActualizadoEn(),
+                condicionVenta);
     }
 }

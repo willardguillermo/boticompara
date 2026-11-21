@@ -1,0 +1,28 @@
+# Lo que NO se copia a la imagen. Docker lo lee antes de cada build.
+
+# Resultados de compilaciones locales: la imagen compila su propio .jar
+target/
+
+# Secretos: nunca dentro de la imagen (se pasan al correr el contenedor)
+.env
+.env.*
+*.json
+*.pem
+*.key
+*.p12
+*.jks
+
+# Herramientas y editores
+.sonar/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.log
+
+# Archivos de Docker y git, que no hacen falta para compilar
+Dockerfile
+.dockerignore
+.git
+.gitignore
+.gitattributes

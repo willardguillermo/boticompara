@@ -22,9 +22,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,14 +48,19 @@ class ReservaServiceTest {
     @Mock BoticaRepository boticas;
     @Mock ReservaRepository reservas;
     @Mock BusquedaService busqueda;
+
     @Mock
     ApplicationEventPublisher eventos;
+
+    @Mock CondicionVentaService condiciones;
+
 
     ReservaService service;
 
     @BeforeEach
     void preparar() {
-        service = new ReservaService(productos, boticas, reservas, busqueda, eventos);
+
+        service = new ReservaService(productos, boticas, reservas, busqueda, eventos, condiciones);
     }
 
     private Producto producto(int stock) {
@@ -142,6 +149,78 @@ class ReservaServiceTest {
         assertEquals("Todas las unidades de este producto ya están reservadas", ex.getMessage());
     }
 
+    // ---------- H72: condición de venta ----------
+
+    private static final long MEDICAMENTO = 40L;
+
+    private Producto enlazado(int stock) {
+        Producto p = producto(stock);
+        p.setMedicamentoId(MEDICAMENTO);
+        return p;
+    }
+
+    @Test
+    void recetaRetenidaEs409ConElMensajeDelContratoYNoCreaNada() {
+        when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(enlazado(10)));
+        when(condiciones.deMedicamento(MEDICAMENTO)).thenReturn("RECETA_RETENIDA");
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("Este medicamento se vende con receta retenida: acércate a la botica con tu receta médica",
+                ex.getMessage());
+        // Antes de calcular lo disponible y sin guardar nada
+        verifyNoInteractions(reservas);
+    }
+
+    @Test
+    void productoNoVisibleEs404AunqueSeaRecetaRetenida() {
+        when(busqueda.detalle(PRODUCTO)).thenThrow(ApiException.notFound("Producto no encontrado"));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+        verifyNoInteractions(condiciones);
+    }
+
+    @Test
+    void conRecetaSiSeReservaYLaRespuestaTraeLaCondicion() {
+        stubCreacionExitosa(enlazado(10));
+        when(condiciones.deMedicamento(MEDICAMENTO)).thenReturn("CON_RECETA");
+
+        ReservaResponse r = service.crear(USUARIO, PRODUCTO, 2);
+
+        verify(reservas).save(any(Reserva.class));
+        assertEquals(EstadoReserva.PENDIENTE, r.estado());
+        assertEquals("CON_RECETA", r.condicionVenta());
+    }
+
+    @Test
+    void productoSinEnlazarSeReservaConCondicionNula() {
+        stubCreacionExitosa(producto(10));
+
+        ReservaResponse r = service.crear(USUARIO, PRODUCTO, 1);
+
+        verify(reservas).save(any(Reserva.class));
+        assertNull(r.condicionVenta());
+    }
+
+    @Test
+    void historialYDetalleTraenLaCondicionActualDelMedicamento() {
+        Reserva r = reservaDe(EstadoReserva.PENDIENTE, Instant.now().plus(1, ChronoUnit.DAYS));
+        when(reservas.findTop100ByUsuarioIdOrderByCreadoEnDesc(USUARIO)).thenReturn(List.of(r));
+        when(productos.findAllById(any())).thenReturn(List.of(enlazado(3)));
+        when(boticas.findAllById(any())).thenReturn(List.of(botica()));
+        when(condiciones.deMedicamentos(List.of(MEDICAMENTO))).thenReturn(Map.of(MEDICAMENTO, "CON_RECETA"));
+        when(reservas.findByIdAndUsuarioId(15L, USUARIO)).thenReturn(Optional.of(r));
+        when(productos.findById(PRODUCTO)).thenReturn(Optional.of(enlazado(3)));
+        when(boticas.findById(BOTICA)).thenReturn(Optional.of(botica()));
+        when(condiciones.deMedicamento(MEDICAMENTO)).thenReturn("RECETA_RETENIDA");
+
+        assertEquals("CON_RECETA", service.misReservas(USUARIO, null).get(0).condicionVenta());
+        assertEquals("RECETA_RETENIDA", service.detalle(USUARIO, 15L).condicionVenta());
+    }
+
     @Test
     void reservaNuevaQuedaPendienteConElPrecioDelProductoYVenceEn24Horas() {
         stubCreacionExitosa(producto(10));
@@ -227,7 +306,7 @@ class ReservaServiceTest {
 
     @Test
     void cancelarUnaReservaPendienteLaPasaACancelada() {
-        when(reservas.findByIdAndUsuarioId(15L, USUARIO))
+        when(reservas.bloquearPropia(15L, USUARIO))
                 .thenReturn(Optional.of(reservaDe(EstadoReserva.PENDIENTE, Instant.now().plus(1, ChronoUnit.DAYS))));
         when(reservas.save(any(Reserva.class))).thenAnswer(inv -> inv.getArgument(0));
         when(productos.findById(PRODUCTO)).thenReturn(Optional.of(producto(3)));
@@ -240,7 +319,7 @@ class ReservaServiceTest {
 
     @Test
     void cancelarUnaReservaEntregadaDa409() {
-        when(reservas.findByIdAndUsuarioId(15L, USUARIO))
+        when(reservas.bloquearPropia(15L, USUARIO))
                 .thenReturn(Optional.of(reservaDe(EstadoReserva.ENTREGADA, Instant.now().plus(1, ChronoUnit.DAYS))));
 
         ApiException ex = assertThrows(ApiException.class, () -> service.cancelar(USUARIO, 15L));
@@ -252,7 +331,7 @@ class ReservaServiceTest {
 
     @Test
     void cancelarUnaReservaYaVencidaDa409() {
-        when(reservas.findByIdAndUsuarioId(15L, USUARIO))
+        when(reservas.bloquearPropia(15L, USUARIO))
                 .thenReturn(Optional.of(reservaDe(EstadoReserva.PENDIENTE, Instant.now().minus(1, ChronoUnit.MINUTES))));
 
         ApiException ex = assertThrows(ApiException.class, () -> service.cancelar(USUARIO, 15L));
@@ -263,7 +342,7 @@ class ReservaServiceTest {
 
     @Test
     void cancelarUnaReservaAjenaEs404() {
-        when(reservas.findByIdAndUsuarioId(15L, USUARIO)).thenReturn(Optional.empty());
+        when(reservas.bloquearPropia(15L, USUARIO)).thenReturn(Optional.empty());
 
         ApiException ex = assertThrows(ApiException.class, () -> service.cancelar(USUARIO, 15L));
 

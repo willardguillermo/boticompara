@@ -6,7 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Pageable;
-
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +60,18 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
                                   @Param("estados") Collection<EstadoReserva> estados,
                                   @Param("id") Long id);
 
+
+    /** H78-H80 (cambios): bloquea la fila de la reserva hasta el commit, solo si es de esa botica. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Reserva r, Producto p "
+            + "where r.id = :id and r.productoId = p.id and p.boticaId = :boticaId")
+    Optional<Reserva> bloquearPedidoDeBotica(@Param("id") Long id, @Param("boticaId") Long boticaId);
+
+    /** H75 (cancelar): bloquea la reserva del comprador hasta el commit. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Reserva r where r.id = :id and r.usuarioId = :usuarioId")
+    Optional<Reserva> bloquearPropia(@Param("id") Long id, @Param("usuarioId") Long usuarioId);
+
     /** Unidades comprometidas de un producto: suma de CONFIRMADA y LISTA (API.md, sección 4). */
     @Query("select coalesce(sum(r.cantidad), 0) from Reserva r "
             + "where r.productoId = :productoId and r.estado in :estados")
@@ -67,4 +80,5 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
 
     /** Baja de un producto: hay pedidos confirmados o listos (API.md, sección 4). */
     boolean existsByProductoIdAndEstadoIn(Long productoId, Collection<EstadoReserva> estados);
+
 }

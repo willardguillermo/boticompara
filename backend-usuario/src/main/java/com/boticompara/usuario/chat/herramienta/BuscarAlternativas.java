@@ -54,9 +54,9 @@ public class BuscarAlternativas implements Herramienta {
         return ResultadoHerramienta.de(todas.size(),
                 primeras.stream().map(a -> new ProductoParaModelo(a.productoId(), a.nombreComercial(),
                         a.principioActivo(), a.presentacion(), a.precio(), a.stock(), a.boticaNombre(),
-                        a.boticaDistrito(), null)).toList(),
+                        a.boticaDistrito(), null, a.condicionVenta())).toList(),
                 primeras.stream().map(a -> new ChatProducto(a.productoId(), a.nombreComercial(),
                         a.principioActivo(), a.presentacion(), a.precio(), a.stock(), null, a.boticaId(),
-                        a.boticaNombre(), a.boticaDistrito(), null)).toList());
+                        a.boticaNombre(), a.boticaDistrito(), null, a.condicionVenta())).toList());
     }
 }
