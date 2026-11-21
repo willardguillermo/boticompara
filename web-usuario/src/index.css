@@ -1838,6 +1838,12 @@ a {
     display: none;
   }
 
+  /* Fila 1: marca + Asistente + Salir. Fila 2: las tres secciones, cada una en una sola línea */
+  .cabecera-contenido {
+    flex-wrap: wrap;
+    padding: 0.6rem 1rem 0.5rem;
+  }
+
   .navegacion {
     order: 3;
     flex-basis: 100%;
@@ -1846,10 +1852,24 @@ a {
   .navegacion a {
     flex: 1;
     justify-content: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0.4rem;
+    font-size: 0.92rem;
+    white-space: nowrap;
   }
 
   .usuario-sesion {
     margin-left: auto;
+    gap: 0.5rem;
+  }
+
+  .texto-escritorio {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   /* La tabla del catálogo se convierte en tarjetas */
