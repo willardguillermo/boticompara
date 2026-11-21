@@ -49,7 +49,7 @@ export default function LoginPage() {
   return (
     <main className="acceso">
       <div className="tarjeta">
-        <Marca a="/login" />
+        <Marca a="/login" degradado />
         {comprador ? (
           <AvisoSoloMovil nombre={comprador.nombre} onVolver={() => setComprador(null)} />
         ) : (
