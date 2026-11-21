@@ -15,7 +15,7 @@ class PedidoCorreoServiceTest {
     private PedidoCorreoService.DatosNuevaReserva datos() {
         return new PedidoCorreoService.DatosNuevaReserva("dueno@botica.com", "Rosa Quispe", "BC-7K2QXM",
                 "Paracetamol Genérico", "Tableta 500 mg x 10", 2, new BigDecimal("2.20"),
-                "Carlos R.", Instant.parse("2026-11-21T20:30:00Z"));
+                "Carlos R.", Instant.parse("2026-11-21T20:30:00Z"), Instant.parse("2026-11-20T15:00:00Z"));
     }
 
     @Test
@@ -78,5 +78,27 @@ class PedidoCorreoServiceTest {
 
         assertTrue(cuerpo.contains("Motivo: No nos queda stock"), cuerpo);
         assertFalse(cuerpo.contains("Puedes recogerla"), cuerpo);
+    }
+
+    @Test
+    void cuerpoPideElPrecioUnitarioYLaFechaDeLaReserva() {
+        String cuerpo = PedidoCorreoService.cuerpoNuevaReserva(datos());
+
+        assertTrue(cuerpo.contains("Precio unitario: S/ 2.20"), cuerpo);
+        // 15:00 UTC = 10:00 en Lima
+        assertTrue(cuerpo.contains("Fecha de la reserva: 20/11/2026 10:00"), cuerpo);
+    }
+
+    @Test
+    void cuerpoAcortaElNombreCompletoDelComprador() {
+        PedidoCorreoService.DatosNuevaReserva d = new PedidoCorreoService.DatosNuevaReserva(
+                "dueno@botica.com", "Rosa Quispe", "BC-7K2QXM", "Paracetamol Genérico", "Tableta 500 mg x 10",
+                2, new BigDecimal("2.20"), "Carlos Ramírez", Instant.parse("2026-11-21T20:30:00Z"),
+                Instant.parse("2026-11-20T15:00:00Z"));
+
+        String cuerpo = PedidoCorreoService.cuerpoNuevaReserva(d);
+
+        assertTrue(cuerpo.contains("Comprador: Carlos R."), cuerpo);
+        assertFalse(cuerpo.contains("Ramírez"), cuerpo);
     }
 }

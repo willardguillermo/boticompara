@@ -1,5 +1,6 @@
 package com.boticompara.usuario.service;
 
+import com.boticompara.usuario.dto.NombreCorto;
 import com.boticompara.usuario.entity.EstadoReserva;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +28,7 @@ public class PedidoCorreoService {
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private static final String SQL_DUENO = "select u.correo, u.nombre as dueno, r.codigo, p.nombre_comercial as producto, "
-            + "p.presentacion, r.cantidad, r.precio_unitario, r.vence_en, cu.nombre as comprador "
+            + "p.presentacion, r.cantidad, r.precio_unitario, r.vence_en, r.creado_en, cu.nombre as comprador "
             + "from reserva r join producto p on p.id = r.producto_id join botica b on b.id = p.botica_id "
             + "join usuario u on u.id = b.usuario_id join usuario cu on cu.id = r.usuario_id where r.id = :id";
 
@@ -55,17 +56,14 @@ public class PedidoCorreoService {
             DatosNuevaReserva d = new DatosNuevaReserva(rs.getString("correo"), rs.getString("dueno"),
                     rs.getString("codigo"), rs.getString("producto"), rs.getString("presentacion"),
                     rs.getInt("cantidad"), rs.getBigDecimal("precio_unitario"), rs.getString("comprador"),
-                    rs.getTimestamp("vence_en").toInstant());
+                    rs.getTimestamp("vence_en").toInstant(), rs.getTimestamp("creado_en").toInstant());
             correo.enviar(d.correo(), asuntoNuevaReserva(d), cuerpoNuevaReserva(d));
         });
     }
 
     record DatosNuevaReserva(String correo, String dueno, String codigo, String producto, String presentacion,
-                             int cantidad, BigDecimal precioUnitario, String comprador, Instant venceEn) {
-    }
-
-    static String asuntoNuevaReserva(DatosNuevaReserva d) {
-        return "Nueva reserva " + d.codigo() + ": " + d.producto() + " x " + d.cantidad();
+                             int cantidad, BigDecimal precioUnitario, String comprador, Instant venceEn,
+                             Instant creadoEn) {
     }
 
     static String cuerpoNuevaReserva(DatosNuevaReserva d) {
@@ -76,11 +74,19 @@ public class PedidoCorreoService {
                 + "Código: " + d.codigo() + "\n"
                 + "Producto: " + d.producto() + " (" + d.presentacion() + ")\n"
                 + "Cantidad: " + d.cantidad() + "\n"
+                + "Precio unitario: S/ " + d.precioUnitario().setScale(2, RoundingMode.HALF_UP).toPlainString() + "\n"
                 + "Total: S/ " + total.toPlainString() + "\n"
-                + "Comprador: " + d.comprador() + "\n"
+                + "Comprador: " + NombreCorto.de(d.comprador()) + "\n"
+                + "Fecha de la reserva: " + FECHA.format(d.creadoEn().atZone(LIMA)) + "\n"
                 + "Vence el: " + FECHA.format(d.venceEn().atZone(LIMA)) + "\n\n"
                 + "Puedes atenderla desde la sección Pedidos de la web.\n\nBotiCompara\n";
     }
+
+    static String asuntoNuevaReserva(DatosNuevaReserva d) {
+        return "Nueva reserva " + d.codigo() + ": " + d.producto() + " x " + d.cantidad();
+    }
+
+
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
