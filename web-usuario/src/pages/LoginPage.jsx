@@ -5,6 +5,7 @@ import Alerta from '../components/Alerta.jsx'
 import AvisoSoloMovil from '../components/AvisoSoloMovil.jsx'
 import Campo from '../components/Campo.jsx'
 import Marca from '../components/Marca.jsx'
+import SpotlightCard from '../components/reactbits/SpotlightCard.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { MODO_SIMULADO } from '../services/index.js'
 import { propsError } from '../utils/validacion.js'
@@ -48,7 +49,8 @@ export default function LoginPage() {
 
   return (
     <main className="acceso">
-      <div className="tarjeta">
+      {/* Luz suave que sigue al mouse (Spotlight Card); el borde lo pone .tarjeta */}
+      <SpotlightCard className="tarjeta" intensity={0.6} style={{ '--spotlight-card-border': 'transparent' }}>
         <Marca a="/login" degradado />
         {comprador ? (
           <AvisoSoloMovil nombre={comprador.nombre} onVolver={() => setComprador(null)} />
@@ -107,7 +109,7 @@ export default function LoginPage() {
             )}
           </>
         )}
-      </div>
+      </SpotlightCard>
     </main>
   )
 }
