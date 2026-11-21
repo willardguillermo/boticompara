@@ -58,7 +58,9 @@ const db = {
   boticas: [
     { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', latitud: -11.942500, longitud: -76.699000, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
     { id: 2, usuarioId: 2, nombreComercial: 'FarmaVida', ruc: '20549871233', razonSocial: 'FarmaVida Perú E.I.R.L.', direccion: 'Jr. Trujillo 210', distrito: 'Lurigancho-Chosica', telefono: '014561234', latitud: -11.935100, longitud: -76.694300, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
-    { id: 3, usuarioId: 3, nombreComercial: 'Botica Nueva Era', ruc: '20712345676', razonSocial: 'Nueva Era Salud S.A.C.', direccion: 'Av. Nicolás Ayllón 980', distrito: 'Ate', telefono: '013459876', latitud: null, longitud: null, tieneLicencia: false, estado: 'PENDIENTE', motivoRechazo: null },
+    // Como en database/seed.sql: Nueva Era (lucia@) rechazada, para probar la corrección y el reenvío (H7)
+    { id: 3, usuarioId: 3, nombreComercial: 'Botica Nueva Era', ruc: '20712345676', razonSocial: 'Nueva Era Salud S.A.C.', direccion: 'Av. Nicolás Ayllón 980', distrito: 'Ate', telefono: '013459876', latitud: null, longitud: null, tieneLicencia: false, estado: 'RECHAZADO',
+      motivoRechazo: 'La dirección no coincide con la ficha RUC. Corrígela y vuelve a enviar.' },
   ],
   productos: [
     [1, 'Panadol', 'Paracetamol', 'Tableta 500 mg x 10', 8.5, 40],
