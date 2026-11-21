@@ -39,6 +39,7 @@ public class ReservaService {
     private final BoticaRepository boticas;
     private final ReservaRepository reservas;
     private final BusquedaService busqueda;
+    private final org.springframework.context.ApplicationEventPublisher eventos;
 
     /**
      * H72-H74: crea la reserva en PENDIENTE. El producto se bloquea dentro de la transacción,
@@ -82,6 +83,7 @@ public class ReservaService {
         r.setVenceEn(Instant.now().plus(HORAS_DE_PLAZO, ChronoUnit.HOURS));
 
         Reserva guardada = reservas.save(r);
+        eventos.publishEvent(new ReservaCreada(guardada.getId()));
         return ReservaResponse.from(guardada, p, boticas.findById(p.getBoticaId()).orElse(null));
     }
 
