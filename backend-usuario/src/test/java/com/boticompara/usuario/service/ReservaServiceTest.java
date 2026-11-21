@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
@@ -45,12 +46,14 @@ class ReservaServiceTest {
     @Mock BoticaRepository boticas;
     @Mock ReservaRepository reservas;
     @Mock BusquedaService busqueda;
+    @Mock
+    ApplicationEventPublisher eventos;
 
     ReservaService service;
 
     @BeforeEach
     void preparar() {
-        service = new ReservaService(productos, boticas, reservas, busqueda);
+        service = new ReservaService(productos, boticas, reservas, busqueda, eventos);
     }
 
     private Producto producto(int stock) {
