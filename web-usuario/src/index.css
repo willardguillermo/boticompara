@@ -2262,6 +2262,29 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+/* Escritorio: el asistente es un panel lateral de alto completo y la página se corre a la izquierda,
+   así no tapa las acciones de las tablas */
+@media (min-width: 900px) {
+  body:has(.chat-panel) {
+    padding-right: 420px;
+  }
+
+  .chat-panel {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 420px;
+    height: auto;
+    border-width: 0 0 0 1px;
+    border-radius: 0;
+    box-shadow: -8px 0 24px rgb(16 48 44 / 8%);
+  }
+
+  body:has(.chat-panel) .toasts {
+    right: calc(420px + 1rem);
+  }
+}
+
 @media (max-width: 600px) {
   .chat-panel {
     inset: 0;
