@@ -41,7 +41,7 @@ class BuscarAlternativasTest {
     private static AlternativaResponse alt(long id) {
         return new AlternativaResponse(id, "Producto " + id, "Paracetamol", "Tableta 500 mg x 10",
                 new BigDecimal("2.20"), 10, 2L, "FarmaVida", "Jr. Trujillo 210", "Chosica", "EQUIVALENTE",
-                new BigDecimal("12.0"));
+                new BigDecimal("12.0"), null);
     }
 
     @Test
@@ -54,8 +54,22 @@ class BuscarAlternativasTest {
         verify(alternativas, never()).alternativas(any(), any());
         assertEquals(1, r.paraModelo().get("total"));
         assertEquals(new ChatProducto(13L, "Producto 13", "Paracetamol", "Tableta 500 mg x 10",
-                new BigDecimal("2.20"), 10, null, 2L, "FarmaVida", "Chosica", null), r.tarjetas().get(0));
+                new BigDecimal("2.20"), 10, null, 2L, "FarmaVida", "Chosica", null, null), r.tarjetas().get(0));
         assertFalse(JSON.writeValueAsString(r.paraModelo()).contains("Trujillo"));
+    }
+
+    @Test
+    void laCondicionDeCadaAlternativaLlegaAlModeloYALaTarjeta() throws Exception {
+        AlternativaResponse conReceta = new AlternativaResponse(12L, "Amoxicilina Genérica", "Amoxicilina",
+                "Cápsula 500 mg x 10", new BigDecimal("4.00"), 10, 2L, "FarmaVida", "Jr. Trujillo 210", "Chosica",
+                "PRINCIPIO_ACTIVO", null, "CON_RECETA");
+        when(alternativas.alternativasSinRegistro(7L))
+                .thenReturn(new AlternativasResponse(7L, false, List.of(conReceta)));
+
+        ResultadoHerramienta r = herramienta.ejecutar(CARLOS, JSON.readTree("{\"productoId\":7}"));
+
+        assertEquals("CON_RECETA", r.tarjetas().get(0).condicionVenta());
+        assertTrue(JSON.writeValueAsString(r.paraModelo()).contains("\"condicionVenta\":\"CON_RECETA\""));
     }
 
     @Test

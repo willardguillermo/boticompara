@@ -75,11 +75,13 @@ public class BuscarPrecios implements Herramienta {
 
     private static ProductoParaModelo paraModelo(BusquedaResponse f) {
         return new ProductoParaModelo(f.productoId(), f.nombreComercial(), f.principioActivo(), f.presentacion(),
-                f.precio(), f.stock(), f.boticaNombre(), f.boticaDistrito(), f.distanciaKm());
+                f.precio(), f.stock(), f.boticaNombre(), f.boticaDistrito(), f.distanciaKm(),
+                f.condicionVenta());
     }
 
     private static ChatProducto tarjeta(BusquedaResponse f) {
         return new ChatProducto(f.productoId(), f.nombreComercial(), f.principioActivo(), f.presentacion(),
-                f.precio(), f.stock(), null, f.boticaId(), f.boticaNombre(), f.boticaDistrito(), f.distanciaKm());
+                f.precio(), f.stock(), null, f.boticaId(), f.boticaNombre(), f.boticaDistrito(), f.distanciaKm(),
+                f.condicionVenta());
     }
 }

@@ -7,12 +7,13 @@ import java.math.BigDecimal;
 /**
  * H68: lo que el modelo ve de un producto. Solo datos del producto y de la botica: sin coordenadas, dirección,
  * RUC ni datos de personas. productoId va para que pueda pedir buscar_alternativas. Los textos se recortan
- * porque los escriben los dueños.
+ * porque los escriben los dueños. condicionVenta (H72) no se recorta: es un valor fijo del catálogo maestro;
+ * si es null no se envía.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ProductoParaModelo(Long productoId, String nombre, String principioActivo, String presentacion,
                                  BigDecimal precio, Integer stock, String botica, String distrito,
-                                 BigDecimal distanciaKm) {
+                                 BigDecimal distanciaKm, String condicionVenta) {
 
     static final int MAX_TEXTO = 80;
 

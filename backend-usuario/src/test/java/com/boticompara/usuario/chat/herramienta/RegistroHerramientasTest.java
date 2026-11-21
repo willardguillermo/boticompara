@@ -7,6 +7,7 @@ import com.boticompara.usuario.service.AlternativasService;
 import com.boticompara.usuario.service.BoticaService;
 import com.boticompara.usuario.service.BusquedaService;
 import com.boticompara.usuario.service.CatalogoService;
+import com.boticompara.usuario.service.CondicionVentaService;
 import com.boticompara.usuario.service.MedicamentoService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,11 +47,14 @@ class RegistroHerramientasTest {
     @Mock
     MedicamentoService medicamentos;
 
+    @Mock
+    CondicionVentaService condiciones;
+
     RegistroHerramientas registro;
 
     @BeforeEach
     void armar() {
-        CatalogoPropio propio = new CatalogoPropio(boticas, catalogo);
+        CatalogoPropio propio = new CatalogoPropio(boticas, catalogo, condiciones);
         registro = new RegistroHerramientas(List.of(new BuscarPrecios(busqueda), new BuscarAlternativas(alternativas),
                 new VerStockBajo(propio), new BuscarEnMiCatalogo(propio), new BuscarMedicamento(medicamentos)));
     }

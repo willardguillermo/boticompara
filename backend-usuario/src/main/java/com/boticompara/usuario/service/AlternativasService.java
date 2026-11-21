@@ -35,7 +35,7 @@ public class AlternativasService {
 
     private static final String COLUMNAS = "v.producto_id, v.nombre_comercial, v.principio_activo, "
             + "v.presentacion, v.precio, v.stock, v.botica_id, v.botica_nombre, v.botica_direccion, "
-            + "v.botica_distrito";
+            + "v.botica_distrito, v.condicion_venta";
     private static final String ORDEN = " order by v.precio asc, v.botica_nombre asc, v.producto_id asc limit "
             + MAX_ALTERNATIVAS;
 
@@ -134,6 +134,7 @@ public class AlternativasService {
                 rs.getString("botica_direccion"),
                 rs.getString("botica_distrito"),
                 tipo,
-                null);
+                null,
+                rs.getString("condicion_venta"));
     }
 }

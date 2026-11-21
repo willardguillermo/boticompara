@@ -8,6 +8,7 @@ import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.service.BoticaService;
 import com.boticompara.usuario.service.CatalogoService;
+import com.boticompara.usuario.service.CondicionVentaService;
 import com.boticompara.usuario.service.MedicamentoService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,13 +51,16 @@ class HerramientasDelDuenoTest {
     @Mock
     MedicamentoService medicamentos;
 
+    @Mock
+    CondicionVentaService condiciones;
+
     VerStockBajo verStockBajo;
     BuscarEnMiCatalogo buscarEnMiCatalogo;
     BuscarMedicamento buscarMedicamento;
 
     @BeforeEach
     void armar() {
-        CatalogoPropio propio = new CatalogoPropio(boticas, catalogo);
+        CatalogoPropio propio = new CatalogoPropio(boticas, catalogo, condiciones);
         verStockBajo = new VerStockBajo(propio);
         buscarEnMiCatalogo = new BuscarEnMiCatalogo(propio);
         buscarMedicamento = new BuscarMedicamento(medicamentos);
@@ -89,14 +93,29 @@ class HerramientasDelDuenoTest {
         ResultadoHerramienta r = verStockBajo.ejecutar(ROSA, JSON.readTree("{\"boticaId\":2,\"usuarioId\":2}"));
 
         assertEquals(new ChatProducto(4L, "Amoxicilina 4", "Amoxicilina", "Cápsula 500 mg x 10",
-                new BigDecimal("6.00"), 3, 5, 1L, "Botica Salud Total", "Lurigancho-Chosica", null),
-                r.tarjetas().get(0));
+                new BigDecimal("6.00"), 3, 5, 1L, "Botica Salud Total", "Lurigancho-Chosica", null,
+                null), r.tarjetas().get(0));
         verify(boticas, never()).obtenerMia(2L);
         String json = JSON.writeValueAsString(r.paraModelo());
         assertEquals("{\"total\":1,\"resultados\":[{\"productoId\":4,\"nombre\":\"Amoxicilina 4\","
                 + "\"principioActivo\":\"Amoxicilina\",\"presentacion\":\"Cápsula 500 mg x 10\",\"precio\":6.00,"
                 + "\"stock\":3,\"botica\":\"Botica Salud Total\",\"distrito\":\"Lurigancho-Chosica\"}]}", json);
         assertFalse(json.contains("20131312955") || json.contains("Av. Lima") || json.contains("11.94"));
+    }
+
+    @Test
+    void buscarEnMiCatalogo_traeLaCondicionDelMedicamentoEnlazado() throws Exception {
+        rosaTieneBotica();
+        ProductoResponse enlazado = new ProductoResponse(4L, "Amoxicilina 4", "Amoxicilina", "Cápsula 500 mg x 10",
+                new BigDecimal("6.00"), 3, 5, 40L);
+        when(catalogo.listar(1L, "amoxi", false)).thenReturn(List.of(enlazado, producto(5)));
+        when(condiciones.deMedicamentos(java.util.Arrays.asList(40L, null))).thenReturn(Map.of(40L, "CON_RECETA"));
+
+        ResultadoHerramienta r = buscarEnMiCatalogo.ejecutar(ROSA, JSON.readTree("{\"texto\":\"amoxi\"}"));
+
+        assertEquals("CON_RECETA", r.tarjetas().get(0).condicionVenta());
+        assertNull(r.tarjetas().get(1).condicionVenta());
+        assertTrue(JSON.writeValueAsString(r.paraModelo()).contains("\"condicionVenta\":\"CON_RECETA\""));
     }
 
     @Test

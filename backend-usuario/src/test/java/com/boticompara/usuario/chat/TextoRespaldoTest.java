@@ -53,7 +53,7 @@ class TextoRespaldoTest {
 
     private static ChatProducto producto(long id, String nombre, String precio, String botica) {
         return new ChatProducto(id, nombre, "Paracetamol", "Tableta 500 mg x 10", new BigDecimal(precio), 10, null,
-                2L, botica, "Lurigancho-Chosica", null);
+                2L, botica, "Lurigancho-Chosica", null, null);
     }
 
     @Test

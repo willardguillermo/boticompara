@@ -7,11 +7,13 @@ import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.service.BoticaService;
 import com.boticompara.usuario.service.CatalogoService;
+import com.boticompara.usuario.service.CondicionVentaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * H68: catálogo del dueño para ver_stock_bajo y buscar_en_mi_catalogo. La botica sale siempre del usuario del
@@ -25,6 +27,7 @@ class CatalogoPropio {
 
     private final BoticaService boticas;
     private final CatalogoService catalogo;
+    private final CondicionVentaService condiciones;
 
     ResultadoHerramienta listar(ContextoChat contexto, String texto, boolean stockBajo) {
         Botica botica;
@@ -39,12 +42,21 @@ class CatalogoPropio {
         }
         List<ProductoResponse> todos = catalogo.listar(contexto.usuarioId(), texto, stockBajo);
         List<ProductoResponse> primeros = todos.stream().limit(Herramienta.MAX_RESULTADOS).toList();
+        // H72: ProductoResponse no trae la condición; se lee del medicamento enlazado, en una sola consulta
+        Map<Long, String> conds = condiciones.deMedicamentos(
+                primeros.stream().map(ProductoResponse::medicamentoId).toList());
         return ResultadoHerramienta.de(todos.size(),
                 primeros.stream().map(p -> new ProductoParaModelo(p.id(), p.nombreComercial(), p.principioActivo(),
                         p.presentacion(), p.precio(), p.stock(), botica.getNombreComercial(), botica.getDistrito(),
-                        null)).toList(),
+                        null, condicion(conds, p))).toList(),
                 primeros.stream().map(p -> new ChatProducto(p.id(), p.nombreComercial(), p.principioActivo(),
                         p.presentacion(), p.precio(), p.stock(), p.stockMinimo(), botica.getId(),
-                        botica.getNombreComercial(), botica.getDistrito(), null)).toList());
+                        botica.getNombreComercial(), botica.getDistrito(), null,
+                        condicion(conds, p))).toList());
+    }
+
+    /** null si el producto no está enlazado al catálogo maestro o su medicamento no tiene la condición. */
+    private static String condicion(Map<Long, String> conds, ProductoResponse p) {
+        return p.medicamentoId() == null ? null : conds.get(p.medicamentoId());
     }
 }

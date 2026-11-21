@@ -708,7 +708,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
       "boticaId": 2,
       "boticaNombre": "FarmaVida",
       "boticaDistrito": "Lurigancho-Chosica",
-      "distanciaKm": 1.25
+      "distanciaKm": 1.25,
+      "condicionVenta": "SIN_RECETA"
     },
     {
       "productoId": 3,
@@ -721,7 +722,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
       "boticaId": 1,
       "boticaNombre": "Botica Salud Total",
       "boticaDistrito": "Lurigancho-Chosica",
-      "distanciaKm": 2.10
+      "distanciaKm": 2.10,
+      "condicionVenta": "SIN_RECETA"
     }
   ],
   "respaldo": false,
@@ -745,7 +747,8 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
       "boticaId": 1,
       "boticaNombre": "Botica Salud Total",
       "boticaDistrito": "Lurigancho-Chosica",
-      "distanciaKm": null
+      "distanciaKm": null,
+      "condicionVenta": "CON_RECETA"
     }
   ],
   "respaldo": false,
@@ -795,6 +798,7 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 - `stockMinimo` solo tiene valor en los productos propios del dueño (herramientas `ver_stock_bajo` y `buscar_en_mi_catalogo`); en los demás es `null`.
 - `distanciaKm` solo tiene valor en las tarjetas de `buscar_precios`, cuando el pedido trae `lat` y `lng` y la botica registró ubicación; si no, `null`. Mismo cálculo que en `GET /productos/buscar`. El parámetro `cerca=true` solo cambia el orden (de la más cercana a la más lejana).
 - Las tarjetas de `buscar_alternativas` llevan siempre `distanciaKm: null`, aunque el pedido traiga ubicación: `AlternativasService` no calcula distancias. Lo mismo las de los productos propios del dueño.
+- `condicionVenta` (H72): la condición de venta del medicamento enlazado al producto, con los mismos valores que en la sección 5 (`SIN_RECETA`, `CON_RECETA`, `RECETA_RETENIDA` o `null` si el producto no está enlazado o no tiene el dato). Va en las tarjetas de las 4 herramientas que dan productos (`buscar_precios`, `buscar_alternativas`, `ver_stock_bajo` y `buscar_en_mi_catalogo`) y es el último campo de la tarjeta.
 - Los resultados de `buscar_medicamento` (catálogo maestro) solo aparecen en el texto: no generan tarjetas ni una lista aparte, porque no son productos de una botica.
 
 **Herramientas del asistente, según el rol del token.** El modelo solo decide los parámetros de la tabla. El usuario, su botica y la ubicación los pone el servidor a partir del token y del pedido, nunca el modelo.
@@ -807,7 +811,7 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 | `buscar_en_mi_catalogo` | `DUENO_BOTICA` | Buscar un producto en su propio catálogo (precio y stock) | `texto` | `CatalogoService.listar(usuarioId, texto, false)` (`GET /boticas/mia/productos?q=`) |
 | `buscar_medicamento` | `DUENO_BOTICA` | Buscar en el catálogo maestro (DIGEMID) | `texto` (mínimo 2 caracteres) | `MedicamentoService.buscar` (`GET /medicamentos?q=`) |
 
-- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (`productoId`, nombre, principio activo, presentación, precio, stock, botica, distrito y distancia en km). El `productoId` va porque el modelo lo necesita para pedir `buscar_alternativas`; es un dato del producto, no de una persona. Nunca coordenadas ni datos de personas.
+- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (`productoId`, nombre, principio activo, presentación, precio, stock, botica, distrito, distancia en km y condición de venta). El `productoId` va porque el modelo lo necesita para pedir `buscar_alternativas`; es un dato del producto, no de una persona. Nunca coordenadas ni datos de personas.
 - Por pregunta hay como máximo 2 rondas de llamadas a herramientas (en una ronda el modelo puede pedir una o varias a la vez; el servidor ejecuta como máximo 3 por ronda y a las demás les responde con un error). Si después de la segunda pide más, el servidor le exige responder con lo que ya tiene. Así una pregunta usa como máximo 3 llamadas a Gemini: 2 rondas de herramientas más la respuesta.
 - Si el dueño aún no registró su botica, sus herramientas devuelven "sin botica registrada" y el asistente lo explica: no es un error.
 - Las búsquedas del asistente **no** se registran en los reportes de búsquedas (H62) ni en el de comparaciones (H42): el texto lo escribe el modelo, no el usuario.
@@ -815,6 +819,7 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 **Límites del asistente:**
 - Solo responde sobre BotiCompara: precios, disponibilidad, boticas, alternativas y, para el dueño, su catálogo.
 - No diagnostica, no da dosis y no recomienda medicamentos por síntomas: deriva al químico farmacéutico o al médico. Ante una emergencia indica llamar al SAMU (106).
+- **Condición de venta (H72):** si un producto es `CON_RECETA`, avisa que se necesita receta médica; si es `RECETA_RETENIDA`, avisa que no se puede reservar y que se compra en la botica presentando la receta. Nunca sugiere cómo conseguir un medicamento sin receta.
 - Estos casos responden `200` con `productos: []`; no son errores.
 
 **Crisis y números de ayuda.** El asistente no es un servicio de salud, pero alguien puede escribirle en un mal momento. Hay dos capas que **no dependen de Gemini**:
