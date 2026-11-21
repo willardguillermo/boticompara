@@ -22,6 +22,9 @@
   --error-fondo: #fee2e2;
   --info: #1d4ed8;
   --info-fondo: #dbeafe;
+  /* H72: color propio de la receta, distinto de todos los estados */
+  --receta: #6b21a8;
+  --receta-fondo: #f3e8ff;
   /* Botones desactivados: gris claro, nunca el color del botón con opacidad */
   --deshabilitado-fondo: #eef2f1;
   --deshabilitado-borde: #dbe3e1;
@@ -1549,8 +1552,8 @@ a {
 
 /* H72: el medicamento pide receta */
 .estado-pedido-receta {
-  background: var(--info-fondo);
-  color: var(--info);
+  background: var(--receta-fondo);
+  color: var(--receta);
 }
 
 .producto-pedido .estado-pedido-receta {
@@ -1562,7 +1565,7 @@ a {
   margin-top: 0.2rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--aviso);
+  color: var(--receta);
 }
 
 .etiquetas-pedido {
