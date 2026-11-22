@@ -1,5 +1,9 @@
 package com.boticompara.app.ui.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,30 +26,39 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.LocalPharmacy
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.NearMe
 import androidx.compose.material.icons.rounded.SmartToy
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.dto.ProductoChatResponse
@@ -70,6 +83,28 @@ fun ChatScreen(
 ) {
     val listState = rememberLazyListState()
     val mensajes = viewModel.mensajes
+    val snackbarHostState = remember { SnackbarHostState() }
+    val contexto = LocalContext.current
+    val permisoMicrofono = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { concedido ->
+        if (concedido) viewModel.iniciarEscucha() else viewModel.permisoMicrofonoDenegado()
+    }
+    val alternarMicrofono: () -> Unit = {
+        when {
+            viewModel.escuchando -> viewModel.detenerEscucha()
+            ContextCompat.checkSelfPermission(contexto, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED -> viewModel.iniciarEscucha()
+            else -> permisoMicrofono.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    LaunchedEffect(viewModel.avisoVoz) {
+        viewModel.avisoVoz?.let { aviso ->
+            snackbarHostState.showSnackbar(aviso)
+            viewModel.avisoVozAtendido()
+        }
+    }
 
     LaunchedEffect(viewModel.sesionVencida) {
         if (viewModel.sesionVencida) {
@@ -87,11 +122,20 @@ fun ChatScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CabeceraPantalla(
                 titulo = "Asistente",
                 subtitulo = "Pregunta por precios y boticas",
                 actions = {
+                    if (viewModel.hablando) {
+                        IconButton(onClick = { viewModel.callar() }) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.VolumeOff,
+                                contentDescription = "Silenciar la voz"
+                            )
+                        }
+                    }
                     if (mensajes.isNotEmpty()) {
                         IconButton(
                             onClick = { viewModel.nuevaConversacion() },
@@ -133,10 +177,13 @@ fun ChatScreen(
                 }
             }
             BarraEscritura(
-                texto = viewModel.texto,
+                texto = if (viewModel.escuchando) viewModel.textoParcial else viewModel.texto,
                 onTextoChange = viewModel::cambiarTexto,
                 onEnviar = { viewModel.enviarEscrito() },
-                puedeEnviar = viewModel.texto.isNotBlank() && !viewModel.enviando
+                onMicrofono = alternarMicrofono,
+                escuchando = viewModel.escuchando,
+                puedeEnviar = viewModel.texto.isNotBlank() &&
+                    !viewModel.enviando && !viewModel.escuchando
             )
         }
     }
@@ -162,7 +209,7 @@ private fun Bienvenida(onSugerencia: (String) -> Unit) {
         )
         Spacer(Modifier.height(Dimens.Space4))
         Text(
-            "Te ayudo a comparar precios y encontrar boticas. No doy consejos médicos ni dosis.",
+            "Te ayudo a comparar precios y encontrar boticas. Toca el micrófono para hablarme y te responderé en voz alta. No doy consejos médicos ni dosis.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -288,19 +335,46 @@ private fun BarraEscritura(
     texto: String,
     onTextoChange: (String) -> Unit,
     onEnviar: () -> Unit,
+    onMicrofono: () -> Unit,
+    escuchando: Boolean,
     puedeEnviar: Boolean
 ) {
     Surface(tonalElevation = 3.dp) {
         BotiTextField(
             value = texto,
             onValueChange = onTextoChange,
-            label = "Escribe tu pregunta",
+            label = if (escuchando) "Escuchando…" else "Escribe tu pregunta",
             singleLine = false,
+            enabled = !escuchando,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { onEnviar() }),
             trailingIcon = {
-                IconButton(onClick = onEnviar, enabled = puedeEnviar) {
-                    Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "Enviar")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onMicrofono,
+                        modifier = Modifier.size(Dimens.MinTouchTarget)
+                    ) {
+                        Icon(
+                            imageVector = if (escuchando) Icons.Rounded.Stop else Icons.Rounded.Mic,
+                            contentDescription = if (escuchando) {
+                                "Detener dictado"
+                            } else {
+                                "Hablar con el asistente"
+                            },
+                            tint = if (escuchando) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                LocalContentColor.current
+                            }
+                        )
+                    }
+                    IconButton(
+                        onClick = onEnviar,
+                        enabled = puedeEnviar,
+                        modifier = Modifier.size(Dimens.MinTouchTarget)
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "Enviar")
+                    }
                 }
             },
             modifier = Modifier.padding(horizontal = Dimens.Space12, vertical = Dimens.Space8)

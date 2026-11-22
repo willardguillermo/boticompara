@@ -36,15 +36,52 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     var sesionVencida by mutableStateOf(false)
         private set
 
+    var escuchando by mutableStateOf(false)
+        private set
+    var hablando by mutableStateOf(false)
+        private set
+    var textoParcial by mutableStateOf("")
+        private set
+    var avisoVoz by mutableStateOf<String?>(null)
+        private set
+
+    private val voz = VozManager(application, object : VozManager.Listener {
+        override fun onListo() {
+            escuchando = true
+        }
+
+        override fun onParcial(texto: String) {
+            textoParcial = texto
+        }
+
+        override fun onResultado(texto: String) {
+            escuchando = false
+            textoParcial = ""
+            enviar(texto, porVoz = true)
+        }
+
+        override fun onErrorEscucha(mensaje: String) {
+            escuchando = false
+            textoParcial = ""
+            avisoVoz = mensaje
+        }
+
+        override fun onHabla(hablando: Boolean) {
+            this@ChatViewModel.hablando = hablando
+        }
+    })
+
     fun cambiarTexto(nuevo: String) {
         texto = nuevo.take(LIMITE_MENSAJE)
     }
 
     fun enviarEscrito() = enviar(texto)
 
-    fun enviar(pregunta: String) {
+    fun enviar(pregunta: String, porVoz: Boolean = false) {
         val mensaje = pregunta.trim()
         if (mensaje.isEmpty() || enviando) return
+
+        voz.callar()
 
         val historial = armarHistorial()
         mensajes.add(MensajeChat(id = siguienteId++, esUsuario = true, texto = mensaje))
@@ -53,11 +90,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             when (val resultado = repository.enviar(mensaje, historial)) {
-                is ResultadoChat.Exito -> agregarRespuesta(
-                    texto = resultado.respuesta.respuesta,
-                    productos = resultado.respuesta.productos,
-                    esAyuda = resultado.respuesta.ayuda
-                )
+                is ResultadoChat.Exito -> {
+                    agregarRespuesta(
+                        texto = resultado.respuesta.respuesta,
+                        productos = resultado.respuesta.productos,
+                        esAyuda = resultado.respuesta.ayuda
+                    )
+                    if (porVoz) voz.hablar(resultado.respuesta.respuesta)
+                }
                 ResultadoChat.SesionVencida -> sesionVencida = true
                 is ResultadoChat.Rechazado -> agregarRespuesta(resultado.mensaje, esError = true)
                 ResultadoChat.SinConexion -> agregarRespuesta(
@@ -73,14 +113,45 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun iniciarEscucha() {
+        if (enviando || escuchando) return
+        escuchando = true
+        textoParcial = ""
+        voz.escuchar()
+    }
+
+    fun detenerEscucha() {
+        escuchando = false
+        textoParcial = ""
+        voz.detenerEscucha()
+    }
+
+    fun callar() {
+        voz.callar()
+    }
+
+    fun permisoMicrofonoDenegado() {
+        avisoVoz = "Para hablarle al asistente permite el uso del micrófono"
+    }
+
+    fun avisoVozAtendido() {
+        avisoVoz = null
+    }
+
     fun nuevaConversacion() {
         if (enviando) return
+        voz.callar()
         mensajes.clear()
         texto = ""
     }
 
     fun sesionVencidaAtendida() {
         sesionVencida = false
+    }
+
+    override fun onCleared() {
+        voz.liberar()
+        super.onCleared()
     }
 
     private fun agregarRespuesta(
