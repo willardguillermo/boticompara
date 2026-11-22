@@ -58,7 +58,18 @@ function PanelNotificaciones({ id, onCerrar, onSalir }) {
         )}
       </div>
       <div className="campana-cuerpo">
-        <ListaNotificaciones onAbrir={onCerrar} />
+        <ListaNotificaciones
+          onAbrir={onCerrar}
+          textoError="No pudimos cargar tus notificaciones."
+          vacio={
+            <>
+              <p>
+                <strong>Aún no tienes notificaciones.</strong>
+              </p>
+              <p>Te avisaremos aquí cuando llegue una reserva o un comprador la cancele.</p>
+            </>
+          }
+        />
       </div>
     </section>
   )

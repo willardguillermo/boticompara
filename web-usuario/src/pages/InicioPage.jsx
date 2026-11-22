@@ -60,6 +60,8 @@ const TARJETAS = [
     titulo: 'Calificación promedio',
     icono: 'estrella',
     a: '/panel/estado',
+    // El backend aún no tiene las reseñas (H87): sin ellas la tarjeta no se muestra
+    ocultarSi: [403, 404],
     cargar: async (boticaId) => {
       const { promedio, total } = await api.listarResenas(boticaId)
       return {
@@ -81,10 +83,10 @@ function Numero({ valor, decimales, sufijo }) {
 }
 
 function TarjetaResumen({ tarjeta, boticaId }) {
-  const { titulo, icono, a, enVivo, cargar } = tarjeta
+  const { titulo, icono, a, enVivo, ocultarSi, cargar } = tarjeta
   const { subidas } = useNotificaciones()
   const actualizacion = enVivo ? subidas : 0
-  const [dato, setDato] = useState(null) // null: cargando; { error: true }: falló
+  const [dato, setDato] = useState(null) // null: cargando; { error: true }: falló; { oculta: true }: no se muestra
   const [intento, setIntento] = useState(0)
 
   useEffect(() => {
@@ -92,11 +94,16 @@ function TarjetaResumen({ tarjeta, boticaId }) {
     cargar(boticaId)
       .then((d) => activo && setDato(d))
       // Si falla una actualización, se queda el último número en lugar de un error
-      .catch(() => activo && setDato((anterior) => anterior ?? { error: true }))
+      .catch((err) => {
+        if (!activo) return
+        setDato((anterior) => anterior ?? (ocultarSi?.includes(err.status) ? { oculta: true } : { error: true }))
+      })
     return () => {
       activo = false
     }
-  }, [cargar, boticaId, intento, actualizacion])
+  }, [cargar, boticaId, ocultarSi, intento, actualizacion])
+
+  if (dato?.oculta) return null
 
   const contenido = (
     <>
@@ -130,26 +137,30 @@ function TarjetaResumen({ tarjeta, boticaId }) {
   // Con error la tarjeta deja de ser enlace para poder llevar el botón de reintentar
   if (dato?.error) {
     return (
-      <div className="resumen-inicio">
-        {contenido}
-        <button
-          type="button"
-          className="boton-texto"
-          aria-label={`Reintentar: ${titulo}`}
-          onClick={() => {
-            setDato(null)
-            setIntento((n) => n + 1)
-          }}
-        >
-          Reintentar
-        </button>
-      </div>
+      <li>
+        <div className="resumen-inicio">
+          {contenido}
+          <button
+            type="button"
+            className="boton-texto"
+            aria-label={`Reintentar: ${titulo}`}
+            onClick={() => {
+              setDato(null)
+              setIntento((n) => n + 1)
+            }}
+          >
+            Reintentar
+          </button>
+        </div>
+      </li>
     )
   }
   return (
-    <Link to={a} className="resumen-inicio" aria-busy={dato === null}>
-      {contenido}
-    </Link>
+    <li>
+      <Link to={a} className="resumen-inicio" aria-busy={dato === null}>
+        {contenido}
+      </Link>
+    </li>
   )
 }
 
@@ -182,9 +193,7 @@ export default function InicioPage() {
         </h2>
         <ul className="resumen-inicio-lista">
           {TARJETAS.map((t) => (
-            <li key={t.clave}>
-              <TarjetaResumen tarjeta={t} boticaId={botica.id} />
-            </li>
+            <TarjetaResumen key={t.clave} tarjeta={t} boticaId={botica.id} />
           ))}
         </ul>
       </section>
@@ -192,7 +201,11 @@ export default function InicioPage() {
       <section className="actividad" aria-labelledby="titulo-actividad">
         <h2 id="titulo-actividad">Actividad reciente</h2>
         <div className="tarjeta actividad-tarjeta">
-          <ListaNotificaciones maximo={MAX_ACTIVIDAD} />
+          <ListaNotificaciones
+            maximo={MAX_ACTIVIDAD}
+            textoError="No pudimos cargar la actividad reciente."
+            vacio={<p>Aún no hay actividad. Aquí verás las nuevas reservas y cancelaciones.</p>}
+          />
         </div>
       </section>
     </>

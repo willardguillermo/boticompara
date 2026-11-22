@@ -17,7 +17,7 @@ const NotificacionesContext = createContext(null)
 export function NotificacionesProvider({ children }) {
   const [total, setTotal] = useState(null)
   const [lista, setLista] = useState(null)
-  const [errorLista, setErrorLista] = useState('')
+  const [errorLista, setErrorLista] = useState(false)
   const [aviso, setAviso] = useState(null) // { id, cantidad, notificacion }
   const [conTitulo, setConTitulo] = useState(false)
   // Cuántas veces subió el contador: el Inicio lo usa para saber cuándo volver a pedir los pedidos
@@ -41,15 +41,16 @@ export function NotificacionesProvider({ children }) {
   /** Trae la lista. Devuelve null si falló o si ya hay otra consulta más reciente. */
   const cargarLista = useCallback(async () => {
     const orden = ++ultimaLista.current
+    setErrorLista(false)
     try {
       const datos = await api.listarNotificaciones()
       if (orden !== ultimaLista.current) return null
       const actual = datos.map((n) => (leidasAqui.current.has(n.id) ? { ...n, leida: true } : n))
       setLista(actual)
-      setErrorLista('')
       return actual
-    } catch (err) {
-      if (orden === ultimaLista.current) setErrorLista(err.mensaje ?? 'No se pudieron cargar las notificaciones.')
+    } catch {
+      // El mensaje del servidor no se muestra: cada pantalla pone el suyo
+      if (orden === ultimaLista.current) setErrorLista(true)
       return null
     }
   }, [])

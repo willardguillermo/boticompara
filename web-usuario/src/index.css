@@ -2700,13 +2700,6 @@ a.notificacion-nueva:hover {
   margin: 0 0 0.25rem;
 }
 
-.notificaciones-error {
-  display: grid;
-  justify-items: start;
-  gap: 0.75rem;
-  padding: 1rem;
-}
-
 .aviso-notificacion {
   display: flex;
   align-items: flex-start;
@@ -2812,9 +2805,24 @@ a.resumen-inicio:active {
   background: var(--color-superficie-plana);
 }
 
+/* Sin la tarjeta de calificación quedan tres: ocupan todo el ancho */
+.resumen-inicio-lista:has(> :nth-child(3):last-child) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 @media (max-width: 1000px) {
   .resumen-inicio-lista {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .resumen-inicio-lista:has(> :nth-child(3):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .resumen-inicio-lista > :nth-child(3):last-child {
+    grid-column: 1 / -1;
   }
 }
 
@@ -2867,7 +2875,8 @@ a.resumen-inicio:active {
 }
 
 @media (max-width: 359px) {
-  .resumen-inicio-lista {
+  .resumen-inicio-lista,
+  .resumen-inicio-lista:has(> :nth-child(3):last-child) {
     grid-template-columns: minmax(0, 1fr);
   }
 

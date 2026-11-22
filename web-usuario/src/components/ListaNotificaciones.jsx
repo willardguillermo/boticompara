@@ -4,7 +4,6 @@ import { useNotificaciones } from '../context/NotificacionesContext.jsx'
 import { useAhora } from '../hooks/useAhora.js'
 import { unirPrecios } from '../utils/chat.js'
 import { iconoNotificacion, rutaPedido, tiempoRelativo } from '../utils/notificaciones.js'
-import Alerta from './Alerta.jsx'
 import Esqueleto from './Esqueleto.jsx'
 import Icono from './Icono.jsx'
 
@@ -54,19 +53,20 @@ function EsqueletoLista({ filas }) {
   )
 }
 
-/** `maximo` limita cuántas se muestran; `onAbrir` se llama después de marcarla como leída. */
-export default function ListaNotificaciones({ maximo, onAbrir, filasEsqueleto = 3 }) {
+/**
+ * `maximo` limita cuántas se muestran; `onAbrir` se llama después de marcarla como leída.
+ * `textoError` y `vacio` (texto o nodos) son los mensajes de cada pantalla: nunca el del servidor.
+ */
+export default function ListaNotificaciones({ maximo, onAbrir, textoError, vacio, filasEsqueleto = 3 }) {
   const { lista, errorLista, cargarLista, marcarLeida } = useNotificaciones()
   const ahora = useAhora()
 
   if (errorLista && !lista) {
     return (
-      <div className="notificaciones-error">
-        <Alerta tipo="error">
-          <p>{errorLista}</p>
-        </Alerta>
-        <button type="button" className="btn btn-secundario btn-icono" onClick={cargarLista}>
-          <Icono nombre="actualizar" /> Reintentar
+      <div className="notificaciones-vacio" role="status">
+        <p>{textoError}</p>
+        <button type="button" className="boton-texto" onClick={cargarLista}>
+          Reintentar
         </button>
       </div>
     )
@@ -76,10 +76,7 @@ export default function ListaNotificaciones({ maximo, onAbrir, filasEsqueleto = 
     return (
       <div className="notificaciones-vacio">
         <Icono nombre="campana" />
-        <p>
-          <strong>Aún no tienes notificaciones.</strong>
-        </p>
-        <p>Te avisaremos aquí cuando llegue una reserva o un comprador la cancele.</p>
+        {vacio}
       </div>
     )
   }
