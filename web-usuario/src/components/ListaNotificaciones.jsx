@@ -55,9 +55,10 @@ function EsqueletoLista({ filas }) {
 
 /**
  * `maximo` limita cuántas se muestran; `onAbrir` se llama después de marcarla como leída.
- * `textoError` y `vacio` (texto o nodos) son los mensajes de cada pantalla: nunca el del servidor.
+ * `textoError` es el mensaje de cada pantalla: nunca el del servidor.
+ * El backend solo devuelve los últimos 7 días; aquí no se filtra.
  */
-export default function ListaNotificaciones({ maximo, onAbrir, textoError, vacio, filasEsqueleto = 3 }) {
+export default function ListaNotificaciones({ maximo, onAbrir, textoError, filasEsqueleto = 3 }) {
   const { lista, errorLista, cargarLista, marcarLeida } = useNotificaciones()
   const ahora = useAhora()
 
@@ -76,7 +77,7 @@ export default function ListaNotificaciones({ maximo, onAbrir, textoError, vacio
     return (
       <div className="notificaciones-vacio">
         <Icono nombre="campana" />
-        {vacio}
+        <p>No tienes notificaciones de los últimos 7 días.</p>
       </div>
     )
   }
