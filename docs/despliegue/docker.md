@@ -63,7 +63,7 @@ y el `.jar`. La imagen final no lleva el código fuente, ni Maven, ni las depend
 | Línea | Qué hace |
 |---|---|
 | `FROM eclipse-temurin:17-jre` | Empieza una imagen **nueva**, solo con el JRE 17 (lo justo para correr Java, sin compilador). Todo lo de la etapa 1 queda fuera, salvo lo que copiemos. |
-| `RUN groupadd --system boticompara && useradd ...` | Crea el usuario `boticompara` sin permisos de administrador (sin carpeta personal). |
+| `RUN (getent group 1000 ...) && groupadd ... && useradd ... --groups 1000` | Crea el usuario `boticompara` sin permisos de administrador (sin carpeta personal) y lo agrega al grupo 1000, el único que puede leer los Secret Files de Render. Sin ese grupo la API no arranca con Firebase configurado. |
 | `WORKDIR /app` | Carpeta de trabajo. Como en `/app` no hay `.env`, Spring usa las variables de entorno. |
 | `COPY --from=compilacion --chown=boticompara:boticompara /fuente/app.jar app.jar` | Trae el `.jar` desde la etapa 1 y lo deja a nombre del usuario nuevo. |
 | `USER boticompara` | Desde aquí todo corre con ese usuario, no como `root`. Si alguien aprovechara una falla de la API, no tendría permisos de administrador en el contenedor. |
@@ -270,17 +270,9 @@ docker system prune
 
 ---
 
-## 7. En Render (el lunes)
+## 7. En Render
 
-1. **New → Web Service**, conectar el repo y elegir **Docker** como entorno.
-2. **Root Directory:** `backend-usuario` (ahí están el `Dockerfile` y el `.dockerignore`).
-3. **Instance type:** Free.
-4. **Environment:** cargar una por una las variables del `.env` (`DB_HOST`, `DB_PASSWORD`, `JWT_SECRET`, etc.). **No** hace falta
-   `PORT`: Render la pone sola. Poner `APP_BASE_URL` con la URL pública que dé Render, terminada en `/api`.
-5. Firebase: en **Secret Files** subir el JSON con el nombre `firebase.json`; Render lo deja en `/etc/secrets/firebase.json`.
-   Entonces `FIREBASE_CREDENTIALS_PATH=/etc/secrets/firebase.json` y `FIREBASE_PROJECT_ID=boticompara`.
-6. En el plan gratis, el servicio se duerme tras unos minutos sin visitas; la primera petición después tarda en responder
-   mientras arranca Spring.
+La guía está en [`render.md`](render.md): servicio, región, variables, Secret File de Firebase, health check y comprobaciones.
 
 ---
 

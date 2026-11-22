@@ -35,7 +35,7 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 | 403 | Rol sin permiso, botica no aprobada intentando crear productos, acción no permitida por el estado de la botica, o reseña sin una reserva entregada (H85) |
 | 404 | Recurso no existe o no pertenece al usuario |
 | 409 | Duplicado (correo o RUC ya registrado), o conflicto con el estado actual: cambio de estado no permitido de una reserva o pedido, stock insuficiente, reserva activa repetida, reserva de un medicamento con receta retenida (H72) |
-| 429 | Demasiados pedidos (solo `POST /chat`) |
+| 429 | Demasiados pedidos (`POST /chat`) o demasiados intentos fallidos (`POST /auth/login`, SEC-05) |
 | 503, 504 | El asistente no está disponible o tardó demasiado (solo `POST /chat`) |
 
 Única excepción al formato JSON: `GET /auth/verificar` responde una página HTML (ver H20).
@@ -1376,6 +1376,20 @@ Si más adelante el Inicio se vuelve lento o hace falta contar más de 100 pendi
 - La tabla es `notificacion` (`database/v7_notificaciones.sql`). Solo la API escribe en ella; Django no la usa.
 - `ReservaCancelada` se agrega en `ReservaService.cancelar` cuando se haga el código; el cambio es mínimo y lo revisa Alexander en el PR.
 - No se borran notificaciones en este sprint: la lista muestra como máximo las 50 más recientes de los últimos 7 días. Borrar las de **más de 30 días** queda para una tarea programada futura, junto con la de H84.
+
+---
+
+## 13. Salud del servicio
+
+### `GET /salud`
+Público, sin token. Lo usa Render como health check: si responde 200, el proceso está vivo y atiende peticiones.
+```json
+// 200 OK
+{ "estado": "OK" }
+```
+- **No consulta la base ni ningún servicio externo:** si Supabase falla un momento, Render no debe reiniciar la API por eso. Un 200 no significa que la base responda.
+- Sin datos internos: ni versión, ni configuración, ni nombres de servicios.
+- La web y la app no lo necesitan. Solo `GET`: con otro método y sin token responde 401.
 
 ---
 
