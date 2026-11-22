@@ -2455,6 +2455,236 @@ a {
   }
 }
 
+/* ---------- Esqueletos de carga ---------- */
+.esqueleto {
+  display: block;
+  max-width: 100%;
+  border-radius: 6px;
+  background: var(--color-borde);
+  animation: latir 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes latir {
+  from {
+    opacity: 0.45;
+  }
+
+  to {
+    opacity: 0.9;
+  }
+}
+
+/* ---------- Notificaciones (H103) ---------- */
+/* El panel y el aviso se ubican respecto a la cabecera, no a la campana: en celular ocupan todo el ancho */
+.cabecera-contenido {
+  position: relative;
+}
+
+.campana-boton {
+  position: relative;
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.campana-boton[aria-expanded='true'] {
+  border-color: var(--color-primario);
+  box-shadow: var(--sombra-hundida);
+  color: var(--color-primario-oscuro);
+}
+
+.campana-contador {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 21px;
+  padding: 0 0.3rem;
+  border: 2px solid var(--color-fondo);
+  border-radius: 999px;
+  background: var(--error);
+  color: var(--color-texto-sobre-color);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.campana-panel,
+.campana-aviso {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 1rem;
+  width: min(400px, calc(100% - 2rem));
+}
+
+.campana-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(560px, calc(100dvh - 9rem));
+  overflow: hidden;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-grande);
+  background: var(--color-superficie-plana);
+  box-shadow: var(--sombra-flotante);
+  animation: aparecer 150ms var(--curva);
+}
+
+/* El foco inicial va al panel; no hace falta el contorno */
+.campana-panel:focus {
+  outline: none;
+}
+
+.campana-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.campana-cabecera h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.campana-cabecera .boton-texto {
+  min-height: 28px;
+  font-size: 0.88rem;
+}
+
+.campana-cuerpo {
+  overflow-y: auto;
+}
+
+.notificaciones-lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notificaciones-lista li + li {
+  border-top: 1px solid var(--color-borde);
+}
+
+.notificacion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+  color: var(--color-texto);
+  text-decoration: none;
+}
+
+a.notificacion:hover {
+  background: var(--color-tabla-hover);
+}
+
+a.notificacion:focus-visible {
+  outline-offset: -3px;
+}
+
+.notificacion-nueva {
+  background: var(--color-primario-suave);
+}
+
+a.notificacion-nueva:hover {
+  background: var(--color-primario-borde);
+}
+
+.notificacion-icono {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--color-hundido);
+  color: var(--color-texto-suave);
+}
+
+.notificacion-nueva .notificacion-icono,
+.aviso-notificacion .notificacion-icono {
+  background: var(--color-primario);
+  color: var(--color-texto-sobre-color);
+}
+
+.notificacion-texto {
+  display: grid;
+  flex: 1;
+  gap: 0.15rem;
+  min-width: 0;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.notificacion-titulo {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.notificacion-nueva .notificacion-titulo,
+.aviso-notificacion .notificacion-titulo {
+  font-weight: 700;
+}
+
+.notificacion-texto time {
+  font-size: 0.82rem;
+}
+
+.notificacion-punto {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: 0.4rem;
+  border-radius: 50%;
+  background: var(--color-primario);
+}
+
+.notificaciones-vacio {
+  padding: 2rem 1.25rem;
+  color: var(--color-texto-suave);
+  text-align: center;
+}
+
+.notificaciones-vacio > .icono {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 0.5rem;
+}
+
+.notificaciones-vacio p {
+  margin: 0 0 0.25rem;
+}
+
+.notificaciones-error {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.aviso-notificacion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-primario-borde);
+  border-radius: var(--radio-grande);
+  background: var(--color-superficie-plana);
+  box-shadow: var(--sombra-flotante);
+  animation: entrar 0.2s ease-out;
+}
+
+.aviso-notificacion a {
+  justify-self: start;
+  padding: 0.15rem 0;
+  font-weight: 600;
+}
+
 /* Movimiento reducido: sin transiciones ni animaciones de entrada en todo el panel.
    Los spinners siguen girando (indican que algo carga) y los efectos de React Bits ya leen
    esta preferencia por su cuenta. */
@@ -2466,7 +2696,10 @@ a {
   }
 
   .toasts .alerta,
-  .pasos-contenido {
+  .pasos-contenido,
+  .campana-panel,
+  .aviso-notificacion,
+  .esqueleto {
     animation: none;
   }
 }

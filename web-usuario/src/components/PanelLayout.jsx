@@ -1,8 +1,10 @@
 import { NavLink, Outlet } from 'react-router'
 import { useAuth } from '../context/AuthContext.jsx'
 import { BoticaProvider, useBotica } from '../context/BoticaContext.jsx'
+import { NotificacionesProvider } from '../context/NotificacionesContext.jsx'
 import Alerta from './Alerta.jsx'
 import AsistenteChat from './AsistenteChat.jsx'
+import Campana from './Campana.jsx'
 import Cargando from './Cargando.jsx'
 import Icono from './Icono.jsx'
 import Marca from './Marca.jsx'
@@ -31,6 +33,7 @@ function Cabecera() {
         )}
         <div className="usuario-sesion">
           <span className="nombre-usuario texto-suave">{usuario.nombre}</span>
+          <Campana />
           <AsistenteChat />
           <button type="button" className="btn btn-secundario btn-icono" onClick={cerrarSesion}>
             {/* En celular solo se ve el ícono; el texto queda para el lector de pantalla */}
@@ -67,10 +70,12 @@ function Contenido() {
 export default function PanelLayout() {
   return (
     <BoticaProvider>
-      <Cabecera />
-      <main className="contenido">
-        <Contenido />
-      </main>
+      <NotificacionesProvider>
+        <Cabecera />
+        <main className="contenido">
+          <Contenido />
+        </main>
+      </NotificacionesProvider>
     </BoticaProvider>
   )
 }
