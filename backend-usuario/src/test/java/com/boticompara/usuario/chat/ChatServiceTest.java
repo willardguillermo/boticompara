@@ -15,6 +15,7 @@ import com.boticompara.usuario.chat.herramienta.ResultadoHerramienta;
 import com.boticompara.usuario.dto.AlternativaResponse;
 import com.boticompara.usuario.dto.AlternativasResponse;
 import com.boticompara.usuario.dto.BusquedaResponse;
+import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.security.UsuarioAutenticado;
 import com.boticompara.usuario.service.AlternativasService;
@@ -295,7 +296,8 @@ class ChatServiceTest {
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
         assertEquals(3, gemini.pedidos.size());
-        verify(busqueda, times(2)).buscar(anyString(), anyString(), anyString(), any(), any(), any());
+        // Cada buscar_precios consulta por nombre y por principio activo: se ejecutaron 2
+        verify(busqueda, times(2)).buscar(anyString(), eq("nombre"), anyString(), any(), any(), any());
     }
 
     @Test
@@ -330,7 +332,9 @@ class ChatServiceTest {
 
         service.responder(CARLOS, pregunta("busca"));
 
-        verify(busqueda, times(3)).buscar(anyString(), anyString(), anyString(), any(), any(), any());
+        // Cada buscar_precios consulta por nombre y por principio activo: se ejecutaron 3
+        verify(busqueda, times(3)).buscar(anyString(), eq("nombre"), anyString(), any(), any(), any());
+        verify(busqueda, times(3)).buscar(anyString(), eq("principio"), anyString(), any(), any(), any());
         List<Turno.Resultado> resultados = ((Turno.Resultados) gemini.pedidos.get(1).turnos().get(2)).resultados();
         assertEquals(4, resultados.size());
         assertEquals(1, resultados.get(2).respuesta().get("total"));
@@ -768,6 +772,36 @@ class ChatServiceTest {
 
         assertEquals(HttpStatus.GATEWAY_TIMEOUT, error(CARLOS, pregunta("hola")).getStatus());
         assertEquals(1, gemini.pedidos.size());
+    }
+
+    // ---------- Caso real del 22/11: "a cuanto tengo la amocicilina a comparacion de otras boticas" ----------
+
+    private static BusquedaResponse amoxicilina(long id, String nombre, long boticaId, String botica, String precio) {
+        return new BusquedaResponse(id, nombre, "Amoxicilina", "Cápsula 500 mg x 10", new BigDecimal(precio), 15,
+                boticaId, botica, "Av. Lima 123", "Lurigancho-Chosica", null, null, null, "CON_RECETA");
+    }
+
+    @Test
+    void elDuenoVeSuAmoxilAunqueElModeloBusqueAmoxicilinaSinTipo() throws Exception {
+        BusquedaResponse generica = amoxicilina(12, "Amoxicilina Genérica", 2, "FarmaVida", "8.50");
+        BusquedaResponse amoxil = amoxicilina(3, "Amoxil", 1, "Botica Salud Total", "24.00");
+        // Lo que devuelve la base real: por nombre solo la genérica; por principio activo, las dos
+        when(busqueda.buscar("amoxicilina", "nombre", "precio_asc", null, null, null)).thenReturn(List.of(generica));
+        when(busqueda.buscar("amoxicilina", "principio", "precio_asc", null, null, null))
+                .thenReturn(List.of(generica, amoxil));
+        Botica saludTotal = new Botica();
+        saludTotal.setId(1L);
+        when(boticas.obtenerMia(1L)).thenReturn(saludTotal);
+        gemini.guion.add(pide(buscar("c1", "amoxicilina")));
+        gemini.guion.add(texto("En tu botica: S/ 24.00. La más barata está en FarmaVida a S/ 8.50."));
+
+        ChatResponse r = service.responder(ROSA, pregunta("a cuanto tengo la amocicilina a comparacion de otras boticas"));
+
+        assertEquals(List.of(12L, 3L), r.productos().stream().map(ChatProducto::productoId).toList());
+        Turno.Resultados resultados = (Turno.Resultados) gemini.pedidos.get(1).turnos().get(2);
+        String paraElModelo = JSON.writeValueAsString(resultados.resultados().get(0).respuesta());
+        assertTrue(paraElModelo.contains("\"nombre\":\"Amoxil\""), paraElModelo);
+        assertEquals(1, paraElModelo.split("\"tuBotica\":true", -1).length - 1, paraElModelo);
     }
 
     // ---------- Respuesta de respaldo ----------

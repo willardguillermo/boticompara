@@ -162,6 +162,8 @@ class InstruccionesSistemaTest {
         assertTrue(dueno.contains("\"en tu botica: S/ X\""));
         assertTrue(dueno.contains("opción más barata de las otras boticas"));
         assertTrue(dueno.contains("búscalo también con buscar_en_mi_catalogo"));
+        assertTrue(dueno.contains("Nunca digas que su botica no tiene un producto, o que no tiene stock, sin un "
+                + "resultado\n  con tuBotica o de buscar_en_mi_catalogo que lo muestre."));
         assertFalse(instrucciones.para("COMPRADOR", false).contains("tuBotica"));
     }
 
