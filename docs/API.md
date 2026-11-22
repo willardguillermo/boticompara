@@ -35,7 +35,7 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 | 403 | Rol sin permiso, botica no aprobada intentando crear productos, acción no permitida por el estado de la botica, o reseña sin una reserva entregada (H85) |
 | 404 | Recurso no existe o no pertenece al usuario |
 | 409 | Duplicado (correo o RUC ya registrado), o conflicto con el estado actual: cambio de estado no permitido de una reserva o pedido, stock insuficiente, reserva activa repetida, reserva de un medicamento con receta retenida (H72) |
-| 429 | Demasiados pedidos (solo `POST /chat`) |
+| 429 | Demasiados pedidos (`POST /chat`) o demasiados intentos fallidos (`POST /auth/login`, SEC-05) |
 | 503, 504 | El asistente no está disponible o tardó demasiado (solo `POST /chat`) |
 
 Única excepción al formato JSON: `GET /auth/verificar` responde una página HTML (ver H20).
