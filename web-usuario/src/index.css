@@ -1,41 +1,106 @@
 /* =====================================================================
    BotiCompara - Panel de botica
-   Tema de salud: verde azulado como color principal, fondos claros.
+   Tema de salud: verde azulado como color principal.
+   Estilo de neumorfismo suave (soft UI): el fondo y las tarjetas tienen el mismo tono gris verdoso
+   y se separan solo con una sombra doble (clara arriba a la izquierda, oscura abajo a la derecha).
+   Los campos van hundidos. Los botones principales, los de peligro, las tablas y las etiquetas de
+   estado se quedan planos y con borde.
+   Todo color y toda sombra se definen aquí: los componentes solo usan estas variables, así un
+   modo oscuro solo tiene que redefinirlas.
+   Contraste (WCAG 2.x), medido sobre --color-fondo: texto 12,1:1, texto suave 5,4:1,
+   primario 4,7:1, borde de los controles 3,5:1.
    ===================================================================== */
 :root {
   --color-primario: #0f766e;
   --color-primario-oscuro: #115e59;
   --color-primario-suave: #ccfbf1;
-  --color-fondo: #f3f7f6;
-  --color-superficie: #ffffff;
-  --color-borde: #d8e2e0;
+  --color-primario-borde: #99f6e4;
+  /* Fondo gris muy claro con un tinte del verde de la marca (no blanco puro) */
+  --color-fondo: #e8efed;
+  /* Superficies neumórficas: el mismo tono que el fondo; las separa la sombra */
+  --color-superficie: var(--color-fondo);
+  /* Superficies planas (tablas, burbujas del chat, tarjetas de productos): un poco más claras y con borde */
+  --color-superficie-plana: #f7faf9;
+  /* Zonas hundidas sin sombra: campos de solo lectura, pie del registro, barra de progreso */
+  --color-hundido: #dee7e4;
+  /* Separadores decorativos (no identifican controles) */
+  --color-borde: #cdd9d6;
+  /* Borde de campos y controles: 3:1 o más contra el fondo */
+  --color-borde-control: #6c827c;
   --color-texto: #12302c;
-  --color-texto-suave: #557069;
-  --color-pendiente: #c6d4d0;
-  --color-pie: #fafcfb;
+  --color-texto-suave: #4d655f;
+  --color-texto-sobre-color: #ffffff;
+  --color-pendiente: #9fb2ad;
+  --color-pie: var(--color-hundido);
+  --color-tabla-cabecera: #edf2f1;
+  --color-tabla-hover: #eef4f2;
+  /* Contorno del foco: sólido, 4,7:1 contra el fondo */
+  --foco: var(--color-primario);
 
-  --exito: #15803d;
+  --exito: #166534;
   --exito-fondo: #dcfce7;
-  --aviso: #b45309;
+  --exito-borde: #bbf7d0;
+  --aviso: #92400e;
   --aviso-fondo: #fef3c7;
+  --aviso-borde: #fde68a;
   --error: #b91c1c;
+  --error-oscuro: #991b1b;
   --error-fondo: #fee2e2;
+  --error-borde: #fecaca;
+  /* Fondo de un campo con error */
+  --error-campo: #fff5f5;
   --info: #1d4ed8;
   --info-fondo: #dbeafe;
+  --info-borde: #bfdbfe;
   /* H72: color propio de la receta, distinto de todos los estados */
   --receta: #6b21a8;
   --receta-fondo: #f3e8ff;
-  /* Botones desactivados: gris claro, nunca el color del botón con opacidad */
-  --deshabilitado-fondo: #eef2f1;
-  --deshabilitado-borde: #dbe3e1;
-  --deshabilitado-texto: #8a9c98;
+  --receta-borde: #e9d5ff;
+  /* Pedido cancelado o vencido */
+  --neutro-fondo: #e3eae8;
+  --neutro-borde: #c5d2ce;
+  /* Franja superior de la tarjeta de estado de la botica */
+  --franja-pendiente: #f59e0b;
+  --franja-aprobado: #22c55e;
+  --franja-rechazado: #ef4444;
+  /* Botones desactivados: gris plano, nunca el color del botón con opacidad */
+  --deshabilitado-fondo: #dfe6e4;
+  --deshabilitado-borde: #c3cfcc;
+  --deshabilitado-texto: #50645f;
+
+  /* Velo detrás de los modales y realce al pasar el puntero */
+  --velo-modal: rgb(10 30 28 / 45%);
+  --capa-hover: rgb(0 0 0 / 6%);
+  /* Brillos del fondo de las pantallas de acceso */
+  --brillo-acceso-1: rgb(15 118 110 / 14%);
+  --brillo-acceso-2: rgb(20 184 166 / 14%);
 
   /* Ancho de la cabecera y del contenido del panel: deja espacio a la tabla de pedidos */
   --ancho-maximo: 1240px;
 
   --radio: 10px;
   --radio-grande: 16px;
-  --sombra: 0 1px 2px rgb(16 48 44 / 6%), 0 4px 16px rgb(16 48 44 / 6%);
+
+  /* Sombras del neumorfismo: luz arriba a la izquierda, sombra abajo a la derecha */
+  --sombra-luz: rgb(255 255 255 / 90%);
+  --sombra-oscuridad: rgb(122 150 143 / 45%);
+  --sombra-elevada: -6px -6px 14px var(--sombra-luz), 6px 6px 14px var(--sombra-oscuridad);
+  --sombra-elevada-suave: -3px -3px 7px var(--sombra-luz), 3px 3px 7px var(--sombra-oscuridad);
+  --sombra-hundida: inset 2px 2px 5px var(--sombra-oscuridad), inset -2px -2px 5px var(--sombra-luz);
+  /* Elementos que flotan sobre la página (modal, asistente, avisos) */
+  --sombra-flotante: 0 12px 40px rgb(16 48 44 / 22%);
+  --sombra-panel-lateral: -8px 0 24px rgb(16 48 44 / 10%);
+  --sombra-columna-fija: -8px 0 8px -8px rgb(16 48 44 / 18%);
+  --sombra-marcador: 0 2px 6px rgb(0 0 0 / 35%);
+  /* Nombre antiguo, lo usan Spotlight Card y los avisos */
+  --sombra: var(--sombra-elevada);
+
+  /* React Bits: colores de los efectos (ver src/components/reactbits) */
+  --rb-gradiente-1: var(--color-primario);
+  --rb-gradiente-2: #0e7490;
+  --rb-gradiente-3: var(--exito);
+  --rb-brillo: var(--color-primario-oscuro);
+
   --curva: cubic-bezier(0.4, 0, 0.2, 1);
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -99,6 +164,12 @@ a {
   flex-shrink: 0;
 }
 
+/* Foco visible en todo: contorno sólido del color de marca, separado del borde */
+:focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+}
+
 /* ---------- Botones ---------- */
 .btn {
   display: inline-flex;
@@ -113,20 +184,20 @@ a {
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
 }
 
 .btn:focus-visible,
 .campo input:focus-visible,
 .campo select:focus-visible {
-  outline: 3px solid rgb(15 118 110 / 35%);
-  outline-offset: 1px;
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
 }
 
 
 .btn-primario {
   background: var(--color-primario);
-  color: #fff;
+  color: var(--color-texto-sobre-color);
 }
 
 .btn-primario:hover:not(:disabled) {
@@ -135,22 +206,27 @@ a {
 
 .btn-secundario {
   background: var(--color-superficie);
-  border-color: var(--color-borde);
+  border-color: var(--color-borde-control);
   color: var(--color-texto);
+  box-shadow: var(--sombra-elevada-suave);
 }
 
 .btn-secundario:hover:not(:disabled) {
   border-color: var(--color-primario);
-  color: var(--color-primario);
+  color: var(--color-primario-oscuro);
+}
+
+.btn-secundario:active:not(:disabled) {
+  box-shadow: var(--sombra-hundida);
 }
 
 .btn-peligro {
   background: var(--error);
-  color: #fff;
+  color: var(--color-texto-sobre-color);
 }
 
 .btn-peligro:hover:not(:disabled) {
-  background: #991b1b;
+  background: var(--error-oscuro);
 }
 
 /* Desactivado: gris claro para cualquier variante (primario, secundario, peligro) */
@@ -245,10 +321,10 @@ a {
   display: block;
   width: 28px;
   height: 28px;
-  border: 3px solid #fff;
+  border: 3px solid var(--color-texto-sobre-color);
   border-radius: 50% 50% 50% 0;
   background: var(--color-primario);
-  box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
+  box-shadow: var(--sombra-marcador);
   transform: rotate(-45deg);
 }
 
@@ -286,22 +362,25 @@ a {
   width: 100%;
   min-height: 44px;
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--color-borde);
+  border: 1px solid var(--color-borde-control);
   border-radius: var(--radio);
-  background: var(--color-superficie);
+  background: var(--color-fondo);
+  box-shadow: var(--sombra-hundida);
   color: inherit;
   font: inherit;
 }
 
-/* H2: razón social tomada de SUNAT */
+/* H2: razón social tomada de SUNAT: plano y más oscuro, no parece editable */
 .campo input[readonly] {
-  background: var(--color-fondo);
+  border-color: var(--color-borde);
+  background: var(--color-hundido);
+  box-shadow: none;
   color: var(--color-texto-suave);
 }
 
 .campo input[aria-invalid='true'] {
   border-color: var(--error);
-  background: #fffafa;
+  background: var(--error-campo);
 }
 
 .campo .ayuda {
@@ -321,8 +400,8 @@ a {
 }
 
 .boton-texto:focus-visible {
-  outline: 3px solid rgb(15 118 110 / 35%);
-  outline-offset: 1px;
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
 }
 
 .campo .error-campo {
@@ -365,25 +444,25 @@ a {
 .alerta-error {
   background: var(--error-fondo);
   color: var(--error);
-  border-color: #fecaca;
+  border-color: var(--error-borde);
 }
 
 .alerta-exito {
   background: var(--exito-fondo);
   color: var(--exito);
-  border-color: #bbf7d0;
+  border-color: var(--exito-borde);
 }
 
 .alerta-aviso {
   background: var(--aviso-fondo);
   color: var(--aviso);
-  border-color: #fde68a;
+  border-color: var(--aviso-borde);
 }
 
 .alerta-info {
   background: var(--info-fondo);
   color: var(--info);
-  border-color: #bfdbfe;
+  border-color: var(--info-borde);
 }
 
 /* H6: aviso de cambio de estado de la botica */
@@ -413,7 +492,7 @@ a {
 
 .aviso-cerrar:hover,
 .aviso-cerrar:focus-visible {
-  background: rgb(0 0 0 / 6%);
+  background: var(--capa-hover);
 }
 
 .toasts {
@@ -441,10 +520,23 @@ a {
 /* ---------- Tarjetas ---------- */
 .tarjeta {
   background: var(--color-superficie);
-  border: 1px solid var(--color-borde);
+  border: 1px solid transparent;
   border-radius: var(--radio-grande);
-  box-shadow: var(--sombra);
+  box-shadow: var(--sombra-elevada);
   padding: 1.5rem;
+}
+
+/* Las tablas de productos y pedidos no llevan neumorfismo: planas, más claras y con borde */
+.tarjeta.tabla-contenedor {
+  border-color: var(--color-borde);
+  background: var(--color-superficie-plana);
+  box-shadow: none;
+}
+
+/* El modal flota sobre un velo oscuro: la sombra doble no se ve ahí, va una sombra normal */
+.tarjeta.modal {
+  border-color: var(--color-borde);
+  box-shadow: var(--sombra-flotante);
 }
 
 /* ---------- Pantallas de acceso (login / registro) ---------- */
@@ -454,8 +546,8 @@ a {
   place-items: center;
   padding: 2rem 1rem;
   background:
-    radial-gradient(circle at 15% 10%, rgb(15 118 110 / 12%), transparent 40%),
-    radial-gradient(circle at 85% 90%, rgb(20 184 166 / 12%), transparent 40%),
+    radial-gradient(circle at 15% 10%, var(--brillo-acceso-1), transparent 40%),
+    radial-gradient(circle at 85% 90%, var(--brillo-acceso-2), transparent 40%),
     var(--color-fondo);
 }
 
@@ -485,7 +577,7 @@ a {
   height: 36px;
   border-radius: 10px;
   background: var(--color-primario);
-  color: #fff;
+  color: var(--color-texto-sobre-color);
 }
 
 .acceso .marca {
@@ -519,7 +611,7 @@ a {
   min-height: 100vh;
   padding: 1.5rem 1rem 3rem;
   background:
-    radial-gradient(circle at 15% 10%, rgb(15 118 110 / 12%), transparent 40%),
+    radial-gradient(circle at 15% 10%, var(--brillo-acceso-1), transparent 40%),
     var(--color-fondo);
 }
 
@@ -580,8 +672,8 @@ a {
 }
 
 .paso:focus-visible {
-  outline: 3px solid rgb(15 118 110 / 35%);
-  outline-offset: 1px;
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
 }
 
 .paso-circulo {
@@ -618,7 +710,7 @@ a {
 
 .paso-actual {
   background: var(--color-superficie);
-  box-shadow: var(--sombra);
+  box-shadow: var(--sombra-elevada-suave);
 }
 
 .paso-actual .paso-circulo {
@@ -630,20 +722,20 @@ a {
 .paso-hecho .paso-circulo {
   border-color: var(--color-primario);
   background: var(--color-primario);
-  color: #fff;
+  color: var(--color-texto-sobre-color);
 }
 
 .pasos-tarjeta {
   overflow: hidden;
   background: var(--color-superficie);
-  border: 1px solid var(--color-borde);
+  border: 1px solid transparent;
   border-radius: var(--radio-grande);
-  box-shadow: var(--sombra);
+  box-shadow: var(--sombra-elevada);
 }
 
 .pasos-barra {
   height: 4px;
-  background: var(--color-fondo);
+  background: var(--color-hundido);
 }
 
 .pasos-barra > div {
@@ -705,14 +797,14 @@ a {
 
 .pasos-tarjeta .campo select[aria-invalid='true'] {
   border-color: var(--error);
-  background: #fffafa;
+  background: var(--error-campo);
 }
 
 .pasos-tarjeta .campo input:focus-visible,
 .pasos-tarjeta .campo select:focus-visible {
   border-color: var(--color-primario);
-  outline: none;
-  box-shadow: 0 0 0 3px rgb(15 118 110 / 18%);
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
 }
 
 .pasos-tarjeta .aviso-privacidad {
@@ -806,7 +898,7 @@ a {
 
 .zona-licencia.zona-error {
   border-color: var(--error);
-  background: #fffafa;
+  background: var(--error-campo);
 }
 
 .zona-licencia .error-campo {
@@ -832,7 +924,7 @@ a {
 }
 
 .zona-boton:focus-visible {
-  outline: 3px solid rgb(15 118 110 / 35%);
+  outline: 3px solid var(--foco);
 }
 
 .zona-boton > .icono {
@@ -858,7 +950,7 @@ a {
   gap: 0.75rem;
   padding: 0.75rem;
   border-radius: var(--radio);
-  background: var(--color-superficie);
+  background: var(--color-superficie-plana);
 }
 
 .archivo-elegido > .icono {
@@ -1052,7 +1144,7 @@ a {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--color-superficie);
+  background: var(--color-fondo);
   border-bottom: 1px solid var(--color-borde);
 }
 
@@ -1066,31 +1158,39 @@ a {
   gap: 0.75rem 1.5rem;
 }
 
+/* Navegación en píldora: un riel hundido y la pestaña activa elevada y resaltada */
 .navegacion {
   display: flex;
   gap: 0.25rem;
-  flex: 1;
+  margin-right: auto;
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: var(--color-fondo);
+  box-shadow: var(--sombra-hundida);
 }
 
 .navegacion a {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.5rem 0.8rem;
-  border-radius: var(--radio);
+  padding: 0.45rem 0.95rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
   color: var(--color-texto-suave);
   font-weight: 600;
   text-decoration: none;
+  transition: background 0.15s, box-shadow 0.15s, color 0.15s;
 }
 
 .navegacion a:hover {
-  color: var(--color-primario);
-  background: var(--color-fondo);
+  color: var(--color-primario-oscuro);
 }
 
 .navegacion a.active {
-  color: var(--color-primario);
+  border-color: var(--color-primario-borde);
   background: var(--color-primario-suave);
+  box-shadow: var(--sombra-elevada-suave);
+  color: var(--color-primario-oscuro);
 }
 
 .usuario-sesion {
@@ -1149,6 +1249,7 @@ a {
   align-items: center;
   gap: 0.4rem;
   padding: 0.3rem 0.8rem;
+  border: 1px solid transparent;
   border-radius: 999px;
   font-weight: 700;
   font-size: 0.85rem;
@@ -1156,16 +1257,19 @@ a {
 }
 
 .estado-PENDIENTE {
+  border-color: var(--aviso-borde);
   background: var(--aviso-fondo);
   color: var(--aviso);
 }
 
 .estado-APROBADO {
+  border-color: var(--exito-borde);
   background: var(--exito-fondo);
   color: var(--exito);
 }
 
 .estado-RECHAZADO {
+  border-color: var(--error-borde);
   background: var(--error-fondo);
   color: var(--error);
 }
@@ -1175,15 +1279,15 @@ a {
 }
 
 .estado-tarjeta.borde-PENDIENTE {
-  border-top-color: #f59e0b;
+  border-top-color: var(--franja-pendiente);
 }
 
 .estado-tarjeta.borde-APROBADO {
-  border-top-color: #22c55e;
+  border-top-color: var(--franja-aprobado);
 }
 
 .estado-tarjeta.borde-RECHAZADO {
-  border-top-color: #ef4444;
+  border-top-color: var(--franja-rechazado);
 }
 
 .estado-cabecera {
@@ -1323,7 +1427,7 @@ a {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-texto-suave);
-  background: #f8fbfa;
+  background: var(--color-tabla-cabecera);
 }
 
 .tabla tbody tr:last-child td {
@@ -1331,7 +1435,7 @@ a {
 }
 
 .tabla tbody tr:hover {
-  background: #f8fbfa;
+  background: var(--color-tabla-hover);
 }
 
 .tabla .numero {
@@ -1344,6 +1448,11 @@ a {
   white-space: nowrap;
 }
 
+/* Dentro de las tablas los botones también son planos */
+.tabla .btn-secundario {
+  box-shadow: none;
+}
+
 .tabla .acciones .btn + .btn {
   margin-left: 0.4rem;
 }
@@ -1353,16 +1462,16 @@ a {
 .tabla th.acciones {
   position: sticky;
   right: 0;
-  background: var(--color-superficie);
-  box-shadow: -8px 0 8px -8px rgb(16 48 44 / 18%);
+  background: var(--color-superficie-plana);
+  box-shadow: var(--sombra-columna-fija);
 }
 
 .tabla th.acciones {
-  background: #f8fbfa;
+  background: var(--color-tabla-cabecera);
 }
 
 .tabla tbody tr:hover td.acciones {
-  background: #f8fbfa;
+  background: var(--color-tabla-hover);
 }
 
 .boton-eliminar:hover:not(:disabled) {
@@ -1378,6 +1487,7 @@ a {
 .etiqueta-aviso {
   display: inline-block;
   padding: 0.1rem 0.5rem;
+  border: 1px solid var(--aviso-borde);
   border-radius: 999px;
   background: var(--aviso-fondo);
   color: var(--aviso);
@@ -1453,7 +1563,7 @@ a {
   font-size: 0.85em;
   padding: 0.05rem 0.3rem;
   border-radius: 4px;
-  background: var(--color-fondo);
+  background: var(--color-hundido);
 }
 
 .resumen-carga {
@@ -1509,6 +1619,7 @@ a {
 
 .tabla-errores {
   border: 1px solid var(--color-borde);
+  background: var(--color-superficie-plana);
   border-radius: var(--radio);
 }
 
@@ -1520,38 +1631,45 @@ a {
 }
 
 .estado-pedido-PENDIENTE {
+  border-color: var(--aviso-borde);
   background: var(--aviso-fondo);
   color: var(--aviso);
 }
 
 .estado-pedido-CONFIRMADA {
+  border-color: var(--info-borde);
   background: var(--info-fondo);
   color: var(--info);
 }
 
 .estado-pedido-LISTA {
+  border-color: var(--color-primario-borde);
   background: var(--color-primario-suave);
   color: var(--color-primario-oscuro);
 }
 
 .estado-pedido-ENTREGADA {
+  border-color: var(--exito-borde);
   background: var(--exito-fondo);
   color: var(--exito);
 }
 
 .estado-pedido-RECHAZADA {
+  border-color: var(--error-borde);
   background: var(--error-fondo);
   color: var(--error);
 }
 
 .estado-pedido-CANCELADA,
 .estado-pedido-VENCIDA {
-  background: #eef2f1;
+  border-color: var(--neutro-borde);
+  background: var(--neutro-fondo);
   color: var(--color-texto-suave);
 }
 
 /* H72: el medicamento pide receta */
 .estado-pedido-receta {
+  border-color: var(--receta-borde);
   background: var(--receta-fondo);
   color: var(--receta);
 }
@@ -1710,22 +1828,23 @@ a {
   width: 100%;
   min-height: 96px;
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--color-borde);
+  border: 1px solid var(--color-borde-control);
   border-radius: var(--radio);
-  background: var(--color-superficie);
+  background: var(--color-fondo);
+  box-shadow: var(--sombra-hundida);
   color: inherit;
   font: inherit;
   resize: vertical;
 }
 
 .campo textarea:focus-visible {
-  outline: 3px solid rgb(15 118 110 / 35%);
-  outline-offset: 1px;
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
 }
 
 .campo textarea[aria-invalid='true'] {
   border-color: var(--error);
-  background: #fffafa;
+  background: var(--error-campo);
 }
 
 .pie-campo {
@@ -1804,7 +1923,7 @@ a {
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgb(10 30 28 / 45%);
+  background: var(--velo-modal);
 }
 
 .modal {
@@ -1952,6 +2071,7 @@ a {
 
 .tabla-medicamentos {
   border: 1px solid var(--color-borde);
+  background: var(--color-superficie-plana);
   border-radius: var(--radio);
 }
 
@@ -1996,7 +2116,10 @@ a {
 .opcion-medicamento:hover,
 .opcion-medicamento:focus-visible {
   background: var(--color-primario-suave);
-  outline: none;
+}
+
+.opcion-medicamento:focus-visible {
+  outline-offset: -3px;
 }
 
 .opcion-medicamento .texto-suave,
@@ -2029,7 +2152,7 @@ a {
   background: var(--color-superficie);
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-grande);
-  box-shadow: 0 8px 32px rgb(16 48 44 / 18%);
+  box-shadow: var(--sombra-flotante);
   overflow: hidden;
 }
 
@@ -2068,6 +2191,11 @@ a {
   overflow-y: auto;
   padding: 1rem;
   background: var(--color-fondo);
+  /* Los mensajes se desvanecen arriba al desplazarse: indica que hay más conversación.
+     Ocupa lo mismo que el relleno, así que en reposo no tapa nada. Es una máscara (solo
+     transparencia), no un color. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 1rem);
+  mask-image: linear-gradient(to bottom, transparent, black 1rem);
 }
 
 .chat-vacio {
@@ -2117,18 +2245,18 @@ a {
 
 .chat-burbuja-usuario {
   background: var(--color-primario);
-  color: #fff;
+  color: var(--color-texto-sobre-color);
   border-bottom-right-radius: 4px;
 }
 
 .chat-burbuja-fallida {
-  background: var(--color-superficie);
+  background: var(--color-superficie-plana);
   color: var(--color-texto);
   border: 1px dashed var(--error);
 }
 
 .chat-burbuja-asistente {
-  background: var(--color-superficie);
+  background: var(--color-superficie-plana);
   border: 1px solid var(--color-borde);
   border-bottom-left-radius: 4px;
 }
@@ -2156,7 +2284,7 @@ a {
 }
 
 .chat-burbuja-ayuda .chat-telefono {
-  background: var(--color-superficie);
+  background: var(--color-superficie-plana);
   color: var(--aviso);
 }
 
@@ -2198,7 +2326,7 @@ a {
   display: grid;
   gap: 0.15rem;
   padding: 0.6rem 0.8rem;
-  background: var(--color-superficie);
+  background: var(--color-superficie-plana);
   border: 1px solid var(--color-borde);
   border-left: 3px solid var(--color-primario);
   border-radius: var(--radio);
@@ -2259,8 +2387,11 @@ a {
   min-height: 3rem;
   max-height: 8rem;
   padding: 0.55rem 0.75rem;
-  border: 1px solid var(--color-borde);
+  border: 1px solid var(--color-borde-control);
   border-radius: var(--radio);
+  background: var(--color-fondo);
+  box-shadow: var(--sombra-hundida);
+  color: inherit;
   font: inherit;
   /* 16px evita que el celular haga zoom al enfocar */
   font-size: 1rem;
@@ -2268,8 +2399,8 @@ a {
 }
 
 .chat-caja:focus-visible {
-  outline: 3px solid rgb(15 118 110 / 35%);
-  outline-offset: 1px;
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
   border-color: var(--color-primario);
 }
 
@@ -2300,7 +2431,7 @@ a {
     height: auto;
     border-width: 0 0 0 1px;
     border-radius: 0;
-    box-shadow: -8px 0 24px rgb(16 48 44 / 8%);
+    box-shadow: var(--sombra-panel-lateral);
   }
 
   body:has(.chat-panel) .toasts {
@@ -2321,5 +2452,21 @@ a {
 @media (prefers-reduced-motion: reduce) {
   .chat-escribiendo .spinner {
     animation-duration: 2.4s;
+  }
+}
+
+/* Movimiento reducido: sin transiciones ni animaciones de entrada en todo el panel.
+   Los spinners siguen girando (indican que algo carga) y los efectos de React Bits ya leen
+   esta preferencia por su cuenta. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+
+  .toasts .alerta,
+  .pasos-contenido {
+    animation: none;
   }
 }

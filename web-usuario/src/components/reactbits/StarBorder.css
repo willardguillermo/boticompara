@@ -1,0 +1,36 @@
+/*
+ * Origen: React Bits (https://reactbits.dev), componente "StarBorder", variante JS-CSS.
+ * Licencia: MIT + Commons Clause, (c) 2026 David Haz. Texto completo en ./LICENSE.md.
+ * Adaptado para BotiCompara: se quitaron el relleno, la tipografía, el fondo, el color y el foco
+ * propios; el botón conserva el aspecto de .btn / .btn-primario de index.css.
+ */
+.star-border {
+  position: relative;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.star-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 var(--star-border-thickness) var(--star-border-track);
+  pointer-events: none;
+}
+
+.star-border__light {
+  position: absolute;
+  top: -48px;
+  left: -48px;
+  z-index: -1;
+  width: calc(100% + 96px);
+  height: calc(100% + 96px);
+  pointer-events: none;
+}
+
+.star-border:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

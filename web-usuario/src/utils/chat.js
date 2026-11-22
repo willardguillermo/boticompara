@@ -56,6 +56,19 @@ export function partirNumerosAyuda(texto) {
     .filter((trozo) => trozo !== '')
 }
 
+// "S/" seguido de un espacio y una cifra (el backend del dueño escribe "S/ 8.50")
+const SOLES_CON_ESPACIO = /S\/ (?=\d)/g
+const ESPACIO_NO_SEPARABLE = '\u00A0'
+
+/**
+ * Solo para mostrar: une "S/" y el número con un espacio de no separación, así
+ * "S/" nunca queda al final de una línea y el monto en la siguiente.
+ * "S/ 8.50" -> "S/\u00A08.50". El texto guardado y el historial que se envía no cambian.
+ */
+export function unirPrecios(texto) {
+  return String(texto).replace(SOLES_CON_ESPACIO, `S/${ESPACIO_NO_SEPARABLE}`)
+}
+
 /** 1.25 -> "1.3 km" (con 1 decimal, como el móvil) */
 export function formatoDistancia(km) {
   return `${Number(km).toFixed(1)} km`
