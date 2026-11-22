@@ -1341,7 +1341,7 @@ Marca como leídas todas las notificaciones del dueño. Responde `204` sin cuerp
 Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
 
 ### Inicio del dueño: alcanza con lo que ya existe
-No hace falta un endpoint de resumen. La pantalla de Inicio arma sus 4 números con endpoints que ya existen, una vez al abrirla (no cada 30 s):
+No hace falta un endpoint de resumen. La pantalla de Inicio arma sus 4 números con endpoints que ya existen, al abrirla (no cada 30 s). Solo **pedidos pendientes** y **por recoger hoy** se vuelven a pedir cuando sube el contador de no leídas (`GET /notificaciones/no-leidas/total`); stock bajo y calificación quedan como se cargaron:
 
 | Dato | Endpoint | Cómo se obtiene |
 |---|---|---|
