@@ -102,4 +102,14 @@ export const apiReal = {
   obtenerPedido: (id) => solicitar('GET', `/pedidos/${id}`),
   cambiarEstadoPedido: (id, estado) => solicitar('PATCH', `/pedidos/${id}/estado`, { estado }),
   rechazarPedido: (id, motivo) => solicitar('PATCH', `/pedidos/${id}/rechazar`, { motivo: motivo.trim() }),
+
+  // 11. Reseñas (público): la calificación de la botica en el Inicio
+  listarResenas: (boticaId, page = 0) => solicitar('GET', `/boticas/${boticaId}/resenas?page=${page}`),
+
+  // 12. Notificaciones del dueño (H103)
+  listarNotificaciones: ({ soloNoLeidas = false } = {}) =>
+    solicitar('GET', `/notificaciones${soloNoLeidas ? '?soloNoLeidas=true' : ''}`),
+  contarNotificacionesNoLeidas: () => solicitar('GET', '/notificaciones/no-leidas/total'),
+  marcarNotificacionLeida: (id) => solicitar('PATCH', `/notificaciones/${id}/leida`),
+  marcarNotificacionesLeidas: () => solicitar('PATCH', '/notificaciones/leidas'),
 }

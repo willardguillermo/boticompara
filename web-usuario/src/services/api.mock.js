@@ -91,6 +91,11 @@ const MINUTO = 60 * 1000
 const HORA = 60 * MINUTO
 const haceMs = (ms) => new Date(Date.now() - ms).toISOString()
 const enMs = (ms) => new Date(Date.now() + ms).toISOString()
+/** Cuánto falta para las 23:59:59 de hoy en Lima (UTC-5 todo el año). */
+const hastaFinDelDiaLima = () => {
+  const DIA = 24 * HORA
+  return DIA - 1000 - ((Date.now() - 5 * HORA) % DIA)
+}
 
 /** [productoId, compradorId, cantidad, estado, creada hace, vence en (negativo = ya pasó), código, motivo] */
 db.reservas = [
@@ -107,6 +112,8 @@ db.reservas = [
   [9, 4, 2, 'PENDIENTE', 50 * MINUTO, 23 * HORA + 10 * MINUTO, 'BC-C7HS2M'],
   [11, 5, 1, 'CONFIRMADA', 5 * HORA, 19 * HORA, 'BC-J4RT6V'],
   [14, 4, 2, 'PENDIENTE', 2 * HORA, 22 * HORA, 'BC-P3GU7R'],
+  // Salud Total (rosa@): lista y vence hoy en hora de Lima, para "Por recoger hoy" del Inicio (H103)
+  [1, 4, 1, 'LISTA', 30 * HORA, hastaFinDelDiaLima(), 'BC-K8DN4F'],
 ].map(([productoId, usuarioId, cantidad, estado, creada, vence, codigo, motivoRechazo = null], i) => {
   const producto = db.productos.find((p) => p.id === productoId)
   const creadoEn = haceMs(creada)
@@ -116,6 +123,17 @@ db.reservas = [
     actualizadoEn: estado === 'PENDIENTE' ? creadoEn : haceMs(Math.max(creada / 2, MINUTO)),
   }
 })
+
+// ---------- Reseñas de prueba (sección 11): Salud Total tiene 3 (promedio 4.3); FarmaVida, ninguna ----------
+/** [boticaId, usuarioId, estrellas, comentario, respuesta, creada hace] */
+db.resenas = [
+  [1, 4, 5, 'Me atendieron rápido y tenían todo.', '¡Gracias, Carlos! Te esperamos.', 3 * 24 * HORA],
+  [1, 5, 4, 'Buen precio y el pedido estaba listo.', null, 6 * 24 * HORA],
+  [1, 6, 4, null, null, 20 * 24 * HORA],
+].map(([boticaId, usuarioId, estrellas, comentario, respuesta, creada], i) => ({
+  id: i + 1, boticaId, usuarioId, estrellas, comentario, respuesta, oculta: false,
+  respondidaEn: respuesta ? haceMs(creada / 2) : null, creadoEn: haceMs(creada), actualizadoEn: haceMs(creada),
+}))
 
 const siguienteId = (lista) => Math.max(0, ...lista.map((x) => x.id)) + 1
 const esperar = () => new Promise((r) => setTimeout(r, 250))
@@ -770,12 +788,85 @@ function validarPedidoChat({ mensaje, historial, lat, lng }) {
   return limpio
 }
 
+// ---------- 12. Notificaciones del dueño (H103, mismas reglas que docs/API.md) ----------
+const MAX_NOTIFICACIONES = 50
+const ESPERA_NUEVA_RESERVA_MS = 60 * 1000
+const TITULOS_NOTIFICACION = {
+  NUEVA_RESERVA: 'Nueva reserva',
+  RESERVA_CANCELADA: 'Reserva cancelada',
+  RESERVA_VENCIDA: 'Reserva vencida',
+}
+db.notificaciones = []
+
+/** Texto ya escrito al crearla y sin datos del comprador; como máximo una por reserva y tipo. */
+function crearNotificacion(tipo, reserva, { creadoEn = ahoraIso(), leida = false } = {}) {
+  if (db.notificaciones.some((n) => n.pedidoId === reserva.id && n.tipo === tipo)) return
+  const producto = db.productos.find((p) => p.id === reserva.productoId)
+  const condicion = db.medicamentos.find((m) => m.id === producto.medicamentoId)?.condicionVenta
+  const partes = [`${producto.nombreComercial} x ${reserva.cantidad}`, precioConSimbolo(reserva.cantidad * reserva.precioUnitario)]
+  if (tipo === 'NUEVA_RESERVA' && condicion === 'CON_RECETA') partes.push('Requiere receta médica')
+  db.notificaciones.push({
+    id: siguienteId(db.notificaciones),
+    usuarioId: db.boticas.find((b) => b.id === producto.boticaId).usuarioId,
+    tipo, titulo: `${TITULOS_NOTIFICACION[tipo]} ${reserva.codigo}`, mensaje: partes.join(' · '),
+    pedidoId: reserva.id, leida, creadoEn,
+  })
+}
+
+// Tres de ejemplo para rosa@: una cancelada ya leída y dos reservas nuevas sin leer
+for (const [tipo, codigo, leida] of [
+  ['RESERVA_CANCELADA', 'BC-W3FJ8N', true],
+  ['NUEVA_RESERVA', 'BC-H4NP2T', false],
+  ['NUEVA_RESERVA', 'BC-7K2QXM', false],
+]) {
+  const reserva = db.reservas.find((r) => r.codigo === codigo)
+  crearNotificacion(tipo, reserva, { leida, creadoEn: tipo === 'NUEVA_RESERVA' ? reserva.creadoEn : reserva.actualizadoEn })
+}
+
+const LETRAS_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+function codigoReserva() {
+  const bytes = crypto.getRandomValues(new Uint8Array(6))
+  return `BC-${Array.from(bytes, (b) => LETRAS_CODIGO[b % LETRAS_CODIGO.length]).join('')}`
+}
+
+/** Imita POST /reservas desde la app del comprador: la reserva y la notificación al dueño. */
+function simularReserva(productoId, cantidad = 1) {
+  const producto = db.productos.find((p) => p.id === Number(productoId) && p.activo)
+  if (!producto) return null
+  const creadoEn = ahoraIso()
+  const reserva = {
+    id: siguienteId(db.reservas), codigo: codigoReserva(), estado: 'PENDIENTE', productoId: producto.id,
+    usuarioId: 5, cantidad, precioUnitario: producto.precio, motivoRechazo: null,
+    venceEn: enMs(24 * HORA), creadoEn, actualizadoEn: creadoEn,
+  }
+  db.reservas.push(reserva)
+  crearNotificacion('NUEVA_RESERVA', reserva)
+  return reserva
+}
+
+// A los 60 s de iniciar sesión (o de recargar la página con sesión) a rosa@ le llega una reserva nueva
+let temporizadorReserva
+function programarReservaNueva(usuarioId) {
+  clearTimeout(temporizadorReserva)
+  if (usuarioId === 1) temporizadorReserva = setTimeout(() => simularReserva(1, 2), ESPERA_NUEVA_RESERVA_MS)
+}
+programarReservaNueva(Number((obtenerToken() ?? '').split('.')[1]))
+
+const notificacionDto = ({ id, tipo, titulo, mensaje, pedidoId, leida, creadoEn }) =>
+  ({ id, tipo, titulo, mensaje, pedidoId, leida, creadoEn })
+
+const misNotificaciones = () => {
+  const dueno = duenoActual()
+  return db.notificaciones.filter((n) => n.usuarioId === dueno.id)
+}
+
 export const apiMock = {
   // ---------- 1. Autenticación ----------
   async login({ correo, password }) {
     await esperar()
     const usuario = db.usuarios.find((u) => u.correo === String(correo ?? '').trim().toLowerCase())
     if (!usuario || usuario.password !== password) throw crearError(401, 'Correo o contraseña incorrectos.')
+    programarReservaNueva(usuario.id)
     return {
       token: `mock-token.${usuario.id}.${crypto.randomUUID()}`,
       tipo: 'Bearer',
@@ -1058,6 +1149,71 @@ export const apiMock = {
       .map(medicamentoDto)
   },
 
+  // ---------- 11. Reseñas ----------
+  // H87: público, páginas de 10, sin las ocultas
+  async listarResenas(boticaId, page = 0) {
+    await esperar()
+    if (!/^\d+$/.test(String(boticaId)) || !/^\d+$/.test(String(page))) {
+      throw crearError(400, 'El id de la botica y la página deben ser números enteros desde 0.')
+    }
+    const botica = db.boticas.find((b) => b.id === Number(boticaId) && b.estado === 'APROBADO')
+    if (!botica) throw crearError(404, 'La botica no existe o no está aprobada.')
+    const visibles = db.resenas
+      .filter((r) => r.boticaId === botica.id && !r.oculta)
+      .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))
+    const suma = visibles.reduce((total, r) => total + r.estrellas, 0)
+    return {
+      boticaId: botica.id,
+      promedio: visibles.length ? Math.round((suma / visibles.length) * 10) / 10 : null,
+      total: visibles.length,
+      page: Number(page),
+      totalPages: Math.ceil(visibles.length / 10),
+      resenas: visibles
+        .slice(page * 10, page * 10 + 10)
+        .map(({ id, usuarioId, estrellas, comentario, respuesta, respondidaEn, creadoEn, actualizadoEn }) => ({
+          id, autor: nombreCorto(db.usuarios.find((u) => u.id === usuarioId)),
+          estrellas, comentario, respuesta, respondidaEn, creadoEn, actualizadoEn,
+        })),
+      miResena: null,
+    }
+  },
+
+  // ---------- 12. Notificaciones del dueño (H103) ----------
+  // De la más reciente a la más antigua, máximo 50. Sin botica: lista vacía, no 404
+  async listarNotificaciones({ soloNoLeidas = false } = {}) {
+    await esperar()
+    const propias = misNotificaciones()
+    if (typeof soloNoLeidas !== 'boolean') throw crearError(400, 'soloNoLeidas debe ser true o false.')
+    return propias
+      .filter((n) => !soloNoLeidas || !n.leida)
+      .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn) || b.id - a.id)
+      .slice(0, MAX_NOTIFICACIONES)
+      .map(notificacionDto)
+  },
+
+  // Cuenta todas las no leídas, sin el límite de 50
+  async contarNotificacionesNoLeidas() {
+    await esperar()
+    return { total: misNotificaciones().filter((n) => !n.leida).length }
+  },
+
+  // 204 también si ya estaba leída; 404 si no existe o es de otro usuario
+  async marcarNotificacionLeida(id) {
+    await esperar()
+    const propias = misNotificaciones()
+    if (!/^\d+$/.test(String(id))) throw crearError(400, 'El id de la notificación debe ser numérico.')
+    const notificacion = propias.find((n) => n.id === Number(id))
+    if (!notificacion) throw crearError(404, 'La notificación no existe')
+    notificacion.leida = true
+    return null
+  },
+
+  async marcarNotificacionesLeidas() {
+    await esperar()
+    for (const n of misNotificaciones()) n.leida = true
+    return null
+  },
+
   // ---------- 8. Asistente (H68) ----------
   async enviarChat(pedido, { signal } = {}) {
     const usuario = usuarioActual()
@@ -1115,6 +1271,7 @@ function responderChat(usuario, mensaje, { lat, lng }) {
 //   boticomparaMock.pedidos()                      (H77: pedidos de todas las boticas)
 //   boticomparaMock.vencerPedido(1)                (H79: venceEn pasa a ayer, para el 409 "La reserva ya venció")
 //   boticomparaMock.cancelarPedido(1)              (H79: el comprador lo cancela desde el móvil)
+//   boticomparaMock.nuevaReserva(1)                (H103: un comprador reserva el producto 1 y llega la notificación)
 //   boticomparaMock.condicionVenta(24, 'RECETA_RETENIDA')  (H72: cambia la condición de un medicamento; null = sin información)
 export function registrarAyudaConsola() {
   const cambiarEstado = (id, estado, motivoRechazo = null) => {
@@ -1158,7 +1315,11 @@ export function registrarAyudaConsola() {
       if (!reserva) return `No existe el pedido ${id}`
       if (!ESTADOS_ACTIVOS.includes(reserva.estado)) return `No se puede cancelar una reserva ${reserva.estado}`
       Object.assign(reserva, { estado: 'CANCELADA', actualizadoEn: ahoraIso() })
+      crearNotificacion('RESERVA_CANCELADA', reserva)
       return `${reserva.codigo}: CANCELADA`
     },
+    // H103: imita una reserva nueva desde la app, con su notificación al dueño
+    nuevaReserva: (productoId = 1, cantidad = 1) =>
+      simularReserva(productoId, cantidad)?.codigo ?? `No existe el producto ${productoId}`,
   }
 }
