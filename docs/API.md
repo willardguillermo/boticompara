@@ -1360,6 +1360,20 @@ Si más adelante el Inicio se vuelve lento o hace falta contar más de 100 pendi
 
 ---
 
+## 13. Salud del servicio
+
+### `GET /salud`
+Público, sin token. Lo usa Render como health check: si responde 200, el proceso está vivo y atiende peticiones.
+```json
+// 200 OK
+{ "estado": "OK" }
+```
+- **No consulta la base ni ningún servicio externo:** si Supabase falla un momento, Render no debe reiniciar la API por eso. Un 200 no significa que la base responda.
+- Sin datos internos: ni versión, ni configuración, ni nombres de servicios.
+- La web y la app no lo necesitan. Solo `GET`: con otro método y sin token responde 401.
+
+---
+
 ## Usuarios de prueba (seed.sql)
 
 Contraseña de todos: `Boti2026!`
