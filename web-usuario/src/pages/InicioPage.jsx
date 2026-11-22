@@ -1,5 +1,6 @@
 // H103 - Inicio del dueño: saludo, 4 números del día y actividad reciente.
-// Los números salen de endpoints que ya existen y se piden una vez al abrir (docs/API.md, sección 12).
+// Los números salen de endpoints que ya existen (docs/API.md, sección 12) y se piden al abrir. Los de
+// pedidos (enVivo) se vuelven a pedir cuando sube el contador de notificaciones, no en cada consulta.
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import AvisoCambioEstado from '../components/AvisoCambioEstado.jsx'
@@ -23,6 +24,7 @@ const TARJETAS = [
     titulo: 'Pedidos pendientes',
     icono: 'pedido',
     a: '/panel/pedidos?estado=PENDIENTE',
+    enVivo: true,
     cargar: async () => {
       const { length } = await api.listarPedidos('PENDIENTE')
       return {
@@ -37,6 +39,7 @@ const TARJETAS = [
     titulo: 'Por recoger hoy',
     icono: 'reloj',
     a: '/panel/pedidos?estado=LISTA',
+    enVivo: true,
     cargar: async () => {
       const valor = porRecogerHoy(await api.listarPedidos('LISTA'))
       return { valor, detalle: valor ? 'Su plazo termina hoy' : 'Ningún plazo termina hoy' }
@@ -78,7 +81,9 @@ function Numero({ valor, decimales, sufijo }) {
 }
 
 function TarjetaResumen({ tarjeta, boticaId }) {
-  const { titulo, icono, a, cargar } = tarjeta
+  const { titulo, icono, a, enVivo, cargar } = tarjeta
+  const { subidas } = useNotificaciones()
+  const actualizacion = enVivo ? subidas : 0
   const [dato, setDato] = useState(null) // null: cargando; { error: true }: falló
   const [intento, setIntento] = useState(0)
 
@@ -86,11 +91,12 @@ function TarjetaResumen({ tarjeta, boticaId }) {
     let activo = true
     cargar(boticaId)
       .then((d) => activo && setDato(d))
-      .catch(() => activo && setDato({ error: true }))
+      // Si falla una actualización, se queda el último número en lugar de un error
+      .catch(() => activo && setDato((anterior) => anterior ?? { error: true }))
     return () => {
       activo = false
     }
-  }, [cargar, boticaId, intento])
+  }, [cargar, boticaId, intento, actualizacion])
 
   const contenido = (
     <>

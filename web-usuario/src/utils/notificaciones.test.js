@@ -43,16 +43,16 @@ test('tiempoRelativo acepta los microsegundos que manda la API', () => {
   assert.equal(tiempoRelativo('2026-11-22T15:25:00.123456Z', AHORA), 'hace 4 min')
 })
 
-test('textoContador: 0 no se muestra y más de 99 es "99+"', () => {
+test('textoContador: 0 no se muestra y más de 9 es "9+"', () => {
   assert.equal(textoContador(null), '')
   assert.equal(textoContador(0), '')
   assert.equal(textoContador(-1), '')
   assert.equal(textoContador(1), '1')
-  assert.equal(textoContador(99), '99')
-  assert.equal(textoContador(100), '99+')
+  assert.equal(textoContador(9), '9')
+  assert.equal(textoContador(10), '9+')
 })
 
-test('etiquetaCampana dice el número real aunque se vea "99+"', () => {
+test('etiquetaCampana dice el número real aunque se vea "9+"', () => {
   assert.equal(etiquetaCampana(null), 'Notificaciones')
   assert.equal(etiquetaCampana(0), 'Notificaciones, 0 sin leer')
   assert.equal(etiquetaCampana(150), 'Notificaciones, 150 sin leer')
@@ -60,7 +60,7 @@ test('etiquetaCampana dice el número real aunque se vea "99+"', () => {
 
 test('tituloPestana pone el contador y vuelve al título de siempre con 0', () => {
   assert.equal(tituloPestana(3, 'Panel'), '(3) BotiCompara')
-  assert.equal(tituloPestana(120, 'Panel'), '(99+) BotiCompara')
+  assert.equal(tituloPestana(120, 'Panel'), '(9+) BotiCompara')
   assert.equal(tituloPestana(0, 'Panel'), 'Panel')
 })
 

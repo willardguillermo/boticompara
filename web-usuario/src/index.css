@@ -31,6 +31,9 @@
   --color-texto-suave: #4d655f;
   --color-texto-sobre-color: #ffffff;
   --color-pendiente: #9fb2ad;
+  /* Notificación sin leer: apenas más verde que la superficie plana (texto 12,7:1 y texto suave 5,6:1; con el puntero encima, 11,9:1 y 5,3:1) */
+  --notificacion-nueva-fondo: #e9f5f1;
+  --notificacion-nueva-hover: #deefe9;
   --color-pie: var(--color-hundido);
   --color-tabla-cabecera: #edf2f1;
   --color-tabla-hover: #eef4f2;
@@ -2625,11 +2628,11 @@ a.notificacion:focus-visible {
 }
 
 .notificacion-nueva {
-  background: var(--color-primario-suave);
+  background: var(--notificacion-nueva-fondo);
 }
 
 a.notificacion-nueva:hover {
-  background: var(--color-primario-borde);
+  background: var(--notificacion-nueva-hover);
 }
 
 .notificacion-icono {

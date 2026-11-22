@@ -22,9 +22,9 @@ export function tiempoRelativo(iso, ahora = Date.now()) {
   return fechaLima.format(new Date(iso))
 }
 
-const MAXIMO_CONTADOR = 99
+const MAXIMO_CONTADOR = 9
 
-/** Número de la campana: 0 no se muestra (''), más de 99 sale como "99+". */
+/** Número de la campana: 0 no se muestra (''), más de 9 sale como "9+" (contrato). */
 export function textoContador(total) {
   if (!total || total < 0) return ''
   return total > MAXIMO_CONTADOR ? `${MAXIMO_CONTADOR}+` : String(total)

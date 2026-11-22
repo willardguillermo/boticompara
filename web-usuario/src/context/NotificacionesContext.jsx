@@ -20,6 +20,8 @@ export function NotificacionesProvider({ children }) {
   const [errorLista, setErrorLista] = useState('')
   const [aviso, setAviso] = useState(null) // { id, cantidad, notificacion }
   const [conTitulo, setConTitulo] = useState(false)
+  // Cuántas veces subió el contador: el Inicio lo usa para saber cuándo volver a pedir los pedidos
+  const [subidas, setSubidas] = useState(0)
   const [tituloOriginal] = useState(() => document.title)
 
   const ultimoTotal = useRef(null)
@@ -73,6 +75,7 @@ export function NotificacionesProvider({ children }) {
         fijarTotal(nuevo)
         if (!subioContador(anterior, nuevo)) return
         setConTitulo(true)
+        setSubidas((n) => n + 1)
         const cantidad = nuevo - anterior
         const reciente = (await cargarLista())?.find((n) => !n.leida)
         if (activo) setAviso({ id: crypto.randomUUID(), cantidad, notificacion: cantidad === 1 ? reciente : undefined })
@@ -152,8 +155,8 @@ export function NotificacionesProvider({ children }) {
   const cerrarAviso = useCallback(() => setAviso(null), [])
 
   const valor = useMemo(
-    () => ({ total, lista, errorLista, aviso, cargarLista, marcarLeida, marcarTodas, cerrarAviso }),
-    [total, lista, errorLista, aviso, cargarLista, marcarLeida, marcarTodas, cerrarAviso],
+    () => ({ total, lista, errorLista, aviso, subidas, cargarLista, marcarLeida, marcarTodas, cerrarAviso }),
+    [total, lista, errorLista, aviso, subidas, cargarLista, marcarLeida, marcarTodas, cerrarAviso],
   )
   return <NotificacionesContext.Provider value={valor}>{children}</NotificacionesContext.Provider>
 }
