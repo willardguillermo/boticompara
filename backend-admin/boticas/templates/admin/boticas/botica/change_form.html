@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  {# H5/H6: Aprobar si está pendiente; Rechazar si está pendiente o aprobada; sin "Can change botica" no hay botones #}
+  {% for accion in acciones_botica %}
+    {# Aprobar es la acción principal (verde, boticas/etiquetas.py); Rechazar, la peligrosa (rojo del admin) #}
+    <li><a href="{{ accion.url }}" class="accion-{{ accion.texto|lower }}"{% if accion.color %} style="background: {{ accion.color }}; color: #fff; font-weight: 600;"{% elif accion.peligrosa %} style="background: var(--delete-button-bg); color: #fff;"{% endif %}>{{ accion.texto }}</a></li>
+  {% endfor %}
+  {{ block.super }}
+{% endblock %}

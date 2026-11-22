@@ -27,7 +27,7 @@
   </p>
 
   {% if filas %}
-  <div class="results">
+  <div class="results reporte-desplazable">
     <table class="reporte-tabla" id="result_list">
       <caption>{{ rango }}</caption>
       <thead>
@@ -35,12 +35,13 @@
           <th scope="col" class="numero">Puesto</th>
           <th scope="col">Botica</th>
           <th scope="col">Distrito</th>
-          <th scope="col" class="numero">Pedidos entregados</th>
-          <th scope="col" class="numero">Reseñas respondidas</th>
-          <th scope="col" class="numero">Productos actualizados</th>
+          {# Encabezados cortos para que no se partan; el nombre completo va en title #}
+          <th scope="col" class="numero"><abbr title="Pedidos entregados">Entregados</abbr></th>
+          <th scope="col" class="numero"><abbr title="Reseñas respondidas">Respuestas</abbr></th>
+          <th scope="col" class="numero"><abbr title="Productos actualizados">Productos</abbr></th>
           <th scope="col" class="numero">Puntaje</th>
-          <th scope="col" class="numero">Calificación promedio</th>
-          <th scope="col" class="numero">Veces comparado</th>
+          <th scope="col" class="numero"><abbr title="Calificación promedio">Calif.</abbr></th>
+          <th scope="col" class="numero"><abbr title="Veces comparado">Comparado</abbr></th>
         </tr>
       </thead>
       <tbody>

@@ -1,0 +1,78 @@
+{% extends "admin/base_site.html" %}
+{% load static admin_urls %}
+{% comment %}
+H5/H6: página para confirmar la aprobación o rechazar con motivo una botica desde su ficha.
+Mismo marcado que ocultar una reseña (H89). La lógica está en boticas/revision.py.
+{% endcomment %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/forms.css" %}">{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% if peligrosa %} delete-confirmation{% endif %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Inicio</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{{ url_detalle }}">{{ botica }}</a>
+  &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div>
+      <fieldset class="module aligned">
+        <h2 class="fieldset-heading">Botica</h2>
+        <div class="form-row">
+          <div><div class="flex-container"><label>Nombre comercial:</label><div class="readonly">{{ botica.nombre_comercial }}</div></div></div>
+        </div>
+        <div class="form-row">
+          <div><div class="flex-container"><label>RUC:</label><div class="readonly">{{ botica.ruc }}</div></div></div>
+        </div>
+        <div class="form-row">
+          <div><div class="flex-container"><label>Razón social:</label><div class="readonly">{{ botica.razon_social }}</div></div></div>
+        </div>
+        <div class="form-row">
+          <div><div class="flex-container"><label>Correo del dueño:</label><div class="readonly">{{ botica.usuario.correo }}</div></div></div>
+        </div>
+        <div class="form-row">
+          <div><div class="flex-container"><label>Estado actual:</label><div class="readonly"><strong>{{ botica.get_estado_display }}</strong></div></div></div>
+        </div>
+      </fieldset>
+
+      {% if aviso %}<p class="help" id="aviso-revision">{{ aviso }}</p>{% endif %}
+
+      {% if form.errors %}
+        <p class="errornote">{% if form.errors|length == 1 %}Corrige el error de abajo.{% else %}Corrige los errores de abajo.{% endif %}</p>
+        {{ form.non_field_errors }}
+      {% endif %}
+      {% if form.fields %}
+        <fieldset class="module aligned">
+          {% for campo in form %}
+            <div class="form-row{% if campo.errors %} errors{% endif %} field-{{ campo.name }}">
+              {{ campo.errors }}
+              <div>
+                <div class="flex-container">
+                  <label for="{{ campo.id_for_label }}"{% if campo.field.required %} class="required"{% endif %}>{{ campo.label }}:</label>
+                  {{ campo }}
+                </div>
+                {% if campo.help_text %}
+                  <div class="help" id="{{ campo.auto_id }}_helptext"><div>{{ campo.help_text }}</div></div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </fieldset>
+      {% endif %}
+
+      <div class="submit-row">
+        <input type="submit" value="{{ boton }}" class="default">
+        <a href="{{ url_detalle }}" class="closelink">Cancelar</a>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

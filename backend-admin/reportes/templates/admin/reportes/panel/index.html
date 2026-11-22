@@ -51,7 +51,7 @@
   <div class="module">
     <h2>Actividad del periodo</h2>
     <div class="panel-cuerpo">
-      {% include "admin/reportes/rango_fechas.html" with rango_desde=panel.rango_desde rango_hasta=panel.rango_hasta %}
+      {% include "admin/reportes/rango_fechas.html" with rango_desde=panel.rango_desde rango_hasta=panel.rango_hasta valor_desde=panel.valor_desde valor_hasta=panel.valor_hasta %}
       <p class="reporte-nota">
         <strong id="panel-rango">{{ panel.rango }}</strong>.
         Días en hora de Lima; «Hasta» incluye todo ese día. Sin fechas, los últimos {{ panel.dias }} días.
