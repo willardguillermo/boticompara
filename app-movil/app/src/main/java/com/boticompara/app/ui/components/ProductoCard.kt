@@ -48,7 +48,8 @@ fun ProductoCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     trailingContent: (@Composable () -> Unit)? = null,
-    contentAdicional: (@Composable () -> Unit)? = null
+    contentAdicional: (@Composable () -> Unit)? = null,
+    condicionVenta: String? = null   // H72: etiqueta de receta; sin etiqueta si es null
 ) {
     val border = if (esMasBarato) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
     Card(
@@ -91,6 +92,10 @@ fun ProductoCard(
             Spacer(Modifier.height(Dimens.Space8))
 
             Etiqueta(texto = principioActivo, icono = Icons.Rounded.Medication)
+            if (ReglasCondicionVenta.etiqueta(condicionVenta) != null) {
+                Spacer(Modifier.height(Dimens.Space8))
+                EtiquetaCondicionVenta(condicionVenta)
+            }
             Spacer(Modifier.height(Dimens.Space12))
 
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.reservas.AccesoMisReservas
 import com.boticompara.app.ui.theme.Dimens
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,6 +91,10 @@ fun ProfileScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(Dimens.Space24))
+
+            // H76: acceso a Mis reservas
+            AccesoMisReservas(onClick = { navController.navigate("reservas") })
+            Spacer(Modifier.height(Dimens.Space16))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),

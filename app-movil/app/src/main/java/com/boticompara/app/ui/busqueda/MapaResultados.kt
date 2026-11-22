@@ -183,7 +183,8 @@ fun MapaResultados(
                             boticaDistrito = seleccion.producto.boticaDistrito,
                             distanciaKm = seleccion.producto.distanciaKm,
                             esMasBarato = false,
-                            onClick = { alTocar(seleccion.producto.productoId) }
+                            onClick = { alTocar(seleccion.producto.productoId) },
+                            condicionVenta = seleccion.producto.condicionVenta
                         )
                         Spacer(Modifier.height(Dimens.Space12))
                         Row(
