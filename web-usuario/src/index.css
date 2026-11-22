@@ -1055,7 +1055,7 @@ a {
 }
 
 .zona-enlace {
-  color: var(--color-primario);
+  color: var(--color-primario-oscuro);
   font-weight: 600;
   text-decoration: underline;
 }
