@@ -18,6 +18,7 @@ import com.boticompara.usuario.dto.BusquedaResponse;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.security.UsuarioAutenticado;
 import com.boticompara.usuario.service.AlternativasService;
+import com.boticompara.usuario.service.BoticaService;
 import com.boticompara.usuario.service.BusquedaService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -130,6 +131,9 @@ class ChatServiceTest {
     @Mock
     AlternativasService alternativas;
 
+    @Mock
+    BoticaService boticas;
+
     private final Reloj reloj = new Reloj();
     private final GeminiFalso gemini = new GeminiFalso();
     private ChatService service;
@@ -167,7 +171,7 @@ class ChatServiceTest {
 
     private ChatService servicio(LimitadorChat limitador) {
         RegistroHerramientas registro = new RegistroHerramientas(
-                List.of(new BuscarPrecios(busqueda), new BuscarAlternativas(alternativas), soloDueno));
+                List.of(new BuscarPrecios(busqueda, boticas), new BuscarAlternativas(alternativas), soloDueno));
         return new ChatService(gemini, registro, limitador, new InstruccionesSistema(), reloj);
     }
 
@@ -782,6 +786,42 @@ class ChatServiceTest {
         assertTrue(r.respaldo());
         assertEquals(RESPALDO_3, r.respuesta());
         assertEquals(List.of(1L, 2L, 3L), r.productos().stream().map(ChatProducto::productoId).toList());
+    }
+
+    @Test
+    void elRespaldoDeUnaBusquedaDelDuenoEscribeLosPreciosConSimbolo() {
+        laBusquedaDevuelve("paracetamol", 1, 3);
+        gemini.guion.add(pide(buscar("c1", "paracetamol")));
+        gemini.guion.add(GeminiException.noDisponible("HTTP 429 cuota"));
+
+        ChatResponse r = service.responder(ROSA, pregunta("paracetamol barato"));
+
+        assertTrue(r.respaldo());
+        assertEquals("Encontré 3 opciones. La más barata es Paracetamol 1 a S/ 2.20 en FarmaVida, Lurigancho-Chosica.",
+                r.respuesta());
+    }
+
+    // ---------- Formato de la respuesta según el rol ----------
+
+    private static final String LISTA_DEL_MODELO = "Para invierno te sugiero:\n\n* **Pañuelos**\n* Termómetros\n"
+            + "* Vitamina C en sobres";
+
+    @Test
+    void alDuenoLeLlegaLaListaConUnaLineaPorPunto() {
+        gemini.guion.add(texto(LISTA_DEL_MODELO));
+
+        ChatResponse r = service.responder(ROSA, pregunta("hazme una lista de productos para invierno"));
+
+        assertEquals("Para invierno te sugiero:\n- Pañuelos\n- Termómetros\n- Vitamina C en sobres", r.respuesta());
+    }
+
+    @Test
+    void alCompradorLaMismaListaLeLlegaEnUnaSolaLinea() {
+        gemini.guion.add(texto(LISTA_DEL_MODELO));
+
+        ChatResponse r = service.responder(CARLOS, pregunta("hazme una lista"));
+
+        assertEquals("Para invierno te sugiero: Pañuelos Termómetros Vitamina C en sobres", r.respuesta());
     }
 
     @Test

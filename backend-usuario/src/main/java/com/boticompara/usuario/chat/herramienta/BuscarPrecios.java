@@ -4,9 +4,13 @@ import com.boticompara.usuario.chat.ChatProducto;
 import com.boticompara.usuario.chat.ContextoChat;
 import com.boticompara.usuario.chat.gemini.DeclaracionHerramienta;
 import com.boticompara.usuario.dto.BusquedaResponse;
+import com.boticompara.usuario.entity.Botica;
+import com.boticompara.usuario.error.ApiException;
+import com.boticompara.usuario.service.BoticaService;
 import com.boticompara.usuario.service.BusquedaService;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -17,13 +21,15 @@ import java.util.Set;
 /**
  * H68: buscar_precios. Usa BusquedaService.buscar, el mismo de GET /productos/buscar (vista
  * v_producto_busqueda), así que el asistente ve exactamente lo que ve el comprador. No registra la búsqueda
- * (H62): eso lo hace BusquedaController, no el servicio.
+ * (H62): eso lo hace BusquedaController, no el servicio. Si pregunta el dueño, los productos de su propia botica
+ * llevan tuBotica=true para que el asistente diga "en tu botica" y lo compare con la competencia.
  */
 @Component
 @RequiredArgsConstructor
 public class BuscarPrecios implements Herramienta {
 
     private final BusquedaService busqueda;
+    private final BoticaService boticas;
 
     @Override
     public String nombre() {
@@ -68,15 +74,33 @@ public class BuscarPrecios implements Herramienta {
         Double lng = contexto.conUbicacion() ? contexto.lng() : null;
         List<BusquedaResponse> filas = busqueda.buscar(texto, tipo, cerca ? "distancia" : "precio_asc", lat, lng, null);
         List<BusquedaResponse> primeras = filas.stream().limit(MAX_RESULTADOS).toList();
+        Long miBotica = primeras.isEmpty() ? null : boticaDelDueno(contexto);
         return ResultadoHerramienta.de(filas.size(),
-                primeras.stream().map(BuscarPrecios::paraModelo).toList(),
+                primeras.stream().map(f -> paraModelo(f, miBotica)).toList(),
                 primeras.stream().map(BuscarPrecios::tarjeta).toList());
     }
 
-    private static ProductoParaModelo paraModelo(BusquedaResponse f) {
+    /** id de la botica del dueño que pregunta; null para el comprador o si el dueño aún no registró su botica. */
+    private Long boticaDelDueno(ContextoChat contexto) {
+        if (!DUENO_BOTICA.equals(contexto.rol())) {
+            return null;
+        }
+        try {
+            Botica botica = boticas.obtenerMia(contexto.usuarioId());
+            return botica == null ? null : botica.getId();
+        } catch (ApiException e) {
+            if (e.getStatus() == HttpStatus.NOT_FOUND) {
+                return null;
+            }
+            throw e;
+        }
+    }
+
+    private static ProductoParaModelo paraModelo(BusquedaResponse f, Long miBotica) {
+        Boolean tuBotica = miBotica != null && miBotica.equals(f.boticaId()) ? Boolean.TRUE : null;
         return new ProductoParaModelo(f.productoId(), f.nombreComercial(), f.principioActivo(), f.presentacion(),
                 f.precio(), f.stock(), f.boticaNombre(), f.boticaDistrito(), f.distanciaKm(),
-                f.condicionVenta());
+                f.condicionVenta(), tuBotica);
     }
 
     private static ChatProducto tarjeta(BusquedaResponse f) {

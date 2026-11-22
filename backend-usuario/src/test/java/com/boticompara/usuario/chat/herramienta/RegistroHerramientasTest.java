@@ -55,7 +55,7 @@ class RegistroHerramientasTest {
     @BeforeEach
     void armar() {
         CatalogoPropio propio = new CatalogoPropio(boticas, catalogo, condiciones);
-        registro = new RegistroHerramientas(List.of(new BuscarPrecios(busqueda), new BuscarAlternativas(alternativas),
+        registro = new RegistroHerramientas(List.of(new BuscarPrecios(busqueda, boticas), new BuscarAlternativas(alternativas),
                 new VerStockBajo(propio), new BuscarEnMiCatalogo(propio), new BuscarMedicamento(medicamentos)));
     }
 

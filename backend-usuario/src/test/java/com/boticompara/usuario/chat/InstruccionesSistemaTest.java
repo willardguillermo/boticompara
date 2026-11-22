@@ -127,6 +127,55 @@ class InstruccionesSistemaTest {
     }
 
     @Test
+    void elDuenoPuedePedirUnaListaDeHasta8Puntos() {
+        String dueno = instrucciones.para("DUENO_BOTICA", false);
+
+        assertTrue(dueno.contains("Si pide una lista, dala: hasta 8 puntos, uno por línea, cada uno empezando con \"- \""));
+        assertTrue(dueno.contains("máximo 900 caracteres"));
+        assertFalse(dueno.contains("sin listas"));
+        // El comprador sigue sin listas: su respuesta se lee en voz alta
+        assertTrue(instrucciones.para("COMPRADOR", false).contains("sin listas"));
+    }
+
+    @Test
+    void alDuenoLosPreciosVanConSimboloYNoSeLeLeeEnVozAlta() {
+        String dueno = instrucciones.para("DUENO_BOTICA", false);
+
+        assertTrue(dueno.contains("\"S/ 8.50\", no \"8 soles con 50\""));
+        assertFalse(dueno.contains("voz alta"));
+        assertTrue(instrucciones.para("COMPRADOR", false).contains("voz alta"));
+    }
+
+    @Test
+    void elSaludoDelDuenoOfreceConsejosParaSuNegocio() {
+        String dueno = instrucciones.para("DUENO_BOTICA", false);
+
+        assertTrue(dueno.contains("Si te saluda o pregunta qué puedes hacer"));
+        assertTrue(dueno.contains("consejos para su negocio:\n  surtido, vitrina y temporadas"));
+    }
+
+    @Test
+    void elDuenoVeSuPrecioComoEnTuBoticaYLoComparaConLaCompetencia() {
+        String dueno = instrucciones.para("DUENO_BOTICA", false);
+
+        assertTrue(dueno.contains("Si un resultado de buscar_precios trae tuBotica"));
+        assertTrue(dueno.contains("\"en tu botica: S/ X\""));
+        assertTrue(dueno.contains("opción más barata de las otras boticas"));
+        assertTrue(dueno.contains("búscalo también con buscar_en_mi_catalogo"));
+        assertFalse(instrucciones.para("COMPRADOR", false).contains("tuBotica"));
+    }
+
+    @Test
+    void sobreProveedoresOrientaSinInventarNombres() {
+        String dueno = instrucciones.para("DUENO_BOTICA", false);
+
+        assertTrue(dueno.contains("no inventes nombres de empresas"));
+        assertTrue(dueno.contains("droguerías y distribuidoras autorizadas por DIGEMID"));
+        assertTrue(dueno.contains("mayoristas de consumo masivo"));
+        assertTrue(dueno.contains("cotizar\n  con varios"));
+    }
+
+    @Test
     void losSaltosDeLineaDeWindowsQuedanIgualQueLosDeUnix() {
         String unix = "Línea 113,\n  opción 5\nfin\n";
 

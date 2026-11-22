@@ -3,6 +3,9 @@ package com.boticompara.usuario.chat.herramienta;
 import com.boticompara.usuario.chat.ChatProducto;
 import com.boticompara.usuario.chat.ContextoChat;
 import com.boticompara.usuario.dto.BusquedaResponse;
+import com.boticompara.usuario.entity.Botica;
+import com.boticompara.usuario.error.ApiException;
+import com.boticompara.usuario.service.BoticaService;
 import com.boticompara.usuario.service.BusquedaService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,6 +38,9 @@ class BuscarPreciosTest {
 
     @Mock
     BusquedaService busqueda;
+
+    @Mock
+    BoticaService boticas;
 
     @InjectMocks
     BuscarPrecios herramienta;
@@ -170,12 +176,97 @@ class BuscarPreciosTest {
         assertEquals("texto", parametros.at("/required/0").asText());
     }
 
-    /** H62: la búsqueda del asistente no se registra. La herramienta solo conoce BusquedaService. */
+    /**
+     * H62: la búsqueda del asistente no se registra. La herramienta solo conoce BusquedaService y, para marcar
+     * tuBotica, BoticaService.
+     */
     @Test
     void noDependeDelRegistroDeBusquedas() {
         List<Class<?>> dependencias = Arrays.stream(BuscarPrecios.class.getDeclaredFields())
                 .map(Field::getType).toList();
 
-        assertEquals(List.of(BusquedaService.class), dependencias);
+        assertEquals(List.of(BusquedaService.class, BoticaService.class), dependencias);
+    }
+
+    // ---------- tuBotica: solo para el dueño y solo en los productos de su botica ----------
+
+    private static final ContextoChat ROSA = new ContextoChat(1L, "DUENO_BOTICA", null, null);
+
+    private static BusquedaResponse deBotica(long productoId, long boticaId, String botica, String precio) {
+        return new BusquedaResponse(productoId, "Amoxicilina " + productoId, "Amoxicilina", "Cápsula 500 mg x 10",
+                new BigDecimal(precio), 20, boticaId, botica, "Av. Lima 123", "Lurigancho-Chosica",
+                null, null, null, "CON_RECETA");
+    }
+
+    private static Botica botica(long id) {
+        Botica b = new Botica();
+        b.setId(id);
+        return b;
+    }
+
+    private static List<ProductoParaModelo> resultados(ResultadoHerramienta r) {
+        return ((List<?>) r.paraModelo().get("resultados")).stream().map(ProductoParaModelo.class::cast).toList();
+    }
+
+    private void amoxicilinaEnDosBoticas() {
+        when(busqueda.buscar("amoxicilina", "nombre", "precio_asc", null, null, null)).thenReturn(List.of(
+                deBotica(5, 2, "FarmaVida", "5.50"), deBotica(4, 1, "Botica Salud Total", "6.00")));
+    }
+
+    @Test
+    void dueno_soloSusProductosLlevanTuBotica() throws Exception {
+        amoxicilinaEnDosBoticas();
+        when(boticas.obtenerMia(1L)).thenReturn(botica(1));
+
+        ResultadoHerramienta r = herramienta.ejecutar(ROSA, args("{\"texto\":\"amoxicilina\"}"));
+
+        List<ProductoParaModelo> p = resultados(r);
+        assertNull(p.get(0).tuBotica(), "FarmaVida es de otro dueño");
+        assertEquals(Boolean.TRUE, p.get(1).tuBotica());
+        String json = JSON.writeValueAsString(r.paraModelo());
+        assertEquals(1, json.split("\"tuBotica\":true", -1).length - 1, json);
+        // Las tarjetas no cambian: tuBotica es solo para el modelo
+        assertEquals(2, r.tarjetas().size());
+    }
+
+    @Test
+    void comprador_nuncaRecibeTuBoticaNiSeConsultaSuBotica() throws Exception {
+        amoxicilinaEnDosBoticas();
+
+        ResultadoHerramienta r = herramienta.ejecutar(SIN_UBICACION, args("{\"texto\":\"amoxicilina\"}"));
+
+        assertFalse(JSON.writeValueAsString(r.paraModelo()).contains("tuBotica"));
+        verifyNoInteractions(boticas);
+    }
+
+    @Test
+    void dueno_siLosResultadosSonDeOtrasBoticas_ningunoLlevaTuBotica() throws Exception {
+        amoxicilinaEnDosBoticas();
+        when(boticas.obtenerMia(1L)).thenReturn(botica(7));
+
+        ResultadoHerramienta r = herramienta.ejecutar(ROSA, args("{\"texto\":\"amoxicilina\"}"));
+
+        assertFalse(JSON.writeValueAsString(r.paraModelo()).contains("tuBotica"));
+    }
+
+    @Test
+    void dueno_sinBoticaRegistrada_igualComparaPreciosSinTuBotica() throws Exception {
+        amoxicilinaEnDosBoticas();
+        when(boticas.obtenerMia(1L)).thenThrow(ApiException.notFound("Aún no registraste tu botica"));
+
+        ResultadoHerramienta r = herramienta.ejecutar(ROSA, args("{\"texto\":\"amoxicilina\"}"));
+
+        assertEquals(2, resultados(r).size());
+        assertFalse(r.paraModelo().containsKey("error"));
+        assertFalse(JSON.writeValueAsString(r.paraModelo()).contains("tuBotica"));
+    }
+
+    @Test
+    void dueno_sinResultados_noConsultaSuBotica() throws Exception {
+        when(busqueda.buscar("xyz", "nombre", "precio_asc", null, null, null)).thenReturn(List.of());
+
+        herramienta.ejecutar(ROSA, args("{\"texto\":\"xyz\"}"));
+
+        verifyNoInteractions(boticas);
     }
 }
