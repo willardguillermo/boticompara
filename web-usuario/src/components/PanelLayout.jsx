@@ -20,6 +20,11 @@ function Cabecera() {
         <Marca />
         {botica && (
           <nav className="navegacion" aria-label="Secciones del panel">
+            {aprobada && (
+              <NavLink to="/panel/inicio">
+                <Icono nombre="casa" /> Inicio
+              </NavLink>
+            )}
             <NavLink to="/panel/estado">
               <Icono nombre="tienda" /> Mi botica
             </NavLink>
