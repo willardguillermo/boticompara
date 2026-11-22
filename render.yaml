@@ -1,0 +1,68 @@
+# Blueprint de Render para backend-usuario (plan gratis). Guía: docs/despliegue/render.md
+# Sin valores secretos: las variables con "sync: false" se piden en el Dashboard al crear el Blueprint.
+services:
+  - type: web
+    name: boticompara-api
+    runtime: docker
+    plan: free
+    region: virginia # la más cercana a Supabase (sa-east-1, São Paulo); no se puede cambiar después
+    rootDir: backend-usuario
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/salud
+    autoDeployTrigger: "off" # se despliega a mano; así un merge no reinicia la API en la demo
+    envVars:
+      # Base de datos (Supabase)
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSLMODE
+        sync: false
+      # Sesiones y CORS
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      # Licencias en Supabase Storage (H4)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_BUCKET_LICENCIAS
+        sync: false
+      # Correos por SMTP
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: ALERTA_STOCK_HABILITADA
+        sync: false
+      # RUC en SUNAT (H2)
+      - key: RUC_API_URL
+        sync: false
+      - key: RUC_API_TOKEN
+        sync: false
+      # Asistente (H68)
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+      # Login con Google (H67). FIREBASE_PROJECT_ID se agrega a mano después de subir el Secret File:
+      # si está puesta y el archivo no existe, la API no arranca
+      - key: FIREBASE_CREDENTIALS_PATH
+        sync: false
