@@ -17,7 +17,7 @@ import { esCambioSinVer, guardarEstadoVisto, leerEstadoVisto } from '../utils/es
 // Conserva el aspecto de .btn-primario; con movimiento reducido la estrella queda quieta.
 function BotonPrincipal({ a, children }) {
   return (
-    <StarBorder as={Link} to={a} className="btn btn-primario" radius={10} duration={9} hover="none" clickPulse={false}>
+    <StarBorder as={Link} to={a} className="btn btn-primario" radius={10} duration={7} thickness={1.5} trailLength={0.45} glow={0.9} hover="none" clickPulse={false}>
       {children}
     </StarBorder>
   )

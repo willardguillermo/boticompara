@@ -212,7 +212,7 @@ function PanelChat({ chat, onCerrar }) {
           <div className="chat-escribiendo" role="status">
             <span className="spinner" aria-hidden="true" />
             {/* Brillo que recorre el texto mientras espera (Shiny Text); quieto con movimiento reducido */}
-            <ShinyText speed={2.2} delay={0.4}>El asistente está buscando…</ShinyText>
+            <ShinyText shineColor="var(--rb-brillo)" speed={2.2} delay={0.4} shineWidth={55} glow={0.2}>El asistente está buscando…</ShinyText>
           </div>
         )}
       </div>

@@ -50,7 +50,7 @@ export default function LoginPage() {
   return (
     <main className="acceso">
       {/* Luz suave que sigue al mouse (Spotlight Card); el borde lo pone .tarjeta */}
-      <SpotlightCard className="tarjeta" intensity={0.6} style={{ '--spotlight-card-border': 'transparent' }}>
+      <SpotlightCard className="tarjeta" intensity={0.5} spotlightSize={280} style={{ '--spotlight-card-border': 'transparent' }}>
         <Marca a="/login" degradado />
         {comprador ? (
           <AvisoSoloMovil nombre={comprador.nombre} onVolver={() => setComprador(null)} />
