@@ -1265,6 +1265,8 @@ No es un endpoint de esta API. El administrador oculta reseñas desde el panel D
 
 Avisos dentro de la web del dueño cuando pasa algo con las reservas de su botica: llega una nueva o el comprador la cancela. Se ven en la campana del panel. No son push (H102) ni correo: los correos siguen siendo los de la sección 10 ("Correos") y no cambian.
 
+**Son avisos del momento: plazo de 7 días.** La lista y el contador solo consideran las notificaciones de los últimos 7 días (`creado_en > now() - interval '7 days'`, con la hora de la base). Al pasar el plazo el aviso deja de verse, leído o no, pero **el pedido sigue en "Pedidos"** (`GET /pedidos`, sección 10). La fila no se borra.
+
 Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño solo ve **sus** notificaciones (`notificacion.usuario_id` = usuario del token). Un dueño que todavía no registró botica no tiene notificaciones: recibe `200` con `[]` o `{ "total": 0 }`, no 404.
 
 **Formato de una notificación:**
@@ -1308,7 +1310,7 @@ Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño 
 - La notificación es para el dueño de la botica del producto: `reserva.producto_id → producto.botica_id → botica.usuario_id`.
 
 ### `GET /notificaciones?soloNoLeidas=true` 🔒 — H103
-Notificaciones del dueño, de la más reciente a la más antigua (por `creadoEn`, y a igual fecha por `id`), **máximo 50**. `soloNoLeidas` es opcional (por defecto `false`).
+Notificaciones del dueño **de los últimos 7 días**, de la más reciente a la más antigua (por `creadoEn`, y a igual fecha por `id`), **máximo 50**. `soloNoLeidas` es opcional (por defecto `false`).
 ```json
 // 200 OK
 [
@@ -1320,7 +1322,7 @@ Notificaciones del dueño, de la más reciente a la más antigua (por `creadoEn`
     "creadoEn": "2026-11-22T15:30:00.123456Z" }
 ]
 ```
-Sin notificaciones → `200` con `[]`.
+Sin notificaciones en ese plazo → `200` con `[]`. La consulta usa el índice `idx_notificacion_usuario_fecha`.
 Errores: 400 (`soloNoLeidas` no es `true` ni `false`), 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
 
 ### `GET /notificaciones/no-leidas/total` 🔒 — H103
@@ -1329,7 +1331,7 @@ Para el número sobre la campana. La web lo consulta **cada 30 segundos** mientr
 // 200 OK
 { "total": 3 }
 ```
-Cuenta todas las no leídas (no tiene el límite de 50). Con más de 9, la web muestra "9+".
+Cuenta las no leídas **de los últimos 7 días**, el mismo plazo que la lista: así el número nunca incluye avisos que ya no se ven. No tiene el límite de 50. Con más de 9, la web muestra "9+".
 Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
 
 ### `PATCH /notificaciones/{id}/leida` 🔒 — H103
@@ -1337,7 +1339,7 @@ Marca una notificación como leída. Responde `204` sin cuerpo, también si ya e
 Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `DUENO_BOTICA`), 404 "La notificación no existe" (no existe **o es de otro usuario**: mismo código y mismo mensaje, para no revelar si existe).
 
 ### `PATCH /notificaciones/leidas` 🔒 — H103
-Marca como leídas todas las notificaciones del dueño. Responde `204` sin cuerpo, también si no tenía ninguna sin leer.
+Marca como leídas todas las notificaciones del dueño, también las de más de 7 días. Responde `204` sin cuerpo, también si no tenía ninguna sin leer.
 Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
 
 ### Inicio del dueño: alcanza con lo que ya existe
@@ -1356,7 +1358,7 @@ Si más adelante el Inicio se vuelve lento o hace falta contar más de 100 pendi
 - `SecurityConfig`: `/notificaciones/**` con `DUENO_BOTICA`. El CORS ya permite `PATCH` (se agregó para `/pedidos`).
 - La tabla es `notificacion` (`database/v7_notificaciones.sql`). Solo la API escribe en ella; Django no la usa.
 - `ReservaCancelada` se agrega en `ReservaService.cancelar` cuando se haga el código; el cambio es mínimo y lo revisa Alexander en el PR.
-- No se borran notificaciones en este sprint: la lista solo muestra las 50 más recientes.
+- No se borran notificaciones en este sprint: la lista muestra como máximo las 50 más recientes de los últimos 7 días. Borrar las de **más de 30 días** queda para una tarea programada futura, junto con la de H84.
 
 ---
 
