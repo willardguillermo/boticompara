@@ -53,7 +53,7 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
 |---|---|
 | `rosa@boticompara.nissidev.dev` | Botica **aprobada**: catálogo completo (agregar, editar, eliminar, buscar) |
 | `jorge@boticompara.nissidev.dev` | Botica **aprobada** con un producto agotado: etiqueta y filtro de **stock bajo** (H12) |
-| `lucia@boticompara.nissidev.dev` | Botica **pendiente**: catálogo bloqueado |
+| `lucia@boticompara.nissidev.dev` | Botica **rechazada** con motivo: catálogo bloqueado; prueba la corrección y el reenvío (H7) |
 | `carlos@boticompara.nissidev.dev` | Comprador: muestra que debe usar la app móvil |
 
 - Los datos viven en memoria: **al recargar la página vuelven a los de prueba**, y las cuentas creadas
@@ -67,8 +67,9 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
   boticomparaMock.pendiente(3)
   ```
 
-  Para probar la corrección (H7): rechaza Botica Nueva Era, entra con `lucia@boticompara.nissidev.dev`, pulsa
-  **"Actualizar estado"** y luego **"Corregir y reenviar"**.
+  Para probar la corrección (H7): entra con `lucia@boticompara.nissidev.dev` (Botica Nueva Era ya viene
+  rechazada) y pulsa **"Corregir y reenviar"**. Para verla pendiente o aprobada, usa `boticomparaMock.pendiente(3)`
+  o `boticomparaMock.aprobar(3)` y pulsa **"Actualizar estado"**.
 
 ## Pantallas e historias de usuario
 
