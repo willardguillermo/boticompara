@@ -2,7 +2,10 @@ package com.boticompara.usuario.chat;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** H68: la respuesta sale en texto plano, sin enlaces y de máximo 600 caracteres. */
@@ -64,5 +67,67 @@ class LimpiadorTextoTest {
     void nullOSoloMarkdown_quedaVacio() {
         assertEquals("", LimpiadorTexto.limpiar(null));
         assertEquals("", LimpiadorTexto.limpiar(" ** \n ``` "));
+        assertEquals("", LimpiadorTexto.limpiar(null, DUENO));
+        assertEquals("", LimpiadorTexto.limpiar(" ** \n ``` ", DUENO));
+    }
+
+    // ---------- Dueño: la web respeta los saltos de línea ----------
+
+    private static final String DUENO = "DUENO_BOTICA";
+
+    @Test
+    void dueno_conservaLaListaYEscribeTodaViñetaComoGuion() {
+        String texto = "Te sugiero:\n\n* **Pañuelos** desechables\n• Termómetros\n1. Alcohol   en gel\n2) `Pañales`\n+ Curitas";
+
+        assertEquals("Te sugiero:\n- Pañuelos desechables\n- Termómetros\n- Alcohol en gel\n- Pañales\n- Curitas",
+                LimpiadorTexto.limpiar(texto, DUENO));
+    }
+
+    @Test
+    void dueno_quitaElRestoDelMarkdownYLosEnlaces() {
+        String texto = "## Consejos\nMira [DIGEMID](https://malo.example/x) y **cotiza** con ~~uno~~ __varios__. "
+                + "https://malo.example\n```java\n- ![foto](http://x/y.png) Vitrina";
+
+        String r = LimpiadorTexto.limpiar(texto, DUENO);
+
+        assertEquals("Consejos\nMira DIGEMID y cotiza con uno varios.\n- foto Vitrina", r);
+        assertFalse(r.contains("*") || r.contains("#") || r.contains("http") || r.contains("[") || r.contains("`"));
+    }
+
+    @Test
+    void dueno_conservaComoMaximo8LineasDeLista() {
+        StringBuilder texto = new StringBuilder("Productos para invierno:\n");
+        for (int i = 1; i <= 11; i++) {
+            texto.append("- Producto ").append(i).append('\n');
+        }
+        texto.append("Cotiza con varios proveedores.");
+
+        String r = LimpiadorTexto.limpiar(texto.toString(), DUENO);
+
+        List<String> lineas = r.lines().toList();
+        assertEquals(8, lineas.stream().filter(l -> l.startsWith("- ")).count());
+        assertEquals("- Producto 8", lineas.get(8));
+        assertFalse(r.contains("Producto 9"));
+        assertEquals("Cotiza con varios proveedores.", lineas.get(lineas.size() - 1));
+    }
+
+    @Test
+    void dueno_textoLargo_seCortaAl900EnUnSaltoDeLineaSinDejarUnaLineaAMedias() {
+        List<String> originales = java.util.stream.IntStream.rangeClosed(1, 12)
+                .mapToObj(i -> "Consejo " + i + " " + "x".repeat(90)).toList();
+
+        String r = LimpiadorTexto.limpiar(String.join("\n", originales), DUENO);
+
+        assertTrue(r.length() <= LimpiadorTexto.MAX_DUENO, String.valueOf(r.length()));
+        assertTrue(r.length() > LimpiadorTexto.MAX, "el dueño tiene más espacio que el comprador");
+        assertTrue(originales.containsAll(r.lines().toList()));
+    }
+
+    @Test
+    void comprador_sigueEnUnaSolaLineaAunqueTraigaUnaLista() {
+        String texto = "Opciones:\n- Paracetamol MK\n- Panadol";
+
+        assertEquals("Opciones: Paracetamol MK Panadol", LimpiadorTexto.limpiar(texto, "COMPRADOR"));
+        assertEquals("Opciones: Paracetamol MK Panadol", LimpiadorTexto.limpiar(texto));
     }
 }
