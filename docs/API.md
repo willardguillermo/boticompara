@@ -1298,7 +1298,7 @@ Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño 
 
 ### Cuándo se guarda
 - **Después del commit de la reserva, en una transacción aparte.** Un listener `@TransactionalEventListener(phase = AFTER_COMMIT)`, **sin `@Async`**, guarda la notificación en una transacción nueva (`@Transactional(propagation = REQUIRES_NEW)`).
-- **Si falla, la reserva o la cancelación no se ven afectadas:** ya están guardadas. El listener **captura cualquier error** y solo lo registra en el log (sin datos del comprador). No lo deja salir, porque un error lanzado después del commit le llegaría al cliente como 500 aunque la reserva sí se guardó. No se reintenta: esa reserva se queda sin su aviso, pero se ve igual en "Pedidos".
+- **Si falla, la reserva o la cancelación no se ven afectadas:** ya están guardadas. El listener **captura cualquier error** y solo lo registra en el log (sin datos del comprador). No lo deja salir, porque Spring lo atraparía (al cliente no le llega como 500) pero escribiría en el log su mensaje y toda la traza, que podrían traer datos: el listener solo registra el tipo, el id de la reserva y la clase del error. No se reintenta: esa reserva se queda sin su aviso, pero se ve igual en "Pedidos".
 - **Sin duplicados:** una sola notificación por reserva y tipo (índice único `uq_notificacion_reserva_tipo`). Si el mismo evento llegara dos veces, el segundo `insert` falla por el índice y solo queda en el log.
 - **Los correos no cambian:** siguen saliendo después del commit y en segundo plano (`AFTER_COMMIT` + `@Async`, sección 10), y no dependen de la notificación ni la notificación de ellos.
 - **De dónde sale cada una:**
