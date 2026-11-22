@@ -106,7 +106,7 @@ function TarjetaResumen({ tarjeta, boticaId }) {
           <span className="resumen-inicio-numero">
             <Esqueleto ancho="3.5rem" alto="1em" />
           </span>
-          <Esqueleto ancho="70%" alto="0.9rem" />
+          <Esqueleto ancho="70%" alto="1.35rem" />
         </>
       ) : dato.error ? (
         <span className="resumen-inicio-detalle">No se pudo cargar.</span>

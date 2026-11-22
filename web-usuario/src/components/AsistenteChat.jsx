@@ -280,7 +280,7 @@ export default function AsistenteChat() {
         aria-expanded={abierto}
         onClick={() => (abierto ? cerrar() : setAbierto(true))}
       >
-        <Icono nombre="chat" /> Asistente
+        <Icono nombre="chat" /> <span className="texto-asistente">Asistente</span>
       </button>
       {abierto && createPortal(<PanelChat chat={chat} onCerrar={cerrar} />, document.body)}
     </>
