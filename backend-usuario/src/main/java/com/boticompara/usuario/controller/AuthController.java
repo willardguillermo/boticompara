@@ -10,6 +10,7 @@ import com.boticompara.usuario.dto.UsuarioResponse;
 import com.boticompara.usuario.service.AuthService;
 import com.boticompara.usuario.service.RecuperacionService;
 import com.boticompara.usuario.service.VerificacionService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import com.boticompara.usuario.dto.GoogleLoginRequest;
 import lombok.RequiredArgsConstructor;
@@ -36,15 +37,16 @@ public class AuthController {
         return nuevo;
     }
 
-    @PostMapping("/login")
-    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
-        return auth.login(request);
-    }
 
     /** H67: login o alta con Google. El token lo verifica Firebase en el servidor. */
     @PostMapping("/google")
     public LoginResponse loginGoogle(@RequestBody GoogleLoginRequest request) {
         return auth.loginGoogle(request.idToken());
+    }
+
+    @PostMapping("/login")
+    public LoginResponse login(@RequestBody LoginRequest request, HttpServletRequest http) {
+        return auth.login(request, http.getRemoteAddr());
     }
 
     /** H17: siempre responde 200, exista o no el correo. */

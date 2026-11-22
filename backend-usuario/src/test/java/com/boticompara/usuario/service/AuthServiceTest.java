@@ -44,13 +44,16 @@ class AuthServiceTest {
     @Mock
     com.boticompara.usuario.security.VerificadorGoogle verificador;
 
+    @Mock
+    com.boticompara.usuario.auth.LimitadorLogin limitador;
+
     BCryptPasswordEncoder encoder;
     AuthService service;
 
     @BeforeEach
     void preparar() {
         encoder = new BCryptPasswordEncoder();
-        service = new AuthService(usuarios, encoder, new JwtService(SECRETO, 3_600_000L), verificador);    }
+        service = new AuthService(usuarios, encoder, new JwtService(SECRETO, 3_600_000L), verificador, limitador);    }
 
     private Usuario cuentaActiva() {
         Usuario u = new Usuario();
