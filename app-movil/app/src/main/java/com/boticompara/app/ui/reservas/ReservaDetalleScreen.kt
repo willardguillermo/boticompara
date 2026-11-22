@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.dto.ReservaResponse
 import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.resenas.AccesoResenas
 import com.boticompara.app.ui.theme.Dimens
 
 // H73 (código al crearla), H75 (cancelar) y H76 (detalle de una reserva)
@@ -105,7 +106,8 @@ fun ReservaDetalleScreen(
                             popUpTo(RUTA_RESERVA) { inclusive = true }
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    navController = navController
                 )
             }
         }
@@ -151,7 +153,8 @@ private fun ContenidoReserva(
     puedeCancelar: Boolean,
     cancelando: Boolean,
     onCancelar: () -> Unit,
-    onIrAMisReservas: () -> Unit
+    onIrAMisReservas: () -> Unit,
+    navController: NavController
 ) {
     val context = LocalContext.current
     val estado = EstadoReserva.desde(reserva.estado)
@@ -249,6 +252,8 @@ private fun ContenidoReserva(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+            Spacer(Modifier.height(Dimens.Space12))
+            AccesoResenas(boticaId = reserva.boticaId, navController = navController)
         }
 
         Spacer(Modifier.height(Dimens.Space16))

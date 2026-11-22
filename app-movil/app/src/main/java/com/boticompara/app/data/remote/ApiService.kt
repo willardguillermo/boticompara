@@ -140,4 +140,17 @@ interface ApiService {
         @Header("Authorization") auth: String,
         @Path("id") id: Long
     ): Response<ReservaResponse>
+
+    @GET("boticas/{id}/resenas")
+    suspend fun obtenerResenas(
+        @Path("id") id: Long,
+        @Query("page") page: Int = 0
+    ): Response<ResenasResponse>
+
+    @PUT("boticas/{id}/resenas/mia")
+    suspend fun guardarResena(
+        @Header("Authorization") auth: String,
+        @Path("id") id: Long,
+        @Body request: ResenaRequest
+    ): Response<ResenaResponse>
 }
