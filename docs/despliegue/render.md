@@ -91,8 +91,14 @@ Las `DJANGO_*` del `.env.example` son del panel de administración: aquí no van
 ### Los correos en el plan gratis
 
 Render bloquea en el plan gratis la salida por los puertos **25, 465 y 587**. Resend también acepta STARTTLS en el **2587**, que no está
-en esa lista: pon **`MAIL_PORT=2587`** **(por comprobar)**. Pruébalo con "olvidé mi contraseña" y revisa que el correo llegue.
-Si tampoco sale, la API sigue funcionando, pero registrarse y recuperar la contraseña pueden tardar hasta 10 s por el tiempo de espera.
+en esa lista: pon **`MAIL_PORT=2587`**.
+
+| Dónde | Resultado |
+|---|---|
+| En local (Docker, 22/11/2026) | **Probado.** `POST /auth/recuperar` con `MAIL_PORT=2587`: conexión establecida al 2587, respuesta en 3,4 s y ningún error en el log: Resend aceptó el correo |
+| En Render | **Por comprobar** el lunes: pide "olvidé mi contraseña" y revisa que el correo llegue y que **Logs** no muestre `No se pudo enviar el correo` |
+
+Si no sale desde Render, la API sigue funcionando, pero registrarse y recuperar la contraseña pueden tardar hasta 10 s por el tiempo de espera.
 
 ---
 
@@ -248,14 +254,48 @@ JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=65 -XX:+UseSerialGC -XX:MaxMetaspaceSize=
 - Mientras despierta, Render muestra una página de carga: la web y la app pueden ver errores de conexión o de CORS. No es una falla del código.
 - Al dormirse se pierde lo que está en memoria: los bloqueos del límite de login y los contadores del chat.
 
-**Antes de la demo**, 15 minutos antes: abrir `https://NOMBRE.onrender.com/api/salud` hasta ver `{"estado":"OK"}`, e iniciar sesión una vez
-en la web y otra en la app (las primeras peticiones también son lentas). **Durante la demo**, en una terminal, para que no se duerma:
+Los pasos para que esto no se note están en la sección 9.
 
-```bash
-while true; do curl -s -o /dev/null -w '%{http_code}\n' $API/salud; sleep 300; done
-```
+---
 
-Ciérralo al terminar: el plan gratis da 750 horas al mes. Como plan B, deja listo el backend en Docker en tu Mac.
+## 9. El día de la demo
+
+### Un monitor que no lo deje dormir
+
+Un servicio gratis llama a `https://NOMBRE.onrender.com/api/salud` **cada 10 minutos**: como Render espera 15, nunca se duerme.
+
+| | cron-job.org (**recomendado**) | UptimeRobot |
+|---|---|---|
+| Método | GET | HEAD por defecto; elegir GET puede requerir el plan de pago. `GET /salud` es lo único público: un HEAD recibe **401** y el monitor lo marca caído (igual mantiene despierto el servicio) |
+| Intervalo gratis | Hasta cada minuto: elegir **10 minutos** | Desde 5 minutos: elegir **10 minutos** |
+| Al despertar en frío | Corta a los 30 s y anota un fallo; no es grave, pero tras varios fallos seguidos puede desactivar la tarea | Avisa que está caído |
+
+En cron-job.org: **Create cronjob** → URL de arriba, cada 10 minutos, sin cabeceras ni datos. **Créalo con el servicio ya despierto**, para
+que no empiece con fallos. `/salud` no pide token: no pongas claves ahí.
+
+### Cuánto gasta de las 750 horas
+
+Se cuenta el tiempo encendido, no las peticiones. Despierto todo el día son 24 h por día:
+
+| Monitor encendido | Horas | De las 750 |
+|---|---|---|
+| Solo el día de la demo | 24 | 3 % |
+| Una semana | 168 | 22 % |
+| Un mes de 30 días | 720 | 96 % (sobran 30 h) |
+| Un mes de 31 días | 744 | 99 % (sobran 6 h) |
+
+Alcanza para **un** servicio despierto todo el mes, pero las 750 h son de **toda la cuenta**: con un segundo servicio gratis se acaban y Render
+**suspende todos** hasta el mes siguiente. Enciende el monitor el día anterior y **apágalo después de la demo**. El consumo
+se ve en **Billing → Monthly Included Usage**.
+
+### Lista del día
+
+1. **El día anterior:** monitor encendido, `JAVA_TOOL_OPTIONS` de la sección 8 puesta y las pruebas de las secciones 4 y 7 repetidas.
+2. **5 minutos antes de presentar:** abrir `https://NOMBRE.onrender.com/api/salud` y esperar `{"estado":"OK"}`. Con el monitor responde al
+   instante. Si estaba dormido, 5 minutos alcanzan con `JAVA_TOOL_OPTIONS` (1 min 47 s en local); **sin ella no** (4 min 35 s): hazlo 10 minutos antes.
+3. Iniciar sesión una vez en la web y otra en la app: las primeras peticiones después de arrancar son más lentas.
+4. No desplegar ni cambiar variables: reinicia el servicio. Render también puede reiniciarlo cuando quiera en el plan gratis.
+5. **Plan B:** el backend en Docker en tu Mac, listo para levantar.
 
 ---
 
@@ -266,3 +306,4 @@ Render: [plan gratis](https://render.com/docs/free), [regiones](https://render.c
 [secretos con Docker](https://render.com/docs/docker-secrets), [Blueprint](https://render.com/docs/blueprint-spec),
 [IP del cliente](https://render.com/articles/how-render-handles-ddos-attacks).
 Resend: [SMTP](https://resend.com/docs/send-with-smtp).
+Monitores: [cron-job.org](https://cron-job.org/en/faq/), [métodos de UptimeRobot](https://uptimerobot.com/blog/http-query-method-monitoring).
