@@ -502,6 +502,9 @@ async function leerFilasProductos(archivo) {
 // con los datos reales de la simulación, con la misma forma que docs/API.md.
 // Para probar errores, escribe en el mensaje: error429, error503, error504 o error401.
 // Si el mensaje contiene "respaldo", la respuesta llega con "respaldo": true.
+// Al dueño le responde como el backend: precios como "S/ 8.50", listas de hasta 8 líneas con "- "
+// (stock bajo, su catálogo y consejos de temporada: "¿qué conviene tener en invierno?") y, al comparar
+// precios, "en tu botica: S/ X" frente a la opción más barata de las otras boticas.
 // Si contiene una frase del filtro de crisis (por ejemplo "hacerme daño" o "me falta el aire"),
 // llega el texto de ayuda con "ayuda": true y sin tarjetas.
 const ESPERA_CHAT_MS = 2000
@@ -539,6 +542,21 @@ const PALABRAS_GENERICAS = new Set(['generico', 'generica'])
 const PIDE_STOCK_BAJO = /\b(stock bajo|poco stock|reponer|por agotarse|se me acaba)\b/
 // buscar_en_mi_catalogo: el dueño pregunta por lo que tiene en su propia botica
 const PIDE_MI_CATALOGO = /\b(tengo|tenemos|mi catalogo|mis productos|mi botica)\b/
+// Consejo de negocio del dueño (surtido, vitrina, temporadas): sin herramientas ni tarjetas
+const PIDE_CONSEJO_NEGOCIO = /\b(consejos?|surtido|vitrina|temporadas?|invierno|verano|vender mas|que mas (puedo )?vender)\b/
+// Respuesta del dueño (docs/API.md, sección 8): hasta 900 caracteres y listas de hasta 8 líneas con "- "
+const MAX_LINEAS_LISTA = 8
+const MAX_RESPUESTA_DUENO = 900
+const CONSEJO_INVIERNO = [
+  'Pañuelos desechables y bálsamo para labios',
+  'Termómetros digitales',
+  'Mascarillas y alcohol en gel',
+  'Caramelos para la garganta (sin receta)',
+  'Vaporizadores y humidificadores pequeños',
+  'Cremas humectantes para manos y rostro',
+  'Sueros de rehidratación oral',
+  'Medias y guantes térmicos, si tienes espacio en vitrina',
+]
 
 /** Espera cancelable: si se aborta `signal`, rechaza con su motivo. */
 function esperarCancelable(ms, signal) {
@@ -562,9 +580,17 @@ function precioHablado(valor) {
   return resto ? `${base} con ${String(resto).padStart(2, '0')}` : base
 }
 
-/** "a, b y c" */
-const enumerar = (lista) =>
-  lista.length <= 1 ? lista.join('') : `${lista.slice(0, -1).join(', ')} y ${lista.at(-1)}`
+/** Para el dueño: 8.5 -> "S/ 8.50" (como TextoRespaldo.precioConSimbolo del backend) */
+const precioConSimbolo = (valor) => `S/ ${Number(valor).toFixed(2)}`
+
+/** El precio como lo escribe el backend según el rol: hablado para el comprador (H71), con símbolo para el dueño. */
+const precioSegunRol = (valor, esDueno) => (esDueno ? precioConSimbolo(valor) : precioHablado(valor))
+
+/** Frase corta y una lista de hasta 8 líneas que empiezan con "- " (respuesta del dueño). */
+function textoLista(frase, lineas) {
+  const texto = [frase, ...lineas.slice(0, MAX_LINEAS_LISTA).map((l) => `- ${l}`)].join('\n')
+  return texto.length <= MAX_RESPUESTA_DUENO ? texto : `${texto.slice(0, MAX_RESPUESTA_DUENO - 1)}…`
+}
 
 /** Distancia en línea recta (haversine), con 2 decimales, como GET /productos/buscar. */
 function distanciaKm(lat, lng, botica) {
@@ -591,6 +617,8 @@ function tarjetaChat(p, { propio = false, lat, lng } = {}) {
     boticaNombre: botica.nombreComercial,
     boticaDistrito: botica.distrito,
     distanciaKm: distanciaKm(lat, lng, botica),
+    // H72: condición de venta del medicamento enlazado; null si no está enlazado o no tiene el dato
+    condicionVenta: db.medicamentos.find((m) => m.id === p.medicamentoId)?.condicionVenta ?? null,
   }
 }
 
@@ -637,10 +665,10 @@ function respuestaMiCatalogo(usuario, mensaje) {
   if (propios.length === 0) {
     return { respuesta: `No encontré ${palabra} en el catálogo de ${botica.nombreComercial}. Puedes agregarlo desde Catálogo.`, productos: [] }
   }
-  const detalle = propios.map((p) =>
-    `${p.nombreComercial}, ${p.presentacion}, a ${precioHablado(p.precio)}, ${p.stock === 0 ? 'agotado' : `con ${p.stock} ${p.stock === 1 ? 'unidad' : 'unidades'}`}`)
+  const lineas = propios.map((p) =>
+    `${p.nombreComercial}, ${p.presentacion}: ${precioConSimbolo(p.precio)}, ${p.stock === 0 ? 'agotado' : `${p.stock} ${p.stock === 1 ? 'unidad' : 'unidades'}`}`)
   return {
-    respuesta: `En ${botica.nombreComercial} tienes ${enumerar(detalle)}.`,
+    respuesta: textoLista(`En tu catálogo tienes ${propios.length === 1 ? 'este producto' : 'estos productos'}:`, lineas),
     productos: propios.map((p) => tarjetaChat(p, { propio: true })),
   }
 }
@@ -658,21 +686,45 @@ function buscarPreciosChat(principio, lat, lng) {
   return tarjetas.slice(0, MAX_TARJETAS_HERRAMIENTA)
 }
 
-function textoPrecios(principio, tarjetas) {
+function textoPrecios(principio, tarjetas, usuario) {
+  const esDueno = usuario.rol === 'DUENO_BOTICA'
+  // tuBotica (buscar_precios del backend): los productos de la botica del dueño que pregunta
+  const miBoticaId = esDueno ? db.boticas.find((b) => b.usuarioId === usuario.id)?.id : null
+  const propias = tarjetas.filter((t) => t.boticaId === miBoticaId)
+  const otras = tarjetas.filter((t) => t.boticaId !== miBoticaId)
+  const precio = (valor) => precioSegunRol(valor, esDueno)
+
+  if (esDueno && propias.length) {
+    // Al dueño se le dice "en tu botica: S/ X" (nunca el nombre de su botica) y se compara con la más barata de las otras
+    const mia = [...propias].sort((a, b) => a.precio - b.precio)[0]
+    if (!otras.length) {
+      return `Solo encontré ${principio.toLowerCase()} en tu botica: S/ ${mia.precio.toFixed(2)} (${mia.nombreComercial}). Ninguna otra botica aprobada lo tiene con stock.`
+    }
+    const rival = [...otras].sort((a, b) => a.precio - b.precio)[0]
+    const diferencia = Math.abs(mia.precio - rival.precio)
+    const comparacion = mia.precio < rival.precio
+      ? `Estás ${precioConSimbolo(diferencia)} por debajo.`
+      : mia.precio > rival.precio
+        ? `Estás ${precioConSimbolo(diferencia)} por encima.`
+        : 'Están al mismo precio.'
+    return `${mia.nombreComercial} en tu botica: ${precioConSimbolo(mia.precio)}. La opción más barata de las otras boticas es ${rival.nombreComercial} en ${rival.boticaNombre}, a ${precioConSimbolo(rival.precio)}. ${comparacion}`
+  }
+
   const masBarata = [...tarjetas].sort((a, b) => a.precio - b.precio)[0]
   const distancia = masBarata.distanciaKm != null ? `, a ${masBarata.distanciaKm.toFixed(1)} kilómetros de ti` : ''
-  let texto = `Encontré ${tarjetas.length === 1 ? 'una opción' : `${tarjetas.length} opciones`} de ${principio.toLowerCase()} en boticas aprobadas. La más barata es ${masBarata.nombreComercial} en ${masBarata.boticaNombre}, ${masBarata.boticaDistrito}, a ${precioHablado(masBarata.precio)}${distancia}.`
+  let texto = `Encontré ${tarjetas.length === 1 ? 'una opción' : `${tarjetas.length} opciones`} de ${principio.toLowerCase()} en boticas aprobadas. La más barata es ${masBarata.nombreComercial} en ${masBarata.boticaNombre}, ${masBarata.boticaDistrito}, a ${precio(masBarata.precio)}${distancia}.`
   const otraMarca = tarjetas.find((t) => t.nombreComercial !== masBarata.nombreComercial)
   if (otraMarca) {
-    texto += ` Si prefieres ${otraMarca.nombreComercial}, está desde ${precioHablado(otraMarca.precio)} en ${otraMarca.boticaNombre}.`
+    texto += ` Si prefieres ${otraMarca.nombreComercial}, está desde ${precio(otraMarca.precio)} en ${otraMarca.boticaNombre}.`
   }
   return texto
 }
 
-/** Texto de respaldo: lo arma "el servidor" solo con datos de las tarjetas. */
-function textoRespaldo(tarjetas) {
+/** Texto de respaldo: lo arma "el servidor" solo con datos de las tarjetas. Precios según el rol. */
+function textoRespaldo(tarjetas, usuario) {
   const masBarata = [...tarjetas].sort((a, b) => a.precio - b.precio)[0]
-  return `Encontré ${tarjetas.length === 1 ? '1 opción' : `${tarjetas.length} opciones`}. La más barata es ${masBarata.nombreComercial} a ${precioHablado(masBarata.precio)} en ${masBarata.boticaNombre}, ${masBarata.boticaDistrito}.`
+  const precio = precioSegunRol(masBarata.precio, usuario.rol === 'DUENO_BOTICA')
+  return `Encontré ${tarjetas.length === 1 ? '1 opción' : `${tarjetas.length} opciones`}. La más barata es ${masBarata.nombreComercial} a ${precio} en ${masBarata.boticaNombre}, ${masBarata.boticaDistrito}.`
 }
 
 /** Herramienta ver_stock_bajo del dueño. */
@@ -688,11 +740,11 @@ function respuestaStockBajo(usuario) {
   if (bajos.length === 0) {
     return { respuesta: `No tienes productos con stock bajo en ${botica.nombreComercial}. Todos están por encima de su stock mínimo.`, productos: [] }
   }
-  const detalle = bajos.map((p) =>
-    `${p.nombreComercial}, ${p.stock === 0 ? 'agotado' : `con ${p.stock} ${p.stock === 1 ? 'unidad' : 'unidades'}`}`)
+  const lineas = bajos.map((p) =>
+    `${p.nombreComercial}: ${p.stock === 0 ? 'agotado' : `${p.stock} ${p.stock === 1 ? 'unidad' : 'unidades'}`} (mínimo ${p.stockMinimo})`)
   const cuantos = bajos.length === 1 ? '1 producto' : `${bajos.length} productos`
   return {
-    respuesta: `Tienes ${cuantos} con stock bajo: ${enumerar(detalle)}. Te conviene ${bajos.length === 1 ? 'reponerlo' : 'reponerlos'} pronto.`,
+    respuesta: textoLista(`Tienes ${cuantos} con stock bajo. Te conviene ${bajos.length === 1 ? 'reponerlo' : 'reponerlos'} pronto:`, lineas),
     productos: bajos.map((p) => tarjetaChat(p, { propio: true })),
   }
 }
@@ -700,7 +752,7 @@ function respuestaStockBajo(usuario) {
 function textoAyuda(usuario) {
   const nombre = usuario.nombre.split(' ')[0]
   return usuario.rol === 'DUENO_BOTICA'
-    ? `Hola, ${nombre}. Soy el asistente de BotiCompara. Puedo comparar el precio de un medicamento en las boticas aprobadas o decirte qué productos de tu botica tienen stock bajo. Por ejemplo, pregúntame qué productos tengo con stock bajo.`
+    ? `Hola, ${nombre}. Soy el asistente de BotiCompara. Puedo revisar tu stock, comparar tus precios con la competencia, ver alternativas y darte consejos para tu negocio: surtido, vitrina y temporadas. Por ejemplo, pregúntame qué productos tengo con stock bajo o qué conviene tener en invierno.`
     : `Hola, ${nombre}. Soy el asistente de BotiCompara. Puedo ayudarte a encontrar dónde está más barato un medicamento en las boticas aprobadas. Por ejemplo, pregúntame dónde está más barato el paracetamol.`
 }
 
@@ -1034,17 +1086,21 @@ function responderChat(usuario, mensaje, { lat, lng }) {
     const mencionado = principioMencionado(mensaje)
     const encontrados = mencionado ? buscarPreciosChat(mencionado, lat, lng) : []
     const productos = encontrados.length ? encontrados : buscarPreciosChat('Paracetamol', lat, lng)
-    return { respuesta: textoRespaldo(productos), productos, respaldo: true }
+    return { respuesta: textoRespaldo(productos, usuario), productos, respaldo: true }
   }
   if (PIDE_CONSEJO.test(consulta)) return { respuesta: TEXTO_FUERA_DE_ALCANCE, productos: [] }
   if (esDueno && PIDE_STOCK_BAJO.test(consulta)) return respuestaStockBajo(usuario)
+  if (esDueno && PIDE_CONSEJO_NEGOCIO.test(consulta)) {
+    // Consejo de surtido: tipos de producto, sin marcas, precios ni stock (instrucciones del dueño)
+    return { respuesta: textoLista('En invierno se piden más estos tipos de producto. Revisa si los tienes y ponlos a la vista:', CONSEJO_INVIERNO), productos: [] }
+  }
   if (esDueno && PIDE_MI_CATALOGO.test(consulta)) return respuestaMiCatalogo(usuario, mensaje)
 
   const principio = principioMencionado(mensaje)
   if (principio) {
     const productos = buscarPreciosChat(principio, lat, lng)
     const respuesta = productos.length
-      ? textoPrecios(principio, productos)
+      ? textoPrecios(principio, productos, usuario)
       : `No encontré ${principio.toLowerCase()} con stock en las boticas aprobadas. Prueba con otro nombre o con el principio activo.`
     return { respuesta, productos }
   }
