@@ -945,6 +945,11 @@ a {
   font-size: 0.95rem;
 }
 
+/* El pie es más oscuro que el fondo: el color de marca no llega a 4,5:1 ahí */
+.pasos-pie p a {
+  color: var(--color-primario-oscuro);
+}
+
 .pasos-pie .btn-primario {
   margin-left: auto;
 }
