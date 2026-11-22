@@ -786,7 +786,14 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 }
 ```
 
-**`respuesta`:** texto plano en español, sin markdown, sin listas ni enlaces, de hasta 600 caracteres. Está pensada para leerse en voz alta (H71): los precios van escritos como se dicen.
+**`respuesta`:** texto plano en español, sin markdown ni enlaces. Depende del rol:
+
+| Rol | Formato |
+|---|---|
+| `COMPRADOR` | Una sola línea, sin listas, de hasta 600 caracteres. Está pensada para leerse en voz alta en la app (H71): los precios van escritos como se dicen ("2 soles con 50"). |
+| `DUENO_BOTICA` | Hasta 900 caracteres. Puede traer saltos de línea (`\n`) y, si el dueño pide una lista, hasta 8 líneas que empiezan con `- `. Los precios van como `S/ 8.50`. La web la muestra respetando los saltos de línea. |
+
+Con 900 caracteres, la respuesta del dueño cabe en un `texto` del `historial` (máximo 1000), así que el cliente la puede reenviar sin cambios.
 
 **`respaldo`:** `false` en una respuesta normal. `true` cuando el texto no lo escribió Gemini sino el servidor, porque la llamada final falló o no llegó a tiempo (ver "Tiempos y respuesta de respaldo").
 
@@ -805,13 +812,13 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 
 | Herramienta | Rol | Para qué sirve | Parámetros que da el modelo | Servicio que usa |
 |---|---|---|---|---|
-| `buscar_precios` | `COMPRADOR`, `DUENO_BOTICA` | Buscar un medicamento en las boticas aprobadas y comparar precios | `texto` (mínimo 2 caracteres), `tipo` (`nombre` o `principio`), `cerca` (`true` = de la botica más cercana a la más lejana; solo si el pedido trae ubicación) | `BusquedaService.buscar` (`GET /productos/buscar`, vista `v_producto_busqueda`) |
+| `buscar_precios` | `COMPRADOR`, `DUENO_BOTICA` | Buscar un medicamento en las boticas aprobadas y comparar precios | `texto` (mínimo 2 caracteres), `tipo` (`nombre` o `principio`), `cerca` (`true` = de la botica más cercana a la más lejana; solo si el pedido trae ubicación) | `BusquedaService.buscar` (`GET /productos/buscar`, vista `v_producto_busqueda`). Si pregunta el dueño, los resultados de su propia botica llevan `tuBotica: true` |
 | `buscar_alternativas` | `COMPRADOR`, `DUENO_BOTICA` | Equivalentes más baratos de un producto que ya salió en una búsqueda | `productoId` | `AlternativasService.alternativas` (`GET /productos/{id}/alternativas`) |
 | `ver_stock_bajo` | `DUENO_BOTICA` | Productos de su botica con `stock <= stockMinimo` | ninguno | `CatalogoService.listar(usuarioId, null, true)` (`GET /boticas/mia/productos?stockBajo=true`) |
 | `buscar_en_mi_catalogo` | `DUENO_BOTICA` | Buscar un producto en su propio catálogo (precio y stock) | `texto` | `CatalogoService.listar(usuarioId, texto, false)` (`GET /boticas/mia/productos?q=`) |
 | `buscar_medicamento` | `DUENO_BOTICA` | Buscar en el catálogo maestro (DIGEMID) | `texto` (mínimo 2 caracteres) | `MedicamentoService.buscar` (`GET /medicamentos?q=`) |
 
-- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (`productoId`, nombre, principio activo, presentación, precio, stock, botica, distrito, distancia en km y condición de venta). El `productoId` va porque el modelo lo necesita para pedir `buscar_alternativas`; es un dato del producto, no de una persona. Nunca coordenadas ni datos de personas.
+- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (`productoId`, nombre, principio activo, presentación, precio, stock, botica, distrito, distancia en km y condición de venta; además `tuBotica: true` en los productos de la botica del dueño que pregunta, solo en `buscar_precios` y nunca para el comprador). El `productoId` va porque el modelo lo necesita para pedir `buscar_alternativas`; es un dato del producto, no de una persona. Nunca coordenadas ni datos de personas.
 - Por pregunta hay como máximo 2 rondas de llamadas a herramientas (en una ronda el modelo puede pedir una o varias a la vez; el servidor ejecuta como máximo 3 por ronda y a las demás les responde con un error). Si después de la segunda pide más, el servidor le exige responder con lo que ya tiene. Así una pregunta usa como máximo 3 llamadas a Gemini: 2 rondas de herramientas más la respuesta.
 - Si el dueño aún no registró su botica, sus herramientas devuelven "sin botica registrada" y el asistente lo explica: no es un error.
 - Las búsquedas del asistente **no** se registran en los reportes de búsquedas (H62) ni en el de comparaciones (H42): el texto lo escribe el modelo, no el usuario.
