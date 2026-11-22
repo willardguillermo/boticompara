@@ -9,7 +9,7 @@
 
 import { useEffect, useRef } from 'react';
 
-import { resolverColor } from './colorCss.js';
+import { claveTema, resolverColor } from './colorCss.js';
 import './ShinyText.css';
 
 const EASINGS = {
@@ -163,7 +163,7 @@ const ShinyText = ({
 
     const draw = () => {
       const s = settingsRef.current;
-      const key = `${s.color}|${s.shineColor}`;
+      const key = `${s.color}|${s.shineColor}|${claveTema()}`;
       if (key !== state.colors) {
         state.colors = key;
         base = parseColor(s.color);

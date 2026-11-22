@@ -1,8 +1,8 @@
 /*
  * Origen: React Bits (https://reactbits.dev), componente "SpotlightCard", variante JS-CSS.
  * Licencia: MIT + Commons Clause, (c) 2026 David Haz. Texto completo en ./LICENSE.md.
- * Adaptado para BotiCompara: los temas usan las variables de index.css (la web no tiene modo
- * oscuro, así que los dos temas son iguales) y el tema por defecto es el claro.
+ * Adaptado para BotiCompara: los temas usan las variables de index.css, que ya cambian con el
+ * modo oscuro (por eso los dos temas son iguales); el tema por defecto es el claro.
  */
 /* oxlint-disable react/refs -- patrón de React Bits: guarda las props más recientes en un ref
    durante el render para leerlas en requestAnimationFrame sin reiniciar la animación. */

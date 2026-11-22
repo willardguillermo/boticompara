@@ -9,14 +9,14 @@
 
 import { useEffect, useRef } from 'react';
 
-import { resolverColor } from './colorCss.js';
+import { claveTema, resolverColor } from './colorCss.js';
 import './StarBorder.css';
 
 const PRIMARIO = {
   surface: 'var(--color-primario)',
   text: 'inherit',
   track: 'var(--color-primario-oscuro)',
-  light: 'var(--color-primario-suave)'
+  light: 'var(--rb-estrella)'
 };
 const THEMES = { dark: PRIMARIO, light: PRIMARIO };
 
@@ -407,7 +407,7 @@ const StarBorder = ({
       last = now;
       state.time += dt;
 
-      const key = `${s.color}|${s.trailColor}`;
+      const key = `${s.color}|${s.trailColor}|${claveTema()}`;
       if (key !== colors.key) {
         colors.key = key;
         colors.head = toRgb(s.color);
