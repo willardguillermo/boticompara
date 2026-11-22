@@ -90,6 +90,9 @@ Responde con el mismo contrato de `docs/API.md` (campos, códigos y formato de e
 En la cabecera del panel, la **campana** (H103) consulta el contador cada 30 s solo con la pestaña visible, abre la
 lista de notificaciones y avisa cuando llega una nueva. `/panel/pedidos?pedido=15` abre el detalle de ese pedido.
 
+**Modo oscuro:** el interruptor de la cabecera (sol/luna) recuerda la elección; sin elección sigue al sistema. `public/tema.js`
+pone el tema antes del primer pintado y `index.css` solo redefine las variables en `:root[data-tema='oscuro']`.
+
 Navegación:
 - Sin sesión no se entra a `/panel`.
 - Si el dueño aún no registró su botica, se le lleva directo al registro de botica.
