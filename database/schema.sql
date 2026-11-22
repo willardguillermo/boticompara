@@ -414,6 +414,34 @@ create table if not exists usuario_accion (
 create index if not exists idx_usuario_accion_usuario on usuario_accion(usuario_id, fecha);
 
 -- ---------------------------------------------------------------------
+-- NOTIFICACION (H103): avisos para el dueño de una botica sobre las
+-- reservas de sus productos (docs/API.md, sección 12). usuario_id es el
+-- dueño que la recibe. titulo y mensaje se guardan ya escritos, sin ningún
+-- dato del comprador. Una por reserva y tipo (evita duplicados). La API la
+-- guarda después del commit de la reserva, en una transacción aparte.
+-- RESERVA_VENCIDA se generará cuando exista la tarea de H84.
+-- ---------------------------------------------------------------------
+create table if not exists notificacion (
+  id          bigserial primary key,
+  usuario_id  bigint        not null references usuario(id),
+  tipo        varchar(30)   not null,
+  titulo      varchar(100)  not null,
+  mensaje     varchar(500)  not null,
+  reserva_id  bigint        not null references reserva(id),
+  leida       boolean       not null default false,
+  creado_en   timestamptz   not null default now(),
+  constraint chk_notificacion_tipo
+    check (tipo in ('NUEVA_RESERVA', 'RESERVA_CANCELADA', 'RESERVA_VENCIDA')),
+  constraint uq_notificacion_reserva_tipo unique (reserva_id, tipo)
+);
+
+-- Para contar las no leídas cada 30 s y listar las más recientes
+create index if not exists idx_notificacion_no_leidas
+  on notificacion(usuario_id) where not leida;
+create index if not exists idx_notificacion_usuario_fecha
+  on notificacion(usuario_id, creado_en desc, id desc);
+
+-- ---------------------------------------------------------------------
 -- VISTA para la búsqueda del comprador (H22, H23, H24):
 -- solo productos activos, con stock, de boticas APROBADAS.
 -- Columnas del catálogo maestro (H29-H32), al final:
@@ -601,6 +629,25 @@ begin
       public.resena_id_seq,
       public.usuario_accion_id_seq
     to boticompara_app;
+  end if;
+end
+$$;
+
+-- ---------------------------------------------------------------------
+-- SEGURIDAD DE NOTIFICACION (H103): mismo esquema que el Sprint 4.
+-- En la BD que ya existe se agregó con v7_notificaciones.sql.
+-- ---------------------------------------------------------------------
+do $$
+begin
+  alter table public.notificacion enable row level security;
+  revoke all on public.notificacion from anon, authenticated;
+
+  if exists (select 1 from pg_roles where rolname = 'boticompara_app') then
+    grant select, insert, update, delete on public.notificacion to boticompara_app;
+    drop policy if exists app_acceso_total on public.notificacion;
+    create policy app_acceso_total on public.notificacion
+      for all to boticompara_app using (true) with check (true);
+    grant usage, select on sequence public.notificacion_id_seq to boticompara_app;
   end if;
 end
 $$;
