@@ -861,11 +861,12 @@ const misNotificaciones = () => {
   return db.notificaciones.filter((n) => n.usuarioId === dueno.id)
 }
 
-/** Las de los últimos 7 días: lo que ven la campana (lista y contador) y la actividad reciente. */
-const misNotificacionesRecientes = () => {
-  const desde = haceMs(PLAZO_NOTIFICACIONES_MS)
-  return misNotificaciones().filter((n) => n.creadoEn >= desde)
-}
+/** Deja las de los últimos 7 días; a los 7 días justos ya no (docs/API.md). Se exporta para probarla. */
+export const soloRecientes = (notificaciones, ahora = Date.now()) =>
+  notificaciones.filter((n) => new Date(n.creadoEn).getTime() > ahora - PLAZO_NOTIFICACIONES_MS)
+
+/** Lo que ven la campana (lista y contador) y la actividad reciente. */
+const misNotificacionesRecientes = () => soloRecientes(misNotificaciones())
 
 export const apiMock = {
   // ---------- 1. Autenticación ----------
