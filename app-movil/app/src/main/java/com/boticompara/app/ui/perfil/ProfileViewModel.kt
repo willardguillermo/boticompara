@@ -79,25 +79,33 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // H66: PUT /usuarios/me/notificaciones. El interruptor solo cambia cuando el servidor confirma;
-    // si falla, queda como estaba y se muestra el aviso.
+    // H66: PUT /usuarios/me/notificaciones. Actualización optimista: el interruptor cambia al instante
+    // y se bloquean nuevos toques mientras se guarda; solo se revierte si el servidor falla.
     fun cambiarNotificaciones(activar: Boolean) {
         if (guardandoNotificaciones) return
+        val valorAnterior = notificacionesPrecio
+        notificacionesPrecio = activar
+        guardandoNotificaciones = true
+        mensajeNotificaciones = null
         viewModelScope.launch {
-            guardandoNotificaciones = true
-            mensajeNotificaciones = null
             try {
                 val resp = api.actualizarNotificaciones(
                     tokenManager.getBearer(),
                     NotificacionesRequest(activar)
                 )
-                val perfil = resp.body()
                 when {
-                    resp.isSuccessful && perfil != null -> notificacionesPrecio = perfil.notificacionesPrecio ?: activar
-                    resp.code() == 401 -> { tokenManager.clearSession(); sesionVencida = true }
-                    else -> mensajeNotificaciones = "No se pudo cambiar la preferencia de alertas"
+                    resp.isSuccessful -> Unit
+                    resp.code() == 401 -> {
+                        notificacionesPrecio = valorAnterior
+                        tokenManager.clearSession(); sesionVencida = true
+                    }
+                    else -> {
+                        notificacionesPrecio = valorAnterior
+                        mensajeNotificaciones = "No se pudo cambiar la preferencia de alertas"
+                    }
                 }
             } catch (e: Exception) {
+                notificacionesPrecio = valorAnterior
                 mensajeNotificaciones = "No se pudo conectar con el servidor"
             } finally {
                 guardandoNotificaciones = false
