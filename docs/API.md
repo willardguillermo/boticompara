@@ -1339,7 +1339,7 @@ Marca una notificación como leída. Responde `204` sin cuerpo, también si ya e
 Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `DUENO_BOTICA`), 404 "La notificación no existe" (no existe **o es de otro usuario**: mismo código y mismo mensaje, para no revelar si existe).
 
 ### `PATCH /notificaciones/leidas` 🔒 — H103
-Marca como leídas todas las notificaciones del dueño, también las de más de 7 días. Responde `204` sin cuerpo, también si no tenía ninguna sin leer.
+Marca como leídas todas las notificaciones del dueño, **también las de más de 7 días, a propósito**: ya no se ven, pero así ninguna queda pendiente en la base. Responde `204` sin cuerpo, también si no tenía ninguna sin leer.
 Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
 
 ### Inicio del dueño: alcanza con lo que ya existe
