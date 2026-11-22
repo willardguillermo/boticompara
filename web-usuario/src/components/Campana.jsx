@@ -15,6 +15,7 @@ function PanelNotificaciones({ id, onCerrar, onSalir }) {
   const toast = useToast()
   const panel = useRef(null)
   const idTitulo = useId()
+  const idPeriodo = useId()
   const haySinLeer = total > 0 || lista?.some((n) => !n.leida)
 
   useEffect(() => {
@@ -46,11 +47,17 @@ function PanelNotificaciones({ id, onCerrar, onSalir }) {
       className="campana-panel"
       role="dialog"
       aria-labelledby={idTitulo}
+      aria-describedby={idPeriodo}
       tabIndex={-1}
       onBlur={(e) => e.relatedTarget && !e.currentTarget.parentNode.contains(e.relatedTarget) && onSalir()}
     >
       <div className="campana-cabecera">
-        <h2 id={idTitulo}>Notificaciones</h2>
+        <div>
+          <h2 id={idTitulo}>Notificaciones</h2>
+          <p id={idPeriodo} className="texto-suave">
+            Últimos 7 días
+          </p>
+        </div>
         {haySinLeer && (
           <button type="button" className="boton-texto" onClick={leerTodas}>
             Marcar todas como leídas
@@ -58,18 +65,7 @@ function PanelNotificaciones({ id, onCerrar, onSalir }) {
         )}
       </div>
       <div className="campana-cuerpo">
-        <ListaNotificaciones
-          onAbrir={onCerrar}
-          textoError="No pudimos cargar tus notificaciones."
-          vacio={
-            <>
-              <p>
-                <strong>Aún no tienes notificaciones.</strong>
-              </p>
-              <p>Te avisaremos aquí cuando llegue una reserva o un comprador la cancele.</p>
-            </>
-          }
-        />
+        <ListaNotificaciones onAbrir={onCerrar} textoError="No pudimos cargar tus notificaciones." />
       </div>
     </section>
   )

@@ -201,11 +201,7 @@ export default function InicioPage() {
       <section className="actividad" aria-labelledby="titulo-actividad">
         <h2 id="titulo-actividad">Actividad reciente</h2>
         <div className="tarjeta actividad-tarjeta">
-          <ListaNotificaciones
-            maximo={MAX_ACTIVIDAD}
-            textoError="No pudimos cargar la actividad reciente."
-            vacio={<p>Aún no hay actividad. Aquí verás las nuevas reservas y cancelaciones.</p>}
-          />
+          <ListaNotificaciones maximo={MAX_ACTIVIDAD} textoError="No pudimos cargar la actividad reciente." />
         </div>
       </section>
     </>

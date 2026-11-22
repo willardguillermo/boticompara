@@ -790,6 +790,7 @@ function validarPedidoChat({ mensaje, historial, lat, lng }) {
 
 // ---------- 12. Notificaciones del dueño (H103, mismas reglas que docs/API.md) ----------
 const MAX_NOTIFICACIONES = 50
+const PLAZO_NOTIFICACIONES_MS = 7 * 24 * HORA
 const ESPERA_NUEVA_RESERVA_MS = 60 * 1000
 const TITULOS_NOTIFICACION = {
   NUEVA_RESERVA: 'Nueva reserva',
@@ -858,6 +859,12 @@ const notificacionDto = ({ id, tipo, titulo, mensaje, pedidoId, leida, creadoEn 
 const misNotificaciones = () => {
   const dueno = duenoActual()
   return db.notificaciones.filter((n) => n.usuarioId === dueno.id)
+}
+
+/** Las de los últimos 7 días: lo que ven la campana (lista y contador) y la actividad reciente. */
+const misNotificacionesRecientes = () => {
+  const desde = haceMs(PLAZO_NOTIFICACIONES_MS)
+  return misNotificaciones().filter((n) => n.creadoEn >= desde)
 }
 
 export const apiMock = {
@@ -1179,10 +1186,10 @@ export const apiMock = {
   },
 
   // ---------- 12. Notificaciones del dueño (H103) ----------
-  // De la más reciente a la más antigua, máximo 50. Sin botica: lista vacía, no 404
+  // Últimos 7 días, de la más reciente a la más antigua, máximo 50. Sin botica: lista vacía, no 404
   async listarNotificaciones({ soloNoLeidas = false } = {}) {
     await esperar()
-    const propias = misNotificaciones()
+    const propias = misNotificacionesRecientes()
     if (typeof soloNoLeidas !== 'boolean') throw crearError(400, 'soloNoLeidas debe ser true o false.')
     return propias
       .filter((n) => !soloNoLeidas || !n.leida)
@@ -1191,10 +1198,10 @@ export const apiMock = {
       .map(notificacionDto)
   },
 
-  // Cuenta todas las no leídas, sin el límite de 50
+  // Cuenta las no leídas de los últimos 7 días, sin el límite de 50
   async contarNotificacionesNoLeidas() {
     await esperar()
-    return { total: misNotificaciones().filter((n) => !n.leida).length }
+    return { total: misNotificacionesRecientes().filter((n) => !n.leida).length }
   },
 
   // 204 también si ya estaba leída; 404 si no existe o es de otro usuario
