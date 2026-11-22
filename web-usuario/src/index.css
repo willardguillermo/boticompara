@@ -5,8 +5,8 @@
    y se separan solo con una sombra doble (clara arriba a la izquierda, oscura abajo a la derecha).
    Los campos van hundidos. Los botones principales, los de peligro, las tablas y las etiquetas de
    estado se quedan planos y con borde.
-   Todo color y toda sombra se definen aquí: los componentes solo usan estas variables, así un
-   modo oscuro solo tiene que redefinirlas.
+   Todo color y toda sombra se definen aquí: los componentes solo usan estas variables y el modo
+   oscuro (más abajo) solo las redefine.
    Contraste (WCAG 2.x), medido sobre --color-fondo: texto 12,1:1, texto suave 5,4:1,
    primario 4,7:1, borde de los controles 3,5:1.
    ===================================================================== */
@@ -31,6 +31,9 @@
   --color-texto-suave: #4d655f;
   --color-texto-sobre-color: #ffffff;
   --color-pendiente: #9fb2ad;
+  /* Notificación sin leer: apenas más verde que la superficie plana (texto 12,7:1 y texto suave 5,6:1; con el puntero encima, 11,9:1 y 5,3:1) */
+  --notificacion-nueva-fondo: #e9f5f1;
+  --notificacion-nueva-hover: #deefe9;
   --color-pie: var(--color-hundido);
   --color-tabla-cabecera: #edf2f1;
   --color-tabla-hover: #eef4f2;
@@ -100,6 +103,11 @@
   --rb-gradiente-2: #0e7490;
   --rb-gradiente-3: var(--exito);
   --rb-brillo: var(--color-primario-oscuro);
+  /* Estrella de Star Border, sobre el botón principal */
+  --rb-estrella: var(--color-primario-suave);
+
+  /* Filtro de los cuadros del mapa: en claro se ven tal cual */
+  --mapa-filtro: none;
 
   --curva: cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -108,6 +116,75 @@
   color: var(--color-texto);
   background: var(--color-fondo);
   -webkit-font-smoothing: antialiased;
+}
+
+/* =====================================================================
+   Modo oscuro: solo redefine las variables. Las superficies son un tono más claras que el fondo y
+   no llevan la sombra doble del neumorfismo (en oscuro la luz no se ve).
+   Los colores de relleno (primario, error) pasan a ser claros, con texto oscuro encima.
+   Contraste mínimo sobre cualquier superficie: texto 9,7:1, texto suave 5,6:1, primario 6,1:1,
+   borde de controles 3,6:1.
+   ===================================================================== */
+:root[data-tema='oscuro'] {
+  --color-primario: #2dd4bf;
+  --color-primario-oscuro: #5eead4;
+  --color-primario-suave: #123f39;
+  --color-primario-borde: #1f6f65;
+  --color-fondo: #101917;
+  --color-superficie: #1a2622;
+  --color-superficie-plana: #202e2a;
+  --color-hundido: #0c1412;
+  --color-borde: #34453f;
+  --color-borde-control: #7f978f;
+  --color-texto: #e4efec;
+  --color-texto-suave: #a7bbb5;
+  --color-texto-sobre-color: #06211e;
+  --color-pendiente: #7f978f;
+  --color-tabla-cabecera: #263530;
+  --color-tabla-hover: #283833;
+  --notificacion-nueva-fondo: #17352f;
+  --notificacion-nueva-hover: #1c403a;
+
+  --exito: #86efac;
+  --exito-fondo: #12331f;
+  --exito-borde: #1f5a36;
+  --aviso: #fcd34d;
+  --aviso-fondo: #3a2b0c;
+  --aviso-borde: #6b4f14;
+  --error: #fca5a5;
+  --error-oscuro: #fecaca;
+  --error-fondo: #411a1a;
+  --error-borde: #7a2e2e;
+  --error-campo: #2e1717;
+  --info: #93c5fd;
+  --info-fondo: #172b4d;
+  --info-borde: #2b4a7d;
+  --receta: #d8b4fe;
+  --receta-fondo: #321c4f;
+  --receta-borde: #573284;
+  --neutro-fondo: #283632;
+  --neutro-borde: #3f504a;
+  --deshabilitado-fondo: #26322e;
+  --deshabilitado-borde: #3a4843;
+  --deshabilitado-texto: #93a6a0;
+
+  --velo-modal: rgb(0 0 0 / 62%);
+  --capa-hover: rgb(255 255 255 / 10%);
+  --brillo-acceso-1: rgb(45 212 191 / 9%);
+  --brillo-acceso-2: rgb(34 211 238 / 7%);
+
+  --sombra-elevada: none;
+  --sombra-elevada-suave: none;
+  --sombra-hundida: inset 0 1px 3px rgb(0 0 0 / 50%);
+  --sombra: 0 4px 16px rgb(0 0 0 / 35%);
+  --sombra-flotante: 0 12px 40px rgb(0 0 0 / 60%);
+  --sombra-panel-lateral: -8px 0 24px rgb(0 0 0 / 40%);
+  --sombra-columna-fija: -8px 0 8px -8px rgb(0 0 0 / 60%);
+
+  --rb-gradiente-2: #67e8f9;
+  --rb-estrella: #f0fdfa;
+  /* Los cuadros de OpenStreetMap solo existen en claro: se invierten conservando los tonos */
+  --mapa-filtro: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.88);
 }
 
 *,
@@ -156,6 +233,11 @@ a {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+::placeholder {
+  color: var(--color-texto-suave);
+  opacity: 1;
 }
 
 .icono {
@@ -272,6 +354,40 @@ a {
   border-radius: var(--radio);
   overflow: hidden;
   z-index: 0;
+}
+
+/* Leaflet trae colores fijos: aquí pasan a las variables (con la clase del mapa, para ganarle a su CSS) */
+.mapa-ubicacion.leaflet-container {
+  background: var(--color-hundido);
+}
+
+.mapa-ubicacion .leaflet-tile-pane {
+  filter: var(--mapa-filtro);
+}
+
+.mapa-ubicacion .leaflet-bar a {
+  border-color: var(--color-borde);
+  background: var(--color-superficie-plana);
+  color: var(--color-texto);
+}
+
+.mapa-ubicacion .leaflet-bar a:hover,
+.mapa-ubicacion .leaflet-bar a:focus {
+  background: var(--color-tabla-hover);
+}
+
+.mapa-ubicacion .leaflet-bar a.leaflet-disabled {
+  background: var(--deshabilitado-fondo);
+  color: var(--deshabilitado-texto);
+}
+
+.mapa-ubicacion.leaflet-container .leaflet-control-attribution {
+  background: var(--color-superficie-plana);
+  color: var(--color-texto-suave);
+}
+
+.mapa-ubicacion.leaflet-container .leaflet-control-attribution a {
+  color: var(--color-primario);
 }
 
 .mapa-pie {
@@ -827,6 +943,11 @@ a {
 .pasos-pie p {
   margin: 0;
   font-size: 0.95rem;
+}
+
+/* El pie es más oscuro que el fondo: el color de marca no llega a 4,5:1 ahí */
+.pasos-pie p a {
+  color: var(--color-primario-oscuro);
 }
 
 .pasos-pie .btn-primario {
@@ -1693,12 +1814,44 @@ a {
 }
 
 .barra-pedidos {
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
 }
 
-.filtro-estado {
-  min-width: 220px;
+/* Filtros en píldora: elevadas; la elegida queda hundida y resaltada */
+.filtros-pildora {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pildora {
+  min-height: 38px;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--color-borde-control);
+  border-radius: 999px;
+  background: var(--color-superficie);
+  box-shadow: var(--sombra-elevada-suave);
+  color: var(--color-texto-suave);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
+}
+
+.pildora:hover {
+  border-color: var(--color-primario);
+  color: var(--color-primario-oscuro);
+}
+
+.pildora[aria-pressed='true'] {
+  border-color: var(--color-primario);
+  background: var(--color-primario-suave);
+  box-shadow: var(--sombra-hundida);
+  color: var(--color-primario-oscuro);
 }
 
 /* Nueve columnas: en pantallas medianas la tabla se desplaza en vez de apretarse */
@@ -2434,6 +2587,15 @@ a {
     box-shadow: var(--sombra-panel-lateral);
   }
 
+  /* Queda menos ancho: sin el nombre, la cabecera sigue en una fila */
+  body:has(.chat-panel) .nombre-usuario {
+    display: none;
+  }
+
+  body:has(.chat-panel) .navegacion a {
+    padding: 0.45rem 0.6rem;
+  }
+
   body:has(.chat-panel) .toasts {
     right: calc(420px + 1rem);
   }
@@ -2455,6 +2617,440 @@ a {
   }
 }
 
+/* ---------- Esqueletos de carga ---------- */
+.esqueleto {
+  display: block;
+  max-width: 100%;
+  border-radius: 6px;
+  background: var(--color-borde);
+  animation: latir 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes latir {
+  from {
+    opacity: 0.45;
+  }
+
+  to {
+    opacity: 0.9;
+  }
+}
+
+/* ---------- Notificaciones (H103) ---------- */
+/* El panel y el aviso se ubican respecto a la cabecera, no a la campana: en celular ocupan todo el ancho */
+.cabecera-contenido {
+  position: relative;
+}
+
+.boton-redondo {
+  position: relative;
+  flex-shrink: 0;
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.campana-boton[aria-expanded='true'] {
+  border-color: var(--color-primario);
+  box-shadow: var(--sombra-hundida);
+  color: var(--color-primario-oscuro);
+}
+
+.campana-contador {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 21px;
+  padding: 0 0.3rem;
+  border: 2px solid var(--color-fondo);
+  border-radius: 999px;
+  background: var(--error);
+  color: var(--color-texto-sobre-color);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.campana-panel,
+.campana-aviso {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 1rem;
+  width: min(400px, calc(100% - 2rem));
+}
+
+.campana-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(560px, calc(100dvh - 9rem));
+  overflow: hidden;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-grande);
+  background: var(--color-superficie-plana);
+  box-shadow: var(--sombra-flotante);
+  animation: aparecer 150ms var(--curva);
+}
+
+/* El foco inicial va al panel; no hace falta el contorno */
+.campana-panel:focus {
+  outline: none;
+}
+
+.campana-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.campana-cabecera h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.campana-cabecera .boton-texto {
+  min-height: 28px;
+  font-size: 0.88rem;
+}
+
+.campana-cuerpo {
+  overflow-y: auto;
+}
+
+.notificaciones-lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notificaciones-lista li + li {
+  border-top: 1px solid var(--color-borde);
+}
+
+.notificacion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+  color: var(--color-texto);
+  text-decoration: none;
+}
+
+a.notificacion:hover {
+  background: var(--color-tabla-hover);
+}
+
+a.notificacion:focus-visible {
+  outline-offset: -3px;
+}
+
+.notificacion-nueva {
+  background: var(--notificacion-nueva-fondo);
+}
+
+a.notificacion-nueva:hover {
+  background: var(--notificacion-nueva-hover);
+}
+
+.notificacion-icono {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--color-hundido);
+  color: var(--color-texto-suave);
+}
+
+.notificacion-nueva .notificacion-icono,
+.aviso-notificacion .notificacion-icono {
+  background: var(--color-primario);
+  color: var(--color-texto-sobre-color);
+}
+
+.notificacion-texto {
+  display: grid;
+  flex: 1;
+  gap: 0.15rem;
+  min-width: 0;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.notificacion-titulo {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.notificacion-nueva .notificacion-titulo,
+.aviso-notificacion .notificacion-titulo {
+  font-weight: 700;
+}
+
+.notificacion-texto time {
+  font-size: 0.82rem;
+}
+
+.notificacion-punto {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: 0.4rem;
+  border-radius: 50%;
+  background: var(--color-primario);
+}
+
+.notificaciones-vacio {
+  padding: 2rem 1.25rem;
+  color: var(--color-texto-suave);
+  text-align: center;
+}
+
+.notificaciones-vacio > .icono {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 0.5rem;
+}
+
+.notificaciones-vacio p {
+  margin: 0 0 0.25rem;
+}
+
+.aviso-notificacion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-primario-borde);
+  border-radius: var(--radio-grande);
+  background: var(--color-superficie-plana);
+  box-shadow: var(--sombra-flotante);
+  animation: entrar 0.2s ease-out;
+}
+
+.aviso-notificacion a {
+  justify-self: start;
+  padding: 0.15rem 0;
+  font-weight: 600;
+}
+
+/* ---------- Inicio del dueño (H103) ---------- */
+.resumen-inicio-lista {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin: 0 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+/* Título, número y detalle comparten filas: quedan alineados aunque un título ocupe más líneas */
+.resumen-inicio-lista > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: 0.5rem;
+}
+
+.resumen-inicio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: 0.5rem;
+  padding: 1.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radio-grande);
+  background: var(--color-superficie);
+  box-shadow: var(--sombra-elevada);
+  color: var(--color-texto);
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+a.resumen-inicio:hover {
+  border-color: var(--color-primario);
+}
+
+a.resumen-inicio:active {
+  box-shadow: var(--sombra-hundida);
+}
+
+.resumen-inicio-titulo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.resumen-inicio-icono {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  box-shadow: var(--sombra-hundida);
+  color: var(--color-primario);
+}
+
+.resumen-inicio-numero {
+  min-height: 1em;
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.resumen-inicio-detalle {
+  color: var(--color-texto-suave);
+  font-size: 0.9rem;
+}
+
+.resumen-inicio .boton-texto {
+  justify-self: start;
+}
+
+.actividad-tarjeta {
+  overflow: hidden;
+  padding: 0;
+  border-color: var(--color-borde);
+  background: var(--color-superficie-plana);
+}
+
+/* Sin la tarjeta de calificación quedan tres: ocupan todo el ancho */
+.resumen-inicio-lista:has(> :nth-child(3):last-child) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1000px) {
+  .resumen-inicio-lista {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .resumen-inicio-lista:has(> :nth-child(3):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .resumen-inicio-lista > :nth-child(3):last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 479px) {
+  .resumen-inicio-lista {
+    gap: 0.9rem;
+  }
+
+  .resumen-inicio {
+    padding: 1rem;
+  }
+
+  .resumen-inicio-titulo {
+    font-size: 0.92rem;
+  }
+
+  .resumen-inicio-icono {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .resumen-inicio-numero {
+    font-size: 2rem;
+  }
+}
+
+/* Celular angosto: caben la marca, la campana, el asistente y salir en una fila, y las cuatro secciones
+   en la siguiente. El texto "Asistente" queda solo para el lector de pantalla. */
+@media (max-width: 479px) {
+  .cabecera-contenido {
+    column-gap: 0.5rem;
+  }
+
+  .usuario-sesion {
+    gap: 0.35rem;
+  }
+
+  .boton-redondo {
+    width: 38px;
+    min-height: 38px;
+  }
+
+  /* Los botones van más juntos: el número no tapa al de al lado */
+  .campana-contador {
+    right: -3px;
+  }
+
+  .texto-asistente {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .navegacion {
+    gap: 0;
+  }
+
+  .navegacion a {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .navegacion a .icono {
+    display: none;
+  }
+}
+
+/* Aún más angosto: de la marca queda el logo (el nombre, para el lector de pantalla) */
+@media (max-width: 389px) {
+  .cabecera .marca-nombre {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 359px) {
+  .resumen-inicio-lista,
+  .resumen-inicio-lista:has(> :nth-child(3):last-child) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .navegacion a {
+    font-size: 0.82rem;
+  }
+}
+
+/* Pantallas medianas: sin el nombre, la cabecera con las cuatro secciones sigue en una fila */
+@media (max-width: 1100px) {
+  .usuario-sesion .nombre-usuario {
+    display: none;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1100px) {
+  .navegacion a {
+    padding: 0.45rem 0.6rem;
+  }
+}
+
 /* Movimiento reducido: sin transiciones ni animaciones de entrada en todo el panel.
    Los spinners siguen girando (indican que algo carga) y los efectos de React Bits ya leen
    esta preferencia por su cuenta. */
@@ -2466,7 +3062,10 @@ a {
   }
 
   .toasts .alerta,
-  .pasos-contenido {
+  .pasos-contenido,
+  .campana-panel,
+  .aviso-notificacion,
+  .esqueleto {
     animation: none;
   }
 }

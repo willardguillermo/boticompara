@@ -23,8 +23,3 @@ export function guardarEstadoVisto(boticaId, estado) {
 export function esCambioSinVer(estado, visto) {
   return ESTADOS_CON_AVISO.includes(estado) && estado !== visto
 }
-
-/** true si la botica está APROBADO o RECHAZADO y el dueño aún no vio ese estado. */
-export function hayCambioSinVer(botica) {
-  return Boolean(botica) && esCambioSinVer(botica.estado, leerEstadoVisto(botica.id))
-}

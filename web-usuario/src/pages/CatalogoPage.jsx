@@ -6,7 +6,7 @@
 // H12 - Etiqueta "Stock bajo" y filtro "Solo stock bajo" (?stockBajo=true)
 // H11 - Acceso a la carga masiva por CSV o Excel (ver CargaMasivaPage)
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Cargando from '../components/Cargando.jsx'
 import ConfirmarEliminarModal from '../components/ConfirmarEliminarModal.jsx'
@@ -110,7 +110,9 @@ export default function CatalogoPage() {
   const aprobada = botica.estado === 'APROBADO'
 
   const [busqueda, setBusqueda] = useState('')
-  const [soloStockBajo, setSoloStockBajo] = useState(false)
+  // H103: la tarjeta "Productos con stock bajo" del Inicio llega con ?stockBajo=true
+  const [parametros] = useSearchParams()
+  const [soloStockBajo, setSoloStockBajo] = useState(() => parametros.get('stockBajo') === 'true')
   const [productos, setProductos] = useState(null)
   const [error, setError] = useState('')
   const [recarga, setRecarga] = useState(0)
