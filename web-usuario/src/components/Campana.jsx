@@ -153,7 +153,7 @@ export default function Campana() {
       <button
         ref={boton}
         type="button"
-        className="btn btn-secundario campana-boton"
+        className="btn btn-secundario boton-redondo campana-boton"
         aria-label={etiquetaCampana(total)}
         aria-haspopup="dialog"
         aria-expanded={abierta}

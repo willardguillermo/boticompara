@@ -14,7 +14,7 @@ export default function Marca({ a = '/panel', degradado = false }) {
       <span className="marca-logo">
         <Icono nombre="cruz" />
       </span>
-      {degradado ? <GradientText colors={COLORES_DEGRADADO} animationSpeed={14} glow={0.18}>BotiCompara</GradientText> : 'BotiCompara'}
+      {degradado ? <GradientText colors={COLORES_DEGRADADO} animationSpeed={14} glow={0.18}>BotiCompara</GradientText> : <span className="marca-nombre">BotiCompara</span>}
     </Link>
   )
 }

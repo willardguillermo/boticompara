@@ -4,6 +4,7 @@ import { BoticaProvider, useBotica } from '../context/BoticaContext.jsx'
 import { NotificacionesProvider } from '../context/NotificacionesContext.jsx'
 import Alerta from './Alerta.jsx'
 import AsistenteChat from './AsistenteChat.jsx'
+import BotonTema from './BotonTema.jsx'
 import Campana from './Campana.jsx'
 import Cargando from './Cargando.jsx'
 import Icono from './Icono.jsx'
@@ -38,6 +39,7 @@ function Cabecera() {
         )}
         <div className="usuario-sesion">
           <span className="nombre-usuario texto-suave">{usuario.nombre}</span>
+          <BotonTema />
           <Campana />
           <AsistenteChat />
           <button type="button" className="btn btn-secundario btn-icono" onClick={cerrarSesion}>

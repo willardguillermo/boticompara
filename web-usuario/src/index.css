@@ -5,8 +5,8 @@
    y se separan solo con una sombra doble (clara arriba a la izquierda, oscura abajo a la derecha).
    Los campos van hundidos. Los botones principales, los de peligro, las tablas y las etiquetas de
    estado se quedan planos y con borde.
-   Todo color y toda sombra se definen aquí: los componentes solo usan estas variables, así un
-   modo oscuro solo tiene que redefinirlas.
+   Todo color y toda sombra se definen aquí: los componentes solo usan estas variables y el modo
+   oscuro (más abajo) solo las redefine.
    Contraste (WCAG 2.x), medido sobre --color-fondo: texto 12,1:1, texto suave 5,4:1,
    primario 4,7:1, borde de los controles 3,5:1.
    ===================================================================== */
@@ -103,6 +103,11 @@
   --rb-gradiente-2: #0e7490;
   --rb-gradiente-3: var(--exito);
   --rb-brillo: var(--color-primario-oscuro);
+  /* Estrella de Star Border, sobre el botón principal */
+  --rb-estrella: var(--color-primario-suave);
+
+  /* Filtro de los cuadros del mapa: en claro se ven tal cual */
+  --mapa-filtro: none;
 
   --curva: cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -111,6 +116,75 @@
   color: var(--color-texto);
   background: var(--color-fondo);
   -webkit-font-smoothing: antialiased;
+}
+
+/* =====================================================================
+   Modo oscuro: solo redefine las variables. Las superficies son un tono más claras que el fondo y
+   no llevan la sombra doble del neumorfismo (en oscuro la luz no se ve).
+   Los colores de relleno (primario, error) pasan a ser claros, con texto oscuro encima.
+   Contraste mínimo sobre cualquier superficie: texto 9,7:1, texto suave 5,6:1, primario 6,1:1,
+   borde de controles 3,6:1.
+   ===================================================================== */
+:root[data-tema='oscuro'] {
+  --color-primario: #2dd4bf;
+  --color-primario-oscuro: #5eead4;
+  --color-primario-suave: #123f39;
+  --color-primario-borde: #1f6f65;
+  --color-fondo: #101917;
+  --color-superficie: #1a2622;
+  --color-superficie-plana: #202e2a;
+  --color-hundido: #0c1412;
+  --color-borde: #34453f;
+  --color-borde-control: #7f978f;
+  --color-texto: #e4efec;
+  --color-texto-suave: #a7bbb5;
+  --color-texto-sobre-color: #06211e;
+  --color-pendiente: #7f978f;
+  --color-tabla-cabecera: #263530;
+  --color-tabla-hover: #283833;
+  --notificacion-nueva-fondo: #17352f;
+  --notificacion-nueva-hover: #1c403a;
+
+  --exito: #86efac;
+  --exito-fondo: #12331f;
+  --exito-borde: #1f5a36;
+  --aviso: #fcd34d;
+  --aviso-fondo: #3a2b0c;
+  --aviso-borde: #6b4f14;
+  --error: #fca5a5;
+  --error-oscuro: #fecaca;
+  --error-fondo: #411a1a;
+  --error-borde: #7a2e2e;
+  --error-campo: #2e1717;
+  --info: #93c5fd;
+  --info-fondo: #172b4d;
+  --info-borde: #2b4a7d;
+  --receta: #d8b4fe;
+  --receta-fondo: #321c4f;
+  --receta-borde: #573284;
+  --neutro-fondo: #283632;
+  --neutro-borde: #3f504a;
+  --deshabilitado-fondo: #26322e;
+  --deshabilitado-borde: #3a4843;
+  --deshabilitado-texto: #93a6a0;
+
+  --velo-modal: rgb(0 0 0 / 62%);
+  --capa-hover: rgb(255 255 255 / 10%);
+  --brillo-acceso-1: rgb(45 212 191 / 9%);
+  --brillo-acceso-2: rgb(34 211 238 / 7%);
+
+  --sombra-elevada: none;
+  --sombra-elevada-suave: none;
+  --sombra-hundida: inset 0 1px 3px rgb(0 0 0 / 50%);
+  --sombra: 0 4px 16px rgb(0 0 0 / 35%);
+  --sombra-flotante: 0 12px 40px rgb(0 0 0 / 60%);
+  --sombra-panel-lateral: -8px 0 24px rgb(0 0 0 / 40%);
+  --sombra-columna-fija: -8px 0 8px -8px rgb(0 0 0 / 60%);
+
+  --rb-gradiente-2: #67e8f9;
+  --rb-estrella: #f0fdfa;
+  /* Los cuadros de OpenStreetMap solo existen en claro: se invierten conservando los tonos */
+  --mapa-filtro: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.88);
 }
 
 *,
@@ -159,6 +233,11 @@ a {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+::placeholder {
+  color: var(--color-texto-suave);
+  opacity: 1;
 }
 
 .icono {
@@ -275,6 +354,40 @@ a {
   border-radius: var(--radio);
   overflow: hidden;
   z-index: 0;
+}
+
+/* Leaflet trae colores fijos: aquí pasan a las variables (con la clase del mapa, para ganarle a su CSS) */
+.mapa-ubicacion.leaflet-container {
+  background: var(--color-hundido);
+}
+
+.mapa-ubicacion .leaflet-tile-pane {
+  filter: var(--mapa-filtro);
+}
+
+.mapa-ubicacion .leaflet-bar a {
+  border-color: var(--color-borde);
+  background: var(--color-superficie-plana);
+  color: var(--color-texto);
+}
+
+.mapa-ubicacion .leaflet-bar a:hover,
+.mapa-ubicacion .leaflet-bar a:focus {
+  background: var(--color-tabla-hover);
+}
+
+.mapa-ubicacion .leaflet-bar a.leaflet-disabled {
+  background: var(--deshabilitado-fondo);
+  color: var(--deshabilitado-texto);
+}
+
+.mapa-ubicacion.leaflet-container .leaflet-control-attribution {
+  background: var(--color-superficie-plana);
+  color: var(--color-texto-suave);
+}
+
+.mapa-ubicacion.leaflet-container .leaflet-control-attribution a {
+  color: var(--color-primario);
 }
 
 .mapa-pie {
@@ -2474,6 +2587,10 @@ a {
     display: none;
   }
 
+  body:has(.chat-panel) .navegacion a {
+    padding: 0.45rem 0.6rem;
+  }
+
   body:has(.chat-panel) .toasts {
     right: calc(420px + 1rem);
   }
@@ -2520,8 +2637,9 @@ a {
   position: relative;
 }
 
-.campana-boton {
+.boton-redondo {
   position: relative;
+  flex-shrink: 0;
   width: 42px;
   min-height: 42px;
   padding: 0;
@@ -2852,6 +2970,24 @@ a.resumen-inicio:active {
 /* Celular angosto: caben la marca, la campana, el asistente y salir en una fila, y las cuatro secciones
    en la siguiente. El texto "Asistente" queda solo para el lector de pantalla. */
 @media (max-width: 479px) {
+  .cabecera-contenido {
+    column-gap: 0.5rem;
+  }
+
+  .usuario-sesion {
+    gap: 0.35rem;
+  }
+
+  .boton-redondo {
+    width: 38px;
+    min-height: 38px;
+  }
+
+  /* Los botones van más juntos: el número no tapa al de al lado */
+  .campana-contador {
+    right: -3px;
+  }
+
   .texto-asistente {
     position: absolute;
     width: 1px;
@@ -2874,6 +3010,18 @@ a.resumen-inicio:active {
   }
 }
 
+/* Aún más angosto: de la marca queda el logo (el nombre, para el lector de pantalla) */
+@media (max-width: 389px) {
+  .cabecera .marca-nombre {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 359px) {
   .resumen-inicio-lista,
   .resumen-inicio-lista:has(> :nth-child(3):last-child) {
@@ -2889,6 +3037,12 @@ a.resumen-inicio:active {
 @media (max-width: 1100px) {
   .usuario-sesion .nombre-usuario {
     display: none;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1100px) {
+  .navegacion a {
+    padding: 0.45rem 0.6rem;
   }
 }
 
