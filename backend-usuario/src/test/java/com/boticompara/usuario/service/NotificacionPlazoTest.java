@@ -1,5 +1,6 @@
 package com.boticompara.usuario.service;
 
+import com.boticompara.usuario.BaseDePrueba;
 import com.boticompara.usuario.dto.NotificacionResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * H103: el plazo de 7 días lo evalúa PostgreSQL, con las consultas reales del servicio. Las filas son inventadas: van
  * en un "with notificacion as (values ...)" que tapa a la tabla, así que no lee ni escribe notificaciones de verdad.
+ * La transacción es de solo lectura en la propia base. Sin base configurada, la clase se omite.
  */
 @JdbcTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -45,6 +47,10 @@ class NotificacionPlazoTest {
 
     NotificacionService service;
 
+    NotificacionPlazoTest() {
+        BaseDePrueba.exigir();
+    }
+
     @BeforeEach
     void preparar() {
         service = new NotificacionService(new NamedParameterJdbcTemplate(base) {
@@ -62,6 +68,11 @@ class NotificacionPlazoTest {
 
     private List<Long> ids(String soloNoLeidas) {
         return service.listar(DUENO, soloNoLeidas).stream().map(NotificacionResponse::id).toList();
+    }
+
+    @Test
+    void laBaseRechazaCualquierEscrituraDeEstaPrueba() {
+        assertEquals("on", base.queryForObject("show transaction_read_only", String.class));
     }
 
     @Test
