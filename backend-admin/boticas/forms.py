@@ -2,6 +2,7 @@ from django import forms
 
 from . import usuarios
 from .models import Botica
+from .revision import MENSAJE_SIN_MOTIVO
 
 
 class BoticaRevisionForm(forms.ModelForm):
@@ -24,7 +25,7 @@ class BoticaRevisionForm(forms.ModelForm):
 
         if estado == Botica.Estado.RECHAZADO:
             if not motivo:
-                self.add_error('motivo_rechazo', 'Indica el motivo del rechazo.')
+                self.add_error('motivo_rechazo', MENSAJE_SIN_MOTIVO)
             else:
                 datos['motivo_rechazo'] = motivo
         else:
@@ -43,6 +44,15 @@ def campo_motivo(requerido, ayuda):
             'min_length': 'El motivo debe tener al menos %(limit_value)d caracteres (tiene %(show_value)d).',
             'max_length': 'El motivo puede tener como máximo %(limit_value)d caracteres (tiene %(show_value)d).',
         },
+    )
+
+
+class RechazarBoticaForm(forms.Form):
+    """Botón "Rechazar" de la ficha: la misma regla que el formulario de revisión (motivo obligatorio)."""
+    motivo = forms.CharField(
+        label='Motivo del rechazo', widget=forms.Textarea(attrs={'rows': 4, 'cols': 60}),
+        help_text='El dueño lo verá en la web y en el correo; con él sabrá qué corregir.',
+        error_messages={'required': MENSAJE_SIN_MOTIVO},
     )
 
 

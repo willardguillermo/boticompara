@@ -7,6 +7,7 @@ import Alerta from '../components/Alerta.jsx'
 import Campo from '../components/Campo.jsx'
 import Cargando from '../components/Cargando.jsx'
 import Icono from '../components/Icono.jsx'
+import Counter from '../components/reactbits/Counter.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { presentacionMedicamento, useBuscarMedicamentos } from '../hooks/useBuscarMedicamentos.js'
 import { api } from '../services/index.js'
@@ -97,6 +98,12 @@ function BuscadorMedicamento() {
   )
 }
 
+// Los números ruedan como un contador al aparecer (Counter de React Bits). El lector de pantalla
+// lee el número completo; con movimiento reducido se muestran quietos.
+function Numero({ valor }) {
+  return <Counter value={valor} locale="es-PE" fontSize="inherit" duration={0.9} stagger={0.06} />
+}
+
 function ResumenCarga({ resultado }) {
   const { creados, actualizados, errores } = resultado
   return (
@@ -104,15 +111,15 @@ function ResumenCarga({ resultado }) {
       <h2 id="titulo-resultado">Resultado de la carga</h2>
       <div className="resumen-carga">
         <div className="resumen-item resumen-exito">
-          <span className="resumen-numero">{creados}</span>
+          <span className="resumen-numero"><Numero valor={creados} /></span>
           <span>{creados === 1 ? 'producto creado' : 'productos creados'}</span>
         </div>
         <div className="resumen-item resumen-info">
-          <span className="resumen-numero">{actualizados}</span>
+          <span className="resumen-numero"><Numero valor={actualizados} /></span>
           <span>{actualizados === 1 ? 'producto actualizado' : 'productos actualizados'}</span>
         </div>
         <div className={`resumen-item ${errores.length ? 'resumen-error' : ''}`}>
-          <span className="resumen-numero">{errores.length}</span>
+          <span className="resumen-numero"><Numero valor={errores.length} /></span>
           <span>{errores.length === 1 ? 'fila con errores' : 'filas con errores'}</span>
         </div>
       </div>

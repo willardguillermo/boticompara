@@ -10,6 +10,8 @@ data class RegistroRequest(
     val telefono: String? = null,
     val rol: String = "COMPRADOR"
 )
+// H67: el token de Firebase que se obtiene después de elegir la cuenta de Google
+data class GoogleAuthRequest(val idToken: String)
 data class RecuperarRequest(val correo: String)
 data class RestablecerRequest(val correo: String, val token: String, val password: String)
 data class MensajeResponse(val mensaje: String)

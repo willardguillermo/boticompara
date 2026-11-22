@@ -38,7 +38,11 @@ public class PedidoService {
     private final ProductoRepository productos;
     private final ReservaRepository reservas;
     private final UsuarioRepository usuarios;
+
+    private final org.springframework.context.ApplicationEventPublisher eventos;
+
     private final CondicionVentaService condiciones;
+
 
     /** H77, H81: pedidos de la botica del dueño. estado vacío = todos. */
     @Transactional(readOnly = true)
@@ -82,7 +86,11 @@ public class PedidoService {
         }
 
         r.setEstado(nuevo);
-        return respuestas(List.of(reservas.save(r))).get(0);
+        Reserva guardada = reservas.save(r);
+        if (nuevo == EstadoReserva.LISTA) {
+            eventos.publishEvent(new EstadoPedidoCambiado(guardada.getId(), nuevo));
+        }
+        return respuestas(List.of(guardada)).get(0);
     }
 
     /** H80: rechaza un pedido PENDIENTE o CONFIRMADA, con motivo. */
@@ -103,7 +111,9 @@ public class PedidoService {
 
         r.setEstado(EstadoReserva.RECHAZADA);
         r.setMotivoRechazo(motivo);
-        return respuestas(List.of(reservas.save(r))).get(0);
+        Reserva guardada = reservas.save(r);
+        eventos.publishEvent(new EstadoPedidoCambiado(guardada.getId(), EstadoReserva.RECHAZADA));
+        return respuestas(List.of(guardada)).get(0);
     }
 
     /**

@@ -1,7 +1,6 @@
 from django.contrib import admin, messages
 from django.contrib.admin.utils import unquote
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -9,11 +8,11 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.text import Truncator
 
-from . import historial, resenas, usuarios
+from . import historial, resenas, revision, usuarios
+from .etiquetas import GRIS, NARANJA, ROJO, VERDE, etiqueta
 from .forms import (BoticaRevisionForm, DarBajaForm, MostrarResenaForm, OcultarResenaForm, ReactivarForm,
-                    SuspenderForm)
+                    RechazarBoticaForm, SuspenderForm)
 from .models import Botica, BoticaRevision, Producto, Resena, Usuario, UsuarioAccion
-from .notificaciones import notificar_revision
 from .storage import StorageError, url_firmada_licencia
 
 admin.site.site_header = 'BotiCompara - Administración'
@@ -36,9 +35,16 @@ class SoloLecturaAdmin(admin.ModelAdmin):
 
 # H94: naranja para la suspensión, verde para la reactivación y rojo para la baja
 COLORES_ACCION = {
-    UsuarioAccion.Accion.SUSPENDER: '#ef6c00',
-    UsuarioAccion.Accion.REACTIVAR: '#2e7d32',
-    UsuarioAccion.Accion.DAR_BAJA: '#ba2121',
+    UsuarioAccion.Accion.SUSPENDER: NARANJA,
+    UsuarioAccion.Accion.REACTIVAR: VERDE,
+    UsuarioAccion.Accion.DAR_BAJA: ROJO,
+}
+
+# Mismos colores para el estado de la cuenta en la lista y la ficha (A-U1)
+COLORES_ESTADO_USUARIO = {
+    usuarios.ACTIVO: VERDE,
+    usuarios.SUSPENDIDO: NARANJA,
+    usuarios.BAJA: ROJO,
 }
 
 
@@ -51,11 +57,7 @@ class ColumnasAccion:
 
     @admin.display(description='acción', ordering='accion')
     def accion_texto(self, obj):
-        return format_html(
-            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
-            ' white-space: nowrap;">{}</span>',
-            COLORES_ACCION.get(obj.accion, '#757575'), obj.get_accion_display(),
-        )
+        return etiqueta(obj.get_accion_display(), COLORES_ACCION.get(obj.accion, GRIS))
 
     @admin.display(description='motivo')
     def motivo_accion(self, obj):
@@ -118,7 +120,7 @@ class UsuarioAdmin(SoloLecturaAdmin):
 
     @admin.display(description='estado')
     def estado(self, obj):
-        return usuarios.texto_estado(obj)
+        return etiqueta(usuarios.texto_estado(obj), COLORES_ESTADO_USUARIO[usuarios.estado_de(obj)])
 
     @admin.display(description='motivo del estado')
     def motivo(self, obj):
@@ -312,7 +314,7 @@ class PalabrasARevisarFilter(admin.SimpleListFilter):
         return queryset
 
 
-COLORES_ESTADO_RESENA = {False: '#2e7d32', True: '#757575'}
+COLORES_ESTADO_RESENA = {False: VERDE, True: GRIS}
 
 
 @admin.register(Resena)
@@ -363,11 +365,7 @@ class ResenaAdmin(SoloLecturaAdmin):
 
     @admin.display(description='estado', ordering='oculta')
     def estado(self, obj):
-        return format_html(
-            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
-            ' white-space: nowrap;">{}</span>',
-            COLORES_ESTADO_RESENA[obj.oculta], resenas.texto_estado(obj),
-        )
+        return etiqueta(resenas.texto_estado(obj), COLORES_ESTADO_RESENA[obj.oculta])
 
     @admin.display(description='palabras a revisar')
     def palabras(self, obj):
@@ -494,8 +492,15 @@ class ProductoInline(admin.TabularInline):
 
 # H47: mismos colores que la columna de vigencia del catálogo
 COLORES_REVISION = {
-    BoticaRevision.Estado.APROBADO: '#2e7d32',
-    BoticaRevision.Estado.RECHAZADO: '#ba2121',
+    BoticaRevision.Estado.APROBADO: VERDE,
+    BoticaRevision.Estado.RECHAZADO: ROJO,
+}
+
+# Estado de la botica en la lista: los mismos colores que el historial, y naranja si espera revisión (A-B2)
+COLORES_ESTADO_BOTICA = {
+    Botica.Estado.PENDIENTE: NARANJA,
+    Botica.Estado.APROBADO: VERDE,
+    Botica.Estado.RECHAZADO: ROJO,
 }
 
 
@@ -509,11 +514,7 @@ class ColumnasRevision:
 
     @admin.display(description='estado', ordering='estado')
     def estado_revision(self, obj):
-        return format_html(
-            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
-            ' white-space: nowrap;">{}</span>',
-            COLORES_REVISION.get(obj.estado, '#757575'), obj.get_estado_display(),
-        )
+        return etiqueta(obj.get_estado_display(), COLORES_REVISION.get(obj.estado, GRIS))
 
     @admin.display(description='revisado por', ordering='revisado_por')
     def revisado_por_texto(self, obj):
@@ -624,7 +625,8 @@ class RevisionInline(ColumnasRevision, admin.TabularInline):
 @admin.register(Botica)
 class BoticaAdmin(admin.ModelAdmin):
     form = BoticaRevisionForm
-    list_display = ('nombre_comercial', 'ruc', 'correo_dueno', 'distrito', 'estado', 'tiene_licencia', 'creado_en')
+    list_display = ('nombre_comercial', 'ruc', 'correo_dueno', 'distrito', 'estado_etiqueta', 'tiene_licencia',
+                    'creado_en')
     list_filter = ('estado', 'distrito')
     search_fields = ('nombre_comercial', 'ruc', 'usuario__correo')
     list_select_related = ('usuario',)
@@ -644,6 +646,10 @@ class BoticaAdmin(admin.ModelAdmin):
         ('Revisión', {'fields': ('estado', 'motivo_rechazo')}),
         ('Fechas', {'fields': ('creado_en', 'actualizado_en')}),
     )
+
+    @admin.display(description='estado', ordering='estado')
+    def estado_etiqueta(self, obj):
+        return etiqueta(obj.get_estado_display(), COLORES_ESTADO_BOTICA.get(obj.estado, GRIS))
 
     @admin.display(description='correo del dueño', ordering='usuario__correo')
     def correo_dueno(self, obj):
@@ -688,34 +694,18 @@ class BoticaAdmin(admin.ModelAdmin):
 
     @admin.action(description='Aprobar boticas seleccionadas', permissions=['change'])
     def aprobar_boticas(self, request, queryset):
-        # Solo las que realmente cambian de estado reciben el correo (H6)
-        # H47: el cambio de estado y su historial se guardan juntos o no se guarda nada
-        with transaction.atomic():
-            # select_for_update: si otro administrador la aprueba a la vez, no se registra dos veces
-            # (se vuelve a consultar por pk: el queryset del changelist puede traer DISTINCT)
-            por_aprobar = list(Botica.objects.filter(pk__in=queryset.values('pk'))
-                               .exclude(estado=Botica.Estado.APROBADO)
-                               .select_related('usuario').select_for_update(of=('self',)))
-            Botica.objects.filter(pk__in=[b.pk for b in por_aprobar]).update(
-                estado=Botica.Estado.APROBADO, motivo_rechazo=None)
-            BoticaRevision.objects.bulk_create([
-                BoticaRevision(botica=b, estado=BoticaRevision.Estado.APROBADO,
-                               revisado_por=request.user.get_username())
-                for b in por_aprobar
-            ])
-            for botica in por_aprobar:
-                botica.estado, botica.motivo_rechazo = Botica.Estado.APROBADO, None
-                transaction.on_commit(lambda b=botica: self._notificar(request, b))
-        self.message_user(request, f'{len(por_aprobar)} botica(s) aprobada(s).', messages.SUCCESS)
+        # Solo las que realmente cambian de estado reciben el correo (H6) y quedan en el historial (H47)
+        aprobadas = revision.revisar(queryset.values('pk'), Botica.Estado.APROBADO, request.user.get_username(),
+                                     si_falla_correo=lambda b: self._aviso_correo(request, b))
+        self.message_user(request, f'{len(aprobadas)} botica(s) aprobada(s).', messages.SUCCESS)
 
-    def _notificar(self, request, botica):
-        if not notificar_revision(botica):
-            self.message_user(
-                request,
-                f'No se pudo enviar el correo a {botica.usuario.correo} ({botica.nombre_comercial}). '
-                'La revisión sí se guardó.',
-                messages.WARNING,
-            )
+    def _aviso_correo(self, request, botica):
+        self.message_user(
+            request,
+            f'No se pudo enviar el correo a {botica.usuario.correo} ({botica.nombre_comercial}). '
+            'La revisión sí se guardó.',
+            messages.WARNING,
+        )
 
     def has_add_permission(self, request):
         return False
@@ -724,23 +714,125 @@ class BoticaAdmin(admin.ModelAdmin):
         return False
 
     def save_model(self, request, obj, form, change):
-        # Estado guardado en la BD justo antes de escribir, para avisar solo si cambia (H6).
-        # select_for_update: el changeform del admin ya corre en una transacción
-        anterior = (Botica.objects.select_for_update().filter(pk=obj.pk)
-                    .values_list('estado', flat=True).first())
+        # Aprobar o rechazar con el select "estado" pasa por la misma función que la acción y los botones.
+        # Si no hay cambio de estado (o pasa a PENDIENTE), solo se guarda lo del formulario, sin historial.
+        if obj.estado in revision.ESTADOS_REVISADOS and revision.revisar(
+                [obj.pk], obj.estado, request.user.get_username(), motivo=obj.motivo_rechazo,
+                si_falla_correo=lambda b: self._aviso_correo(request, b)):
+            return
         # Solo se escribe la revisión, para no pisar datos que el dueño
         # haya cambiado desde la web mientras el admin tenía el formulario abierto
         obj.save(update_fields=['estado', 'motivo_rechazo'])
-        if obj.estado != anterior and obj.estado in (Botica.Estado.APROBADO, Botica.Estado.RECHAZADO):
-            # H47: en la misma transacción que el guardado; si falla, la botica no queda cambiada
-            BoticaRevision.objects.create(
-                botica=obj,
-                estado=obj.estado,
-                motivo=obj.motivo_rechazo if obj.estado == Botica.Estado.RECHAZADO else None,
-                revisado_por=request.user.get_username(),
-            )
-            # Después del commit: si algo falla al guardar, no se avisa de un cambio que no ocurrió
-            transaction.on_commit(lambda: self._notificar(request, obj))
+
+    # ---- Botones Aprobar y Rechazar de la ficha, cada uno con su página (como las reseñas, H89) ----
+
+    def get_urls(self):
+        # Antes que las del admin: su ruta "<id>/" atraparía estas URLs
+        vista = self.admin_site.admin_view
+        nombre = f'{self.opts.app_label}_{self.opts.model_name}'
+        return [
+            path('<path:object_id>/aprobar/', vista(self.aprobar_view), name=f'{nombre}_aprobar'),
+            path('<path:object_id>/rechazar/', vista(self.rechazar_view), name=f'{nombre}_rechazar'),
+            *super().get_urls(),
+        ]
+
+    def url_accion(self, botica, accion):
+        return reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_{accion}', args=[botica.pk],
+                       current_app=self.admin_site.name)
+
+    def url_detalle(self, botica):
+        return reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_change', args=[botica.pk],
+                       current_app=self.admin_site.name)
+
+    def acciones_disponibles(self, request, botica):
+        """Aprobar si está pendiente; Rechazar si está pendiente o aprobada. Sin permiso de cambio, ninguno."""
+        if not self.has_change_permission(request, botica):
+            return []
+        acciones = []
+        if botica.estado in revision.PUEDE_APROBAR:
+            acciones.append({'texto': 'Aprobar', 'url': self.url_accion(botica, 'aprobar'), 'color': VERDE})
+        if botica.estado in revision.PUEDE_RECHAZAR:
+            acciones.append({'texto': 'Rechazar', 'url': self.url_accion(botica, 'rechazar'), 'peligrosa': True})
+        return acciones
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        botica = self.get_object(request, unquote(object_id))
+        extra_context = {**(extra_context or {}),
+                         'acciones_botica': self.acciones_disponibles(request, botica) if botica else []}
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def _botica_para(self, request, object_id, estados_validos, requisito):
+        """(botica, None) si la acción corresponde a su estado; si no, (None, redirección con el error).
+
+        Se comprueba también aquí (y no solo en los botones) por si alguien entra directo por la URL.
+        """
+        botica = self.get_object(request, unquote(object_id))
+        if botica is None:
+            messages.error(request, 'La botica no existe.')
+            return None, redirect(reverse(f'admin:{self.opts.app_label}_{self.opts.model_name}_changelist',
+                                          current_app=self.admin_site.name))
+        if not self.has_change_permission(request, botica):
+            raise PermissionDenied
+        if botica.estado not in estados_validos:
+            messages.error(request, f'La botica está «{botica.get_estado_display()}». {requisito}')
+            return None, redirect(self.url_detalle(botica))
+        return botica, None
+
+    def _pagina(self, request, botica, form, titulo, boton, **extra):
+        contexto = {
+            **self.admin_site.each_context(request),
+            'opts': self.opts, 'title': titulo, 'botica': botica, 'form': form, 'boton': boton,
+            'url_detalle': self.url_detalle(botica),
+            **extra,
+        }
+        return TemplateResponse(request, 'admin/boticas/botica/accion.html', contexto)
+
+    REQUISITO_APROBAR = 'Solo se aprueba una botica pendiente.'
+    REQUISITO_RECHAZAR = 'Solo se rechaza una botica pendiente o aprobada.'
+
+    def _resultado(self, request, botica, cambiadas, exito, requisito):
+        if cambiadas:
+            messages.success(request, exito)
+        else:
+            # Otro administrador la revisó mientras esta página estaba abierta
+            botica.refresh_from_db(fields=['estado'])
+            messages.error(request, f'No se hizo ningún cambio: la botica ya está «{botica.get_estado_display()}». '
+                                    f'{requisito}')
+        return redirect(self.url_detalle(botica))
+
+    def aprobar_view(self, request, object_id):
+        botica, respuesta = self._botica_para(request, object_id, revision.PUEDE_APROBAR, self.REQUISITO_APROBAR)
+        if respuesta:
+            return respuesta
+        if request.method == 'POST':
+            cambiadas = revision.revisar([botica.pk], Botica.Estado.APROBADO, request.user.get_username(),
+                                         desde=revision.PUEDE_APROBAR,
+                                         si_falla_correo=lambda b: self._aviso_correo(request, b))
+            return self._resultado(request, botica, cambiadas,
+                                   f'Se aprobó la botica {botica.nombre_comercial}. Sus productos ya aparecen '
+                                   'en las búsquedas.', self.REQUISITO_APROBAR)
+        return self._pagina(request, botica, None, f'¿Aprobar la botica {botica.nombre_comercial}?',
+                            'Sí, aprobar botica',
+                            aviso='Sus productos aparecerán en las búsquedas de la app y el dueño recibirá un '
+                                  'correo. Revisa antes la licencia y la ubicación en la ficha.')
+
+    def rechazar_view(self, request, object_id):
+        botica, respuesta = self._botica_para(request, object_id, revision.PUEDE_RECHAZAR, self.REQUISITO_RECHAZAR)
+        if respuesta:
+            return respuesta
+        form = RechazarBoticaForm(request.POST if request.method == 'POST' else None)
+        if form.is_valid():
+            cambiadas = revision.revisar([botica.pk], Botica.Estado.RECHAZADO, request.user.get_username(),
+                                         motivo=form.cleaned_data['motivo'], desde=revision.PUEDE_RECHAZAR,
+                                         si_falla_correo=lambda b: self._aviso_correo(request, b))
+            return self._resultado(request, botica, cambiadas,
+                                   f'Se rechazó la botica {botica.nombre_comercial}. El dueño verá el motivo '
+                                   'en la web.', self.REQUISITO_RECHAZAR)
+        aviso = 'El dueño recibirá un correo con el motivo y podrá corregir los datos y reenviar la solicitud.'
+        if botica.estado == Botica.Estado.APROBADO:
+            aviso = 'La botica está aprobada: sus productos dejarán de aparecer en las búsquedas. ' + aviso
+        return self._pagina(request, botica, form, f'Rechazar la botica {botica.nombre_comercial}',
+                            'Rechazar botica', peligrosa=True, aviso=aviso)
 
 
 class RangoFechasAccionFilter(RangoFechasFilter):

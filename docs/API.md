@@ -116,7 +116,9 @@ El token dura 24 h. Errores:
 
 - **401:** correo o contraseña incorrectos, o cuenta sin contraseña (creada con Google). Es el mismo mensaje en todos los casos, para no revelar qué correos existen.
 - **403:** cuenta dada de baja o suspendida, **solo si la contraseña es correcta**. Responde "Tu cuenta fue dada de baja" o "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima). Sin contraseña correcta no se revela el estado de la cuenta.
+- **429:** demasiados intentos fallidos. Se cuenta por correo e IP: 5 contraseñas incorrectas en 15 minutos bloquean nuevos intentos de ese correo desde esa IP durante 15 minutos. Responde con el header `Retry-After` (segundos restantes) y el mensaje "Demasiados intentos fallidos. Espera 15 minutos". Un login correcto limpia el contador de ese correo e IP.
 
+La IP se toma de la cabecera `X-Forwarded-For` cuando el backend está detrás de un proxy (Render); si no existe, se usa la IP de conexión.
 Una sesión ya abierta sigue funcionando hasta que el token venza o la cuenta quede dada de baja o suspendida: en ese caso, cada petición responde 401 y la app debe cerrar sesión. Al volver a entrar, el login da el 403 correspondiente.
 
 ### `POST /auth/recuperar` — H17
@@ -1273,6 +1275,105 @@ No es un endpoint de esta API. El administrador oculta reseñas desde el panel D
 5. **`autor` con nombre de pila más la inicial del apellido** (`"Carlos R."`), la misma regla que `compradorNombre` en los pedidos.
 6. **Reseñas de cuentas eliminadas** se conservan con autor `"Usuario eliminado"`.
 7. **Editar no quita el ocultamiento** y las reseñas ocultas no se pueden responder.
+
+---
+
+## 12. Notificaciones del dueño (rol `DUENO_BOTICA`) — H103
+
+Avisos dentro de la web del dueño cuando pasa algo con las reservas de su botica: llega una nueva o el comprador la cancela. Se ven en la campana del panel. No son push (H102) ni correo: los correos siguen siendo los de la sección 10 ("Correos") y no cambian.
+
+Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño solo ve **sus** notificaciones (`notificacion.usuario_id` = usuario del token). Un dueño que todavía no registró botica no tiene notificaciones: recibe `200` con `[]` o `{ "total": 0 }`, no 404.
+
+**Formato de una notificación:**
+```json
+{
+  "id": 31,
+  "tipo": "NUEVA_RESERVA",
+  "titulo": "Nueva reserva BC-7K2QXM",
+  "mensaje": "Amoxil x 3 · S/ 72.00 · Requiere receta médica",
+  "pedidoId": 15,
+  "leida": false,
+  "creadoEn": "2026-11-22T15:30:00.123456Z"
+}
+```
+- `pedidoId`: la reserva a la que se refiere (`notificacion.reserva_id`). Se abre con `GET /pedidos/{pedidoId}`; en la web lleva a "Pedidos" con ese pedido a la vista.
+- `titulo` y `mensaje` se guardan **ya escritos** al crear la notificación: si después cambia el producto o el pedido, el texto no cambia (dice lo que pasó en ese momento).
+- **Ningún dato del comprador**, ni siquiera el nombre corto: quién reservó se ve en el pedido (`compradorNombre`, sección 10). Así, si el comprador elimina su cuenta (H19), no queda nada suyo en las notificaciones.
+
+### Tipos
+
+| `tipo` | Cuándo se crea | `titulo` | `mensaje` | Lleva a |
+|---|---|---|---|---|
+| `NUEVA_RESERVA` | `POST /reservas` (H72) | "Nueva reserva BC-7K2QXM" | "Amoxil x 3 · S/ 72.00", y si el producto pide receta, "· Requiere receta médica" | El pedido, en `PENDIENTE` |
+| `RESERVA_CANCELADA` | El comprador cancela: `PATCH /reservas/{id}/cancelar` (H75) | "Reserva cancelada BC-7K2QXM" | "Amoxil x 3 · S/ 72.00" | El pedido, en `CANCELADA` |
+| `RESERVA_VENCIDA` | El proceso de H84 la pasa a `VENCIDA` | "Reserva vencida BC-7K2QXM" | "Amoxil x 3 · S/ 72.00" | El pedido, en `VENCIDA` |
+
+- `mensaje`: nombre comercial del producto, la cantidad y el total de la reserva (`cantidad × precio_unitario`), con el precio como en los correos (`S/ 72.00`), separados por " · ".
+- **Receta (H72), solo en `NUEVA_RESERVA`**, que es cuando el dueño prepara el pedido. Sale de la `condicionVenta` del pedido en ese momento: `CON_RECETA` agrega "· Requiere receta médica"; con `SIN_RECETA` o `null` no se agrega nada. Una reserva `RECETA_RETENIDA` no puede crearse (`POST /reservas` responde 409, sección 9).
+- **`RESERVA_VENCIDA` se generará cuando exista la tarea de H84 (fuera del sprint).** Hoy ninguna reserva pasa a `VENCIDA`, así que no se crea ninguna; el tipo ya está en la base para no cambiarla después.
+- **No hay notificación** cuando el dueño cambia el estado él mismo (`CONFIRMADA`, `LISTA`, `ENTREGADA`, `RECHAZADA`): lo acaba de hacer. Por eso `EstadoPedidoCambiado` (H83) no crea notificaciones.
+
+### Cuándo se guarda
+- **Después del commit de la reserva, en una transacción aparte.** Un listener `@TransactionalEventListener(phase = AFTER_COMMIT)`, **sin `@Async`**, guarda la notificación en una transacción nueva (`@Transactional(propagation = REQUIRES_NEW)`).
+- **Si falla, la reserva o la cancelación no se ven afectadas:** ya están guardadas. El listener **captura cualquier error** y solo lo registra en el log (sin datos del comprador). No lo deja salir, porque un error lanzado después del commit le llegaría al cliente como 500 aunque la reserva sí se guardó. No se reintenta: esa reserva se queda sin su aviso, pero se ve igual en "Pedidos".
+- **Sin duplicados:** una sola notificación por reserva y tipo (índice único `uq_notificacion_reserva_tipo`). Si el mismo evento llegara dos veces, el segundo `insert` falla por el índice y solo queda en el log.
+- **Los correos no cambian:** siguen saliendo después del commit y en segundo plano (`AFTER_COMMIT` + `@Async`, sección 10), y no dependen de la notificación ni la notificación de ellos.
+- **De dónde sale cada una:**
+  - `NUEVA_RESERVA`: del evento `ReservaCreada` que ya publica `ReservaService.crear`.
+  - `RESERVA_CANCELADA`: hoy `ReservaService.cancelar` **no publica ningún evento**. Al hacer el código se agrega `ReservaCancelada(reservaId)` ahí, después de pasar a `CANCELADA`.
+  - `RESERVA_VENCIDA`: lo publicará la tarea de H84 por cada reserva que venza, cuando exista.
+- La notificación es para el dueño de la botica del producto: `reserva.producto_id → producto.botica_id → botica.usuario_id`.
+
+### `GET /notificaciones?soloNoLeidas=true` 🔒 — H103
+Notificaciones del dueño, de la más reciente a la más antigua (por `creadoEn`, y a igual fecha por `id`), **máximo 50**. `soloNoLeidas` es opcional (por defecto `false`).
+```json
+// 200 OK
+[
+  { "id": 32, "tipo": "RESERVA_CANCELADA", "titulo": "Reserva cancelada BC-7K2QXM",
+    "mensaje": "Amoxil x 3 · S/ 72.00", "pedidoId": 15, "leida": false,
+    "creadoEn": "2026-11-22T16:05:00.123456Z" },
+  { "id": 31, "tipo": "NUEVA_RESERVA", "titulo": "Nueva reserva BC-7K2QXM",
+    "mensaje": "Amoxil x 3 · S/ 72.00 · Requiere receta médica", "pedidoId": 15, "leida": true,
+    "creadoEn": "2026-11-22T15:30:00.123456Z" }
+]
+```
+Sin notificaciones → `200` con `[]`.
+Errores: 400 (`soloNoLeidas` no es `true` ni `false`), 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
+
+### `GET /notificaciones/no-leidas/total` 🔒 — H103
+Para el número sobre la campana. La web lo consulta **cada 30 segundos** mientras el panel está abierto (y al volver a la pestaña); es una sola cuenta sobre el índice `idx_notificacion_no_leidas`, sin traer filas.
+```json
+// 200 OK
+{ "total": 3 }
+```
+Cuenta todas las no leídas (no tiene el límite de 50). Con más de 9, la web muestra "9+".
+Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
+
+### `PATCH /notificaciones/{id}/leida` 🔒 — H103
+Marca una notificación como leída. Responde `204` sin cuerpo, también si ya estaba leída.
+Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `DUENO_BOTICA`), 404 "La notificación no existe" (no existe **o es de otro usuario**: mismo código y mismo mensaje, para no revelar si existe).
+
+### `PATCH /notificaciones/leidas` 🔒 — H103
+Marca como leídas todas las notificaciones del dueño. Responde `204` sin cuerpo, también si no tenía ninguna sin leer.
+Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
+
+### Inicio del dueño: alcanza con lo que ya existe
+No hace falta un endpoint de resumen. La pantalla de Inicio arma sus 4 números con endpoints que ya existen, una vez al abrirla (no cada 30 s):
+
+| Dato | Endpoint | Cómo se obtiene |
+|---|---|---|
+| Pedidos pendientes | `GET /pedidos?estado=PENDIENTE` (H77) | Cantidad de elementos. La lista trae como máximo 100: con 100, la web muestra "100+" |
+| Por recoger hoy | `GET /pedidos?estado=LISTA` (H77) | Los que tienen `venceEn` con fecha de hoy en hora de Lima (`America/Lima`) |
+| Productos con stock bajo | `GET /boticas/mia/productos?stockBajo=true` (H12) | Cantidad de elementos |
+| Calificación promedio | `GET /boticas/mia` (H5) para el `id` y luego `GET /boticas/{id}/resenas?page=0` (H87) | `promedio` y `total` (`promedio` es `null` sin reseñas) |
+
+Si más adelante el Inicio se vuelve lento o hace falta contar más de 100 pendientes, se propondrá `GET /boticas/mia/resumen`, actualizando primero este contrato.
+
+### Notas para el backend (sección 12)
+- `SecurityConfig`: `/notificaciones/**` con `DUENO_BOTICA`. El CORS ya permite `PATCH` (se agregó para `/pedidos`).
+- La tabla es `notificacion` (`database/v7_notificaciones.sql`). Solo la API escribe en ella; Django no la usa.
+- `ReservaCancelada` se agrega en `ReservaService.cancelar` cuando se haga el código; el cambio es mínimo y lo revisa Alexander en el PR.
+- No se borran notificaciones en este sprint: la lista solo muestra las 50 más recientes.
 
 ---
 

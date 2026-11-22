@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.LocalPharmacy
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Mail
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -22,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.ui.components.BotiButton
+import com.boticompara.app.ui.components.BotiTonalButton
 import com.boticompara.app.ui.components.BotiTextField
 import com.boticompara.app.ui.components.IconoCircular
 import com.boticompara.app.ui.components.SeccionTitulo
@@ -32,6 +35,7 @@ fun LoginScreen(navController: NavController, authViewModel: AuthViewModel = vie
     var correo by remember { mutableStateOf("") }
     var contrasena by remember { mutableStateOf("") }
     var verContrasena by remember { mutableStateOf(false) }
+    val contexto = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -115,6 +119,28 @@ fun LoginScreen(navController: NavController, authViewModel: AuthViewModel = vie
                         }
                     },
                     enabled = correo.isNotBlank() && contrasena.isNotBlank() && !authViewModel.isLoading,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // H67: iniciar sesión con Google (solo compradores)
+                Spacer(Modifier.height(Dimens.Space12))
+                Text(
+                    "o",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(Dimens.Space12))
+                BotiTonalButton(
+                    text = "Continuar con Google",
+                    icon = Icons.Rounded.AccountCircle,
+                    onClick = {
+                        authViewModel.loginConGoogle(contexto) {
+                            navController.navigate("busqueda") { popUpTo("login") { inclusive = true } }
+                        }
+                    },
+                    enabled = !authViewModel.isLoading,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

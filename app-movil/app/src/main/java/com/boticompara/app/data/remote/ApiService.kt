@@ -8,6 +8,10 @@ interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
 
+    // H67: inicia sesión con Google (o crea la cuenta de comprador). Devuelve nuestro JWT, igual que el login
+    @POST("auth/google")
+    suspend fun loginGoogle(@Body request: GoogleAuthRequest): Response<AuthResponse>
+
     @POST("auth/registro")   // 201, devuelve el usuario SIN token -> luego llamar a login
     suspend fun registro(@Body request: RegistroRequest): Response<UsuarioResponse>
 
@@ -16,6 +20,13 @@ interface ApiService {
 
     @POST("auth/restablecer")   // H17: 200 si el código es válido, 400 si no
     suspend fun restablecer(@Body request: RestablecerRequest): Response<MensajeResponse>
+
+    // H70: asistente de texto. El servidor no guarda la conversación: la app envía el historial
+    @POST("chat")
+    suspend fun enviarMensajeChat(
+        @Header("Authorization") auth: String,
+        @Body request: ChatRequest
+    ): Response<ChatResponse>
 
     @GET("usuarios/me")
     suspend fun obtenerPerfil(@Header("Authorization") auth: String): Response<PerfilResponse>
@@ -113,4 +124,31 @@ interface ApiService {
     suspend fun marcarTodasLeidas(
         @Header("Authorization") auth: String
     ): Response<Unit>
+
+    // H72, H73, H74: reservar un producto (201 con la reserva PENDIENTE y su código)
+    @POST("reservas")
+    suspend fun crearReserva(
+        @Header("Authorization") auth: String,
+        @Body request: ReservaRequest
+    ): Response<ReservaResponse>
+
+    // H76: historial de reservas del comprador, de la más reciente a la más antigua (máx. 100)
+    @GET("reservas/mias")
+    suspend fun obtenerMisReservas(
+        @Header("Authorization") auth: String
+    ): Response<List<ReservaResponse>>
+
+    // H76: detalle de una reserva propia
+    @GET("reservas/{id}")
+    suspend fun obtenerReserva(
+        @Header("Authorization") auth: String,
+        @Path("id") id: Long
+    ): Response<ReservaResponse>
+
+    // H75: cancelar una reserva PENDIENTE, CONFIRMADA o LISTA (sin cuerpo)
+    @PATCH("reservas/{id}/cancelar")
+    suspend fun cancelarReserva(
+        @Header("Authorization") auth: String,
+        @Path("id") id: Long
+    ): Response<ReservaResponse>
 }

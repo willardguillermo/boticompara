@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 
@@ -52,13 +53,16 @@ class PedidoServiceTest {
     @Mock ProductoRepository productos;
     @Mock ReservaRepository reservas;
     @Mock UsuarioRepository usuarios;
+
+    @Mock ApplicationEventPublisher eventos;
     @Mock CondicionVentaService condiciones;
+
 
     PedidoService service;
 
     @BeforeEach
     void preparar() {
-        service = new PedidoService(boticas, productos, reservas, usuarios, condiciones);
+        service = new PedidoService(boticas, productos, reservas, usuarios, eventos, condiciones);
     }
 
     private Botica botica() {

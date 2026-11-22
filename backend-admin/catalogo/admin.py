@@ -4,7 +4,8 @@ from django.db.models import Count
 from django.forms.models import BaseInlineFormSet
 from django.template.response import TemplateResponse
 from django.urls import path
-from django.utils.html import format_html
+
+from boticas.etiquetas import GRIS, NARANJA, ROJO, VERDE, etiqueta
 
 from . import vigencia
 from .digemid import importador, lector
@@ -55,12 +56,12 @@ class VigenciaRegistroFilter(admin.SimpleListFilter):
         return queryset
 
 
-# Mismos colores que usa el admin de Django para mensajes de éxito, aviso y error
+# Los mismos colores de todo el admin (boticas/etiquetas.py)
 COLORES_VIGENCIA = {
-    vigencia.VIGENTE: '#2e7d32',
-    vigencia.POR_VENCER: '#b26a00',
-    vigencia.VENCIDO: '#ba2121',
-    vigencia.SIN_FECHA: '#757575',
+    vigencia.VIGENTE: VERDE,
+    vigencia.POR_VENCER: NARANJA,
+    vigencia.VENCIDO: ROJO,
+    vigencia.SIN_FECHA: GRIS,
 }
 
 
@@ -131,11 +132,7 @@ class MedicamentoAdmin(admin.ModelAdmin):
     @admin.display(description='vigencia', ordering='fecha_vencimiento_registro')
     def estado_registro(self, obj):
         estado = vigencia.estado(obj.fecha_vencimiento_registro)
-        return format_html(
-            '<span style="color: #fff; background: {}; padding: 2px 8px; border-radius: 10px;'
-            ' white-space: nowrap;">{}</span>',
-            COLORES_VIGENCIA[estado], vigencia.ETIQUETAS[estado],
-        )
+        return etiqueta(vigencia.ETIQUETAS[estado], COLORES_VIGENCIA[estado])
 
     # H35: solo se cuentan los que realmente cambian, no los que ya estaban así
     @admin.action(description='Ocultar del catálogo (sin registro válido)', permissions=['change'])

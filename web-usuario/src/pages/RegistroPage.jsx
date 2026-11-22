@@ -68,7 +68,7 @@ export default function RegistroPage() {
 
   return (
     <main className="registro-pagina">
-      <Marca a="/login" />
+      <Marca a="/login" degradado />
       <RegistroPasos paso={1} pie={pie}>
         <div className="pasos-encabezado">
           <h1>Crea tu cuenta</h1>
