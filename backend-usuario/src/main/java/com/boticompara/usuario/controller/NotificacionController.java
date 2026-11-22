@@ -25,7 +25,7 @@ public class NotificacionController {
 
     private final NotificacionService notificaciones;
 
-    /** De la más reciente a la más antigua, máximo 50. soloNoLeidas se recibe como texto para responder 400 si no es true ni false. */
+    /** De los últimos 7 días, de la más reciente a la más antigua, máximo 50. soloNoLeidas se recibe como texto para responder 400 si no es true ni false. */
     @GetMapping
     public List<NotificacionResponse> listar(@AuthenticationPrincipal UsuarioAutenticado yo,
                                              @RequestParam(required = false) String soloNoLeidas) {

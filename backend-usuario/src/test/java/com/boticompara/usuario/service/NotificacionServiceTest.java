@@ -71,13 +71,15 @@ class NotificacionServiceTest {
     void listar_soloLasDelDuenoDeLaMasRecienteALaMasAntiguaMaximo50() {
         String consulta = sqlDeListar(null);
 
-        assertTrue(consulta.contains("where usuario_id = :usuario order by creado_en desc, id desc limit 50"), consulta);
+        assertTrue(consulta.contains("where usuario_id = :usuario and creado_en > now() - interval '7 days' "
+                + "order by creado_en desc, id desc limit 50"), consulta);
         assertFalse(consulta.contains("not leida"), consulta);
     }
 
     @Test
     void listar_soloNoLeidas() {
-        assertTrue(sqlDeListar("true").contains("where usuario_id = :usuario and not leida order by"));
+        assertTrue(sqlDeListar("true").contains("where usuario_id = :usuario "
+                + "and creado_en > now() - interval '7 days' and not leida order by"));
     }
 
     @Test
@@ -116,11 +118,12 @@ class NotificacionServiceTest {
     // ---------- contar ----------
 
     @Test
-    void totalNoLeidas_cuentaTodasLasDelDuenoSinLimite() {
+    void totalNoLeidas_cuentaLasDelPlazoSinElLimiteDe50() {
         when(jdbc.queryForObject(sql.capture(), params.capture(), eq(Long.class))).thenReturn(73L);
 
         assertEquals(73, service.totalNoLeidas(DUENO).total());
-        assertEquals("select count(*) from notificacion where usuario_id = :usuario and not leida", sql.getValue());
+        assertEquals("select count(*) from notificacion where usuario_id = :usuario and not leida "
+                + "and creado_en > now() - interval '7 days'", sql.getValue());
         assertEquals(DUENO, params.getValue().getValue("usuario"));
     }
 
@@ -149,7 +152,7 @@ class NotificacionServiceTest {
     }
 
     @Test
-    void marcarTodasLeidas_soloLasDelDuenoYSinErrorSiNoHabia() {
+    void marcarTodasLeidas_soloLasDelDuenoSinPlazoYSinErrorSiNoHabia() {
         when(jdbc.update(sql.capture(), params.capture())).thenReturn(0);
 
         service.marcarTodasLeidas(DUENO);

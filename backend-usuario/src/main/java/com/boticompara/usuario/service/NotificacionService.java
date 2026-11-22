@@ -21,6 +21,9 @@ public class NotificacionService {
 
     static final int MAX_NOTIFICACIONES = 50;
 
+    /** Son avisos del momento: pasado el plazo no se listan ni se cuentan (el pedido sigue en Pedidos). */
+    private static final String EN_PLAZO = "creado_en > now() - interval '7 days'";
+
     private static final String CON_RECETA = "CON_RECETA";
 
     /** No pasa por la tabla usuario: ningún dato del comprador llega al aviso. */
@@ -35,7 +38,7 @@ public class NotificacionService {
     @Transactional(readOnly = true)
     public List<NotificacionResponse> listar(Long usuarioId, String soloNoLeidas) {
         String sql = "select id, tipo, titulo, mensaje, reserva_id, leida, creado_en from notificacion "
-                + "where usuario_id = :usuario "
+                + "where usuario_id = :usuario and " + EN_PLAZO + " "
                 + (soloNoLeidas(soloNoLeidas) ? "and not leida " : "")
                 + "order by creado_en desc, id desc limit " + MAX_NOTIFICACIONES;
         return jdbc.query(sql, new MapSqlParameterSource("usuario", usuarioId), (rs, i) -> new NotificacionResponse(
@@ -51,7 +54,7 @@ public class NotificacionService {
     @Transactional(readOnly = true)
     public TotalNoLeidasResponse totalNoLeidas(Long usuarioId) {
         Long total = jdbc.queryForObject(
-                "select count(*) from notificacion where usuario_id = :usuario and not leida",
+                "select count(*) from notificacion where usuario_id = :usuario and not leida and " + EN_PLAZO,
                 new MapSqlParameterSource("usuario", usuarioId), Long.class);
         return new TotalNoLeidasResponse(total == null ? 0 : total);
     }
