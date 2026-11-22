@@ -1282,6 +1282,8 @@ No es un endpoint de esta API. El administrador oculta reseñas desde el panel D
 
 Avisos dentro de la web del dueño cuando pasa algo con las reservas de su botica: llega una nueva o el comprador la cancela. Se ven en la campana del panel. No son push (H102) ni correo: los correos siguen siendo los de la sección 10 ("Correos") y no cambian.
 
+**Son avisos del momento: plazo de 7 días.** La lista y el contador solo consideran las notificaciones de los últimos 7 días (`creado_en > now() - interval '7 days'`, con la hora de la base). Al pasar el plazo el aviso deja de verse, leído o no, pero **el pedido sigue en "Pedidos"** (`GET /pedidos`, sección 10). La fila no se borra.
+
 Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño solo ve **sus** notificaciones (`notificacion.usuario_id` = usuario del token). Un dueño que todavía no registró botica no tiene notificaciones: recibe `200` con `[]` o `{ "total": 0 }`, no 404.
 
 **Formato de una notificación:**
@@ -1315,7 +1317,7 @@ Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño 
 
 ### Cuándo se guarda
 - **Después del commit de la reserva, en una transacción aparte.** Un listener `@TransactionalEventListener(phase = AFTER_COMMIT)`, **sin `@Async`**, guarda la notificación en una transacción nueva (`@Transactional(propagation = REQUIRES_NEW)`).
-- **Si falla, la reserva o la cancelación no se ven afectadas:** ya están guardadas. El listener **captura cualquier error** y solo lo registra en el log (sin datos del comprador). No lo deja salir, porque un error lanzado después del commit le llegaría al cliente como 500 aunque la reserva sí se guardó. No se reintenta: esa reserva se queda sin su aviso, pero se ve igual en "Pedidos".
+- **Si falla, la reserva o la cancelación no se ven afectadas:** ya están guardadas. El listener **captura cualquier error** y solo lo registra en el log (sin datos del comprador). No lo deja salir, porque Spring lo atraparía (al cliente no le llega como 500) pero escribiría en el log su mensaje y toda la traza, que podrían traer datos: el listener solo registra el tipo, el id de la reserva y la clase del error. No se reintenta: esa reserva se queda sin su aviso, pero se ve igual en "Pedidos".
 - **Sin duplicados:** una sola notificación por reserva y tipo (índice único `uq_notificacion_reserva_tipo`). Si el mismo evento llegara dos veces, el segundo `insert` falla por el índice y solo queda en el log.
 - **Los correos no cambian:** siguen saliendo después del commit y en segundo plano (`AFTER_COMMIT` + `@Async`, sección 10), y no dependen de la notificación ni la notificación de ellos.
 - **De dónde sale cada una:**
@@ -1325,7 +1327,7 @@ Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño 
 - La notificación es para el dueño de la botica del producto: `reserva.producto_id → producto.botica_id → botica.usuario_id`.
 
 ### `GET /notificaciones?soloNoLeidas=true` 🔒 — H103
-Notificaciones del dueño, de la más reciente a la más antigua (por `creadoEn`, y a igual fecha por `id`), **máximo 50**. `soloNoLeidas` es opcional (por defecto `false`).
+Notificaciones del dueño **de los últimos 7 días**, de la más reciente a la más antigua (por `creadoEn`, y a igual fecha por `id`), **máximo 50**. `soloNoLeidas` es opcional (por defecto `false`).
 ```json
 // 200 OK
 [
@@ -1337,7 +1339,7 @@ Notificaciones del dueño, de la más reciente a la más antigua (por `creadoEn`
     "creadoEn": "2026-11-22T15:30:00.123456Z" }
 ]
 ```
-Sin notificaciones → `200` con `[]`.
+Sin notificaciones en ese plazo → `200` con `[]`. La consulta usa el índice `idx_notificacion_usuario_fecha`.
 Errores: 400 (`soloNoLeidas` no es `true` ni `false`), 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
 
 ### `GET /notificaciones/no-leidas/total` 🔒 — H103
@@ -1346,7 +1348,7 @@ Para el número sobre la campana. La web lo consulta **cada 30 segundos** mientr
 // 200 OK
 { "total": 3 }
 ```
-Cuenta todas las no leídas (no tiene el límite de 50). Con más de 9, la web muestra "9+".
+Cuenta las no leídas **de los últimos 7 días**, el mismo plazo que la lista: así el número nunca incluye avisos que ya no se ven. No tiene el límite de 50. Con más de 9, la web muestra "9+".
 Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
 
 ### `PATCH /notificaciones/{id}/leida` 🔒 — H103
@@ -1354,11 +1356,11 @@ Marca una notificación como leída. Responde `204` sin cuerpo, también si ya e
 Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `DUENO_BOTICA`), 404 "La notificación no existe" (no existe **o es de otro usuario**: mismo código y mismo mensaje, para no revelar si existe).
 
 ### `PATCH /notificaciones/leidas` 🔒 — H103
-Marca como leídas todas las notificaciones del dueño. Responde `204` sin cuerpo, también si no tenía ninguna sin leer.
+Marca como leídas todas las notificaciones del dueño, **también las de más de 7 días, a propósito**: ya no se ven, pero así ninguna queda pendiente en la base. Responde `204` sin cuerpo, también si no tenía ninguna sin leer.
 Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
 
 ### Inicio del dueño: alcanza con lo que ya existe
-No hace falta un endpoint de resumen. La pantalla de Inicio arma sus 4 números con endpoints que ya existen, una vez al abrirla (no cada 30 s):
+No hace falta un endpoint de resumen. La pantalla de Inicio arma sus 4 números con endpoints que ya existen, al abrirla (no cada 30 s). Solo **pedidos pendientes** y **por recoger hoy** se vuelven a pedir cuando sube el contador de no leídas (`GET /notificaciones/no-leidas/total`); stock bajo y calificación quedan como se cargaron:
 
 | Dato | Endpoint | Cómo se obtiene |
 |---|---|---|
@@ -1373,7 +1375,7 @@ Si más adelante el Inicio se vuelve lento o hace falta contar más de 100 pendi
 - `SecurityConfig`: `/notificaciones/**` con `DUENO_BOTICA`. El CORS ya permite `PATCH` (se agregó para `/pedidos`).
 - La tabla es `notificacion` (`database/v7_notificaciones.sql`). Solo la API escribe en ella; Django no la usa.
 - `ReservaCancelada` se agrega en `ReservaService.cancelar` cuando se haga el código; el cambio es mínimo y lo revisa Alexander en el PR.
-- No se borran notificaciones en este sprint: la lista solo muestra las 50 más recientes.
+- No se borran notificaciones en este sprint: la lista muestra como máximo las 50 más recientes de los últimos 7 días. Borrar las de **más de 30 días** queda para una tarea programada futura, junto con la de H84.
 
 ---
 
