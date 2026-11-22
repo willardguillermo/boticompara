@@ -1,6 +1,6 @@
 // Pedidos de la botica (sección 10 de docs/API.md)
 // H77 - Ver los pedidos de mi botica (GET /pedidos)
-// H81 - Filtrar por estado (?estado=), guardado en la URL
+// H81 - Filtrar por estado con píldoras (?estado=), guardado en la URL
 // H78 - Detalle de un pedido (ver PedidoModales)
 // H79 - Confirmar, marcar listo para recoger y entregar (PATCH /pedidos/{id}/estado)
 // H80 - Rechazar con motivo (PATCH /pedidos/{id}/rechazar)
@@ -301,16 +301,20 @@ export default function PedidosPage() {
       </div>
 
       <div className="barra-catalogo barra-pedidos">
-        <div className="campo filtro-estado">
-          <label htmlFor="filtro-estado">Estado</label>
-          <select id="filtro-estado" value={filtro} onChange={(e) => cambiarFiltro(e.target.value)}>
-            <option value="">Todos</option>
-            {Object.entries(ESTADOS_PEDIDO).map(([estado, info]) => (
-              <option key={estado} value={estado}>
-                {info.plural}
-              </option>
-            ))}
-          </select>
+        <div className="filtros-pildora" role="group" aria-label="Filtrar por estado">
+          {[['', 'Todos'], ...Object.entries(ESTADOS_PEDIDO).map(([estado, info]) => [estado, info.plural])].map(
+            ([estado, texto]) => (
+              <button
+                key={estado}
+                type="button"
+                className="pildora"
+                aria-pressed={filtro === estado}
+                onClick={() => cambiarFiltro(estado)}
+              >
+                {texto}
+              </button>
+            ),
+          )}
         </div>
         <button
           type="button"

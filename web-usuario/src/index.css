@@ -1697,8 +1697,40 @@ a {
   justify-content: space-between;
 }
 
-.filtro-estado {
-  min-width: 220px;
+/* Filtros en píldora: elevadas; la elegida queda hundida y resaltada */
+.filtros-pildora {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pildora {
+  min-height: 38px;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--color-borde-control);
+  border-radius: 999px;
+  background: var(--color-superficie);
+  box-shadow: var(--sombra-elevada-suave);
+  color: var(--color-texto-suave);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
+}
+
+.pildora:hover {
+  border-color: var(--color-primario);
+  color: var(--color-primario-oscuro);
+}
+
+.pildora[aria-pressed='true'] {
+  border-color: var(--color-primario);
+  background: var(--color-primario-suave);
+  box-shadow: var(--sombra-hundida);
+  color: var(--color-primario-oscuro);
 }
 
 /* Nueve columnas: en pantallas medianas la tabla se desplaza en vez de apretarse */
