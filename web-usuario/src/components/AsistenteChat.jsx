@@ -7,7 +7,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { useChat } from '../hooks/useChat.js'
-import { formatoDistancia, MAX_CARACTERES_CHAT, partirNumerosAyuda } from '../utils/chat.js'
+import { formatoDistancia, MAX_CARACTERES_CHAT, partirNumerosAyuda, unirPrecios } from '../utils/chat.js'
 import { formatoSoles } from '../utils/formato.js'
 import Icono from './Icono.jsx'
 import ShinyText from './reactbits/ShinyText.jsx'
@@ -22,7 +22,7 @@ const NOTA_RESPALDO = 'Respuesta resumida: el asistente estaba ocupado.'
 function TextoConTelefonos({ texto }) {
   return partirNumerosAyuda(texto).map((trozo, i) =>
     typeof trozo === 'string' ? (
-      trozo
+      unirPrecios(trozo)
     ) : (
       <a key={i} href={`tel:${trozo.telefono}`} className="chat-telefono" aria-label={`Llamar al ${trozo.telefono}`}>
         {trozo.telefono}
@@ -94,14 +94,15 @@ function Mensaje({ mensaje, onReintentar, puedeReintentar, onNavegar }) {
     <li className="chat-fila">
       <div className={`chat-burbuja chat-burbuja-asistente ${mensaje.ayuda ? 'chat-burbuja-ayuda' : ''}`}>
         <span className="sr-only">Asistente: </span>
-        {/* Texto de un modelo de IA: siempre como texto plano, nunca como HTML */}
+        {/* Texto de un modelo de IA: siempre como texto plano, nunca como HTML.
+            unirPrecios solo cambia lo que se ve: mensaje.texto (y el historial) quedan igual */}
         {mensaje.ayuda ? (
           <>
             <Icono nombre="telefono" className="chat-icono-ayuda" />
             <TextoConTelefonos texto={mensaje.texto} />
           </>
         ) : (
-          mensaje.texto
+          unirPrecios(mensaje.texto)
         )}
         {mensaje.respaldo && <p className="chat-respaldo">{NOTA_RESPALDO}</p>}
       </div>
