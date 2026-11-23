@@ -50,6 +50,8 @@ public class SecurityConfig {
                 .requestMatchers("/productos/buscar").authenticated()
                 .requestMatchers(HttpMethod.GET, "/productos/{id}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/productos/{id}/alternativas").permitAll()
+                .requestMatchers(HttpMethod.GET, "/boticas/*/resenas").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/boticas/*/resenas/mia").hasRole("COMPRADOR")
                 .requestMatchers("/boticas/**", "/productos/**").hasRole("DUENO_BOTICA")
                 .requestMatchers("/reservas/**").hasRole("COMPRADOR")
                 .requestMatchers("/pedidos/**").hasRole("DUENO_BOTICA")
