@@ -32,10 +32,10 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 |---|---|
 | 400 | Datos inválidos (validación) |
 | 401 | Sin token, token vencido o credenciales incorrectas |
-| 403 | Rol sin permiso, botica no aprobada intentando crear productos, acción no permitida por el estado de la botica, o reseña sin una reserva entregada (H85) |
+| 403 | Rol sin permiso, botica no aprobada intentando crear productos o usar el asistente, acción no permitida por el estado de la botica, reseña sin una reserva entregada (H85), o comprador sin el correo verificado intentando usar el asistente o reservar |
 | 404 | Recurso no existe o no pertenece al usuario |
 | 409 | Duplicado (correo o RUC ya registrado), o conflicto con el estado actual: cambio de estado no permitido de una reserva o pedido, stock insuficiente, reserva activa repetida, reserva de un medicamento con receta retenida (H72) |
-| 429 | Demasiados pedidos (`POST /chat`) o demasiados intentos fallidos (`POST /auth/login`, SEC-05) |
+| 429 | Demasiados pedidos (`POST /chat`, `GET /boticas/validar-ruc`, `POST /auth/registro`, `POST /auth/recuperar`) o demasiados intentos fallidos (`POST /auth/login`, SEC-05). Siempre con el header `Retry-After` (segundos) |
 | 503, 504 | El asistente no está disponible o tardó demasiado (solo `POST /chat`) |
 
 Única excepción al formato JSON: `GET /auth/verificar` responde una página HTML (ver H20).
@@ -96,8 +96,11 @@ Crea un comprador o un dueño de botica.
 { "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev", "rol": "COMPRADOR" }
 ```
 Validaciones: correo con formato válido, password de mínimo 8 caracteres, `rol` = `COMPRADOR` o `DUENO_BOTICA`. Nunca se piden datos de salud (H21).
-Tras el registro se envía un correo con un enlace de verificación (H20). El login **no** exige tener el correo verificado.
-Errores: 400, 409 (correo ya registrado).
+Tras el registro se envía un correo con un enlace de verificación (H20). El login **no** exige tener el correo verificado, pero el comprador lo necesita para usar el asistente (`POST /chat`) y para reservar (`POST /reservas`).
+
+**Límite por IP:** como máximo 5 registros por hora desde la misma IP (`auth.limite.registro-por-ip-hora`), porque cada registro envía un correo y el plan de correo tiene 100 envíos al día. Solo cuentan los registros creados: un 400 o un 409 no gastan el límite. Al pasarlo → 429 con el header `Retry-After` y el mensaje "Hiciste demasiados registros desde esta conexión. Intenta más tarde". La IP se toma igual que en el login.
+
+Errores: 400, 409 (correo ya registrado), 429 (límite por IP).
 
 ### `POST /auth/login` — H18
 ```json
@@ -132,7 +135,9 @@ Inicia la recuperación de contraseña. **Siempre responde 200**, exista o no el
 { "mensaje": "Si el correo está registrado, te enviamos las instrucciones para restablecer tu contraseña" }
 ```
 Si el correo existe, se envía un mensaje con un código de 6 dígitos. El código vence a los 15 minutos, solo sirve una vez y se invalida tras 5 intentos fallidos. Si ya se pidió uno hace menos de un minuto, no se envía otro (la respuesta sigue siendo 200). Tampoco se genera otro código si ya se generaron 3 en la última hora (la respuesta también es 200).
-Errores: 400 (falta el campo `correo`).
+
+**Límite por IP:** como máximo 5 solicitudes por hora desde la misma IP (`auth.limite.recuperar-por-ip-hora`). El límite por correo de arriba no evita que alguien pida códigos para muchas cuentas distintas y gaste los 100 correos del día. Cuentan todas las solicitudes, exista o no el correo, así el 429 no revela qué correos están registrados. Al pasarlo → 429 con el header `Retry-After` y el mensaje "Hiciste demasiadas solicitudes desde esta conexión. Intenta más tarde".
+Errores: 400 (falta el campo `correo`), 429 (límite por IP).
 
 ### `POST /auth/restablecer` — H17
 ```json
@@ -199,7 +204,9 @@ Respuesta: 204 sin cuerpo. El token usado deja de ser válido (las siguientes ll
 
 ## 3. Botica (rol `DUENO_BOTICA`)
 
-### `GET /boticas/validar-ruc/{ruc}` — H2
+### `GET /boticas/validar-ruc/{ruc}` 🔒 — H2
+Requiere sesión de `DUENO_BOTICA`: sin token → 401; con otro rol → 403. La web lo usa al registrar o corregir la botica, cuando la cuenta ya existe.
+
 Primero valida el formato y el dígito verificador. Si pasan, consulta el RUC en SUNAT (servicio Decolecta) para obtener la razón social, el estado y la condición. La web lo usa para avisar mientras se escribe y para mostrar la razón social.
 ```json
 // 200 OK — consultado en SUNAT
@@ -216,9 +223,16 @@ Primero valida el formato y el dígito verificador. Si pasan, consulta el RUC en
 `valido` es `false`, con el motivo en `mensaje`, si el formato o el dígito verificador son incorrectos (no se consulta SUNAT), si el RUC no existe en SUNAT, o si `estado` no es `ACTIVO` o `condicion` no es `HABIDO`.
 
 - `fuente`: `SUNAT` si se consultó; `LOCAL` si solo se validó el formato (RUC mal escrito, o SUNAT no respondió en 5 s o falló).
-- Sin sesión de dueño de botica (sin token o con otro rol) solo se hace la validación local (`fuente: LOCAL`), para cuidar la cuota del servicio.
 - `direccion` y `distrito`: domicilio **fiscal** que figura en SUNAT, no necesariamente el local de la botica. Son opcionales: `null` si SUNAT no los da o si `fuente` es `LOCAL`. La web los usa solo como sugerencia; `POST` y `PUT /boticas` siguen guardando la dirección que envía el dueño.
-- Cada consulta a SUNAT se guarda 24 h en memoria
+- Cada consulta a SUNAT se guarda 24 h en memoria. Una respuesta tomada de esa caché no cuenta en los límites de abajo.
+
+**Límites de consultas a SUNAT** (Decolecta da 100 consultas al mes). Cuentan solo las consultas que de verdad llegan a Decolecta: no cuentan las respuestas de la caché ni los RUC que fallan la validación local. Son los mismos contadores para `validar-ruc`, `POST /boticas` y `PUT /boticas/mia`:
+- **Por usuario:** 5 consultas por hora (`ruc.limite.por-usuario-hora`). En `validar-ruc`, al pasarlo → 429 con el header `Retry-After` y el mensaje "Consultaste demasiados RUC. Espera un momento y vuelve a intentar". En `POST /boticas` y `PUT /boticas/mia` no hay 429: se usa la validación local, igual que si SUNAT no respondiera, para no dejar al dueño sin poder registrar su botica.
+- **Global, por backend:** 10 consultas por día entre todos los usuarios (`ruc.limite.global-por-dia`), con el día de Lima. Al llegar al tope no se consulta SUNAT: se responde con la validación local (`fuente: LOCAL`, "RUC válido (no se pudo consultar SUNAT)"), igual que cuando el proveedor falla. Con 10 al día, un abuso no puede gastar más del 10 % de la cuota del mes en un día.
+- Primero se revisa el límite por usuario y después el global. Una consulta rechazada por cualquiera de los dos no cuenta en ninguno.
+- Los contadores están en memoria: se reinician a medianoche de Lima y cuando el backend se reinicia.
+
+Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`), 429 (límite por usuario).
 
 **Algoritmo del dígito verificador:**
 1. 11 dígitos numéricos; los 2 primeros deben ser `10`, `15`, `17` o `20`.
@@ -228,7 +242,7 @@ Primero valida el formato y el dígito verificador. Si pasan, consulta el RUC en
 
 ### `POST /boticas` 🔒 — H1, H2, H3
 Registra la botica del dueño logueado. Queda en estado `PENDIENTE`.
-El RUC se verifica igual que en `validar-ruc`. Si SUNAT responde, se guarda su razón social (reemplaza la enviada); si no responde, se guarda la enviada.
+El RUC se verifica igual que en `validar-ruc` y la consulta a SUNAT cuenta en los mismos límites (ver arriba). Si SUNAT responde, se guarda su razón social (reemplaza la enviada); si no responde o se llegó a un límite, se guarda la enviada.
 ```json
 // Request
 {
@@ -272,7 +286,7 @@ Errores: 400 (RUC inválido, inexistente en SUNAT, que no está `ACTIVO` o no es
 
 ### `PUT /boticas/mia` 🔒 — H7
 Corrige y reenvía una solicitud rechazada. **Solo se permite si el estado es `RECHAZADO`.** Al guardar, la botica vuelve a `PENDIENTE` y `motivoRechazo` se borra. La licencia ya subida se conserva.
-Cuerpo igual al de `POST /boticas` (incluye `latitud` y `longitud` opcionales). El RUC se verifica en SUNAT con las mismas reglas.
+Cuerpo igual al de `POST /boticas` (incluye `latitud` y `longitud` opcionales). El RUC se verifica en SUNAT con las mismas reglas y los mismos límites.
 Respuesta: 200 con el mismo formato que `GET /boticas/mia` (con `estado: "PENDIENTE"` y `motivoRechazo: null`).
 Errores: 400 (datos inválidos), 403 (el estado no es `RECHAZADO`), 404 (no tiene botica), 409 (el RUC pertenece a otra botica).
 
@@ -673,6 +687,11 @@ Asistente de texto que responde preguntas sobre BotiCompara usando los mismos da
 
 Roles: `COMPRADOR` y `DUENO_BOTICA`. El rol del token decide qué herramientas tiene el asistente (ver más abajo). El servidor no guarda la conversación: el cliente envía el historial en cada pedido.
 
+**Quién puede usarlo:** el asistente gasta la cuota de Gemini, que es una sola para todo el backend, así que se exige una cuenta comprobada:
+- `DUENO_BOTICA`: su botica debe estar `APROBADO`. Si está `PENDIENTE` o `RECHAZADO`, o todavía no registró botica → 403 "El asistente se activa cuando tu botica sea aprobada".
+- `COMPRADOR`: debe tener `correoVerificado = true` (H20). Las cuentas creadas con Google ya lo tienen. Si no → 403 "Verifica tu correo para usar el asistente".
+- Se revisa antes que las validaciones del cuerpo, y un 403 no cuenta en los límites del chat. El mensaje del 403 no lleva los números de ayuda.
+
 ```json
 // Pedido
 {
@@ -858,7 +877,7 @@ Con 900 caracteres, la respuesta del dueño cabe en un `texto` del `historial` (
 **Límite de uso:**
 - **Por usuario:** por defecto 3 preguntas por minuto y 15 por día. Al pasarlo → 429.
 - **Global, por backend:** por defecto 150 preguntas por día entre todos los usuarios (unas 450 llamadas a Gemini en el peor caso, con margen bajo los 500 pedidos por día de `gemini-3.5-flash-lite`). Al llegar al tope → 503 con "El asistente alcanzó su límite de hoy. Intenta mañana.", **sin llamar a Gemini**. Existe porque la cuota de Gemini es por proyecto, no por usuario: sin este tope, unos pocos usuarios intensivos podrían agotarla para todos.
-- Primero se revisa el límite por usuario (429) y después el global (503). Los pedidos que responden 400 o 401 no cuentan en ninguno.
+- Primero se revisa el límite por usuario (429) y después el global (503). Los pedidos que responden 400, 401 o 403 no cuentan en ninguno.
 - **Reinicio diario:** el límite propio (por usuario y global) se reinicia a medianoche de Lima. La cuota de Google se reinicia a medianoche del Pacífico: 08:00 UTC (3:00 a. m. en Lima) de noviembre a marzo, con el horario estándar de EE. UU., y 07:00 UTC (2:00 a. m. en Lima) de marzo a noviembre, con su horario de verano. Lima no cambia de hora (UTC−5).
 - Un reintento por 500 o 503 de Google (ver abajo) es un pedido más a Gemini. Es raro y el tope global deja margen: 150 preguntas × 3 llamadas = 450, 50 por debajo de los 500 del día.
 - Los tres valores son configurables en el backend: `chat.limite.por-minuto`, `chat.limite.por-dia` y `chat.limite.global-por-dia`. Con 3 llamadas a Gemini como máximo por pregunta, un usuario usa como máximo 9 de los 15 pedidos por minuto del plan gratis de `gemini-3.5-flash-lite`.
@@ -884,6 +903,8 @@ Errores:
 | 400 | `historial` con un `rol` distinto de `usuario` o `asistente`, o un `texto` vacío o de más de 1000 caracteres | "El historial no es válido" |
 | 400 | Solo una de `lat` y `lng`, o coordenadas fuera de rango | Los mismos mensajes que `GET /productos/buscar` |
 | 401 | El token no es válido o la cuenta no está habilitada (dada de baja o suspendida) | El mismo que el resto de la API |
+| 403 | Dueño cuya botica no está `APROBADO` (o sin botica) | "El asistente se activa cuando tu botica sea aprobada" |
+| 403 | Comprador sin el correo verificado | "Verifica tu correo para usar el asistente" |
 | 429 | Se pasó el límite por minuto o por día | "Hiciste muchas preguntas seguidas. Espera un minuto y vuelve a intentar. " o "Llegaste al límite de preguntas de hoy. Vuelve mañana. ", seguido de los números de ayuda |
 | 503 | Se llegó al tope global del día (`chat.limite.global-por-dia`); no se llama a Gemini | "El asistente alcanzó su límite de hoy. Intenta mañana. " seguido de los números de ayuda |
 | 503 | Gemini no responde, devuelve un error (también después del reintento), se agotó la cuota gratis del proyecto, o falta `GEMINI_API_KEY`, y no hay productos de herramientas para el respaldo | "El asistente no está disponible en este momento. Intenta más tarde. " seguido de los números de ayuda |
@@ -962,6 +983,7 @@ El comprador aparta un producto para recogerlo en la botica. La reserva **aparta
 Respuesta: 201 con la reserva (formato de arriba), en estado `PENDIENTE`.
 
 Validaciones y reglas:
+- **Correo verificado:** el comprador debe tener `correoVerificado = true` (H20); las cuentas de Google ya lo tienen. Si no → 403 "Verifica tu correo para poder reservar" y no se crea nada. Se revisa después de validar el cuerpo (400) y antes que todo lo demás. Cada reserva envía un correo al dueño: así una cuenta creada con un correo ajeno no puede gastar el cupo de correos.
 - `productoId` obligatorio. El producto debe verse en `v_producto_busqueda` con el mismo criterio que `GET /productos/{id}` (activo, con stock, botica `APROBADO`, dueño no suspendido ni dado de baja, sin medicamento oculto ni registro vencido). Si no → 404 "El producto no está disponible".
 - `cantidad` obligatoria, entero de **1 a 10** → si no, 400.
 - **Condición de venta (H72):** si el medicamento enlazado al producto es `RECETA_RETENIDA` → 409 "Este medicamento se vende con receta retenida: acércate a la botica con tu receta médica" y no se crea nada. Se revisa después del 404 y antes de calcular lo disponible. `CON_RECETA` sí se reserva (la app muestra el aviso de la receta antes de confirmar y en la reserva); `SIN_RECETA` y `null` (producto sin enlazar o sin dato) se reservan como siempre. El límite de 10 unidades y la regla de una reserva activa por producto no cambian.
@@ -973,7 +995,7 @@ Validaciones y reglas:
 - **Código de confirmación:** `BC-` seguido de 6 caracteres tomados de `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (sin `0`, `O`, `1` ni `I`, para que no se confundan al dictarlo). Se genera con `SecureRandom`; si choca con `uq_reserva_codigo` se genera otro (hasta 3 intentos). Hay 32⁶ ≈ 1 070 millones de combinaciones. El comprador lo muestra al recoger.
 - Al crearse, se avisa por correo al dueño de la botica (ver "Correos" en la sección 10).
 
-Errores: 400 (falta `productoId` o `cantidad`, o `cantidad` fuera de 1 a 10), 401 (sin token), 403 (el rol no es `COMPRADOR`), 404 (el producto no existe o no se ve), 409 (medicamento con receta retenida, cantidad mayor que la disponible, o ya tiene una reserva activa de ese producto).
+Errores: 400 (falta `productoId` o `cantidad`, o `cantidad` fuera de 1 a 10), 401 (sin token), 403 (el rol no es `COMPRADOR`, o el correo no está verificado), 404 (el producto no existe o no se ve), 409 (medicamento con receta retenida, cantidad mayor que la disponible, o ya tiene una reserva activa de ese producto).
 
 ### `GET /reservas/mias?estado=PENDIENTE` 🔒 — H76
 Historial de reservas del comprador, de la más reciente a la más antigua (por `creadoEn`), máximo 100. `estado` es opcional: sin él devuelve todas.
