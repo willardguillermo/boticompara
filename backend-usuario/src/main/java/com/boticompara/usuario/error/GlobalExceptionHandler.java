@@ -1,7 +1,9 @@
 package com.boticompara.usuario.error;
 
+import com.boticompara.usuario.limite.LimiteExcedidoException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -25,6 +27,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> api(ApiException e) {
         return responder(e.getStatus(), e.getMessage());
+    }
+
+    /** validar-ruc, registro y recuperar: 429 con los segundos de espera en Retry-After. */
+    @ExceptionHandler(LimiteExcedidoException.class)
+    public ResponseEntity<ErrorResponse> limite(LimiteExcedidoException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getReintentarEnSegundos()))
+                .body(ErrorResponse.de(HttpStatus.TOO_MANY_REQUESTS, e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

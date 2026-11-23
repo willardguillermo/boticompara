@@ -1,6 +1,7 @@
 package com.boticompara.usuario.security;
 
 import com.boticompara.usuario.auth.LimitadorLogin;
+import com.boticompara.usuario.limite.LimitesPorIp;
 import com.boticompara.usuario.controller.AuthController;
 import com.boticompara.usuario.controller.UsuarioController;
 import com.boticompara.usuario.dto.PerfilResponse;
@@ -42,7 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * funcionando: login con contraseña, login con Google y JWT. La base y Firebase se simulan.
  */
 @WebMvcTest({AuthController.class, UsuarioController.class})
-@Import({SecurityConfig.class, SecurityErrorHandler.class, JwtService.class, AuthService.class, LimitadorLogin.class})
+@Import({SecurityConfig.class, SecurityErrorHandler.class, JwtService.class, AuthService.class, LimitadorLogin.class,
+        LimitesPorIp.class})
 @TestPropertySource(properties = "jwt.secret=secreto-de-prueba-con-mas-de-treinta-y-dos-caracteres")
 class SinUsuarioPorDefectoTest {
 

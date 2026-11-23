@@ -7,6 +7,7 @@ import com.boticompara.usuario.dto.RecuperarRequest;
 import com.boticompara.usuario.dto.RegistroRequest;
 import com.boticompara.usuario.dto.RestablecerRequest;
 import com.boticompara.usuario.dto.UsuarioResponse;
+import com.boticompara.usuario.limite.LimitesPorIp;
 import com.boticompara.usuario.service.AuthService;
 import com.boticompara.usuario.service.RecuperacionService;
 import com.boticompara.usuario.service.VerificacionService;
@@ -27,12 +28,24 @@ public class AuthController {
     private final AuthService auth;
     private final RecuperacionService recuperacion;
     private final VerificacionService verificacion;
+    private final LimitesPorIp limites;
 
-    /** H1, H15, H20: el registro se guarda primero; el correo de verificación se manda después y nunca lo hace fallar. */
+    /**
+     * H1, H15, H20: el registro se guarda primero; el correo de verificación se manda después y nunca lo hace fallar.
+     * Como cada registro envía un correo, hay un límite por IP (429). Si el registro falla (400, 409), no cuenta.
+     */
     @PostMapping("/registro")
     @ResponseStatus(HttpStatus.CREATED)
-    public UsuarioResponse registro(@Valid @RequestBody RegistroRequest request) {
-        UsuarioResponse nuevo = auth.registrar(request);
+    public UsuarioResponse registro(@Valid @RequestBody RegistroRequest request, HttpServletRequest http) {
+        String ip = http.getRemoteAddr();
+        limites.consumirRegistro(ip);
+        UsuarioResponse nuevo;
+        try {
+            nuevo = auth.registrar(request);
+        } catch (RuntimeException e) {
+            limites.devolverRegistro(ip);
+            throw e;
+        }
         verificacion.enviarAlRegistrarse(nuevo.id());
         return nuevo;
     }
@@ -49,9 +62,10 @@ public class AuthController {
         return auth.login(request, http.getRemoteAddr());
     }
 
-    /** H17: siempre responde 200, exista o no el correo. */
+    /** H17: responde 200 exista o no el correo. El límite por IP (429) cuenta todas las solicitudes, así no revela nada. */
     @PostMapping("/recuperar")
-    public MensajeResponse recuperar(@Valid @RequestBody RecuperarRequest request) {
+    public MensajeResponse recuperar(@Valid @RequestBody RecuperarRequest request, HttpServletRequest http) {
+        limites.consumirRecuperar(http.getRemoteAddr());
         recuperacion.solicitar(request.correo());
         return new MensajeResponse(
                 "Si el correo está registrado, te enviamos las instrucciones para restablecer tu contraseña");
