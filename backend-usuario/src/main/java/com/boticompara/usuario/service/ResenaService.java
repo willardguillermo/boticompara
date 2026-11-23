@@ -100,7 +100,7 @@ public class ResenaService {
             r.setUsuarioId(usuarioId);
             r.setBoticaId(boticaId);
         }
-        // ... validaciones y armado de r, igual que ahora ...
+
         r.setEstrellas(estrellas.shortValue());
         r.setComentario(comentario);
         // La respuesta del dueño (H88) se conserva al actualizar; no se toca aquí
