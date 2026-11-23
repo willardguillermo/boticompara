@@ -286,7 +286,7 @@ private fun TarjetaResena(resena: ResenaResponse) {
                 IconoCircular(icono = Icons.Rounded.Edit, tamano = 40.dp)
                 Spacer(Modifier.width(Dimens.Space12))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(resena.autor, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(ReglasResena.autorVisible(resena), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Estrellas(estrellas = resena.estrellas)
                 }
                 Text(

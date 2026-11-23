@@ -5,9 +5,14 @@ data class ResenaRequest(
     val comentario: String? = null
 )
 
+/**
+ * Sirve para los dos formatos de API.md (sección 11): el de la lista trae autor y no trae
+ * boticaId ni oculta; el de PUT /boticas/{id}/resenas/mia y miResena es al revés.
+ * Por eso esos tres campos son nulables: Gson deja null lo que no viene.
+ */
 data class ResenaResponse(
     val id: Long,
-    val autor: String,
+    val autor: String? = null,
     val estrellas: Int,
     val comentario: String? = null,
     val respuesta: String? = null,

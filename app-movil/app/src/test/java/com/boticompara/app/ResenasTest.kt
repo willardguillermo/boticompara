@@ -4,6 +4,7 @@ import com.boticompara.app.data.remote.dto.ResenaResponse
 import com.boticompara.app.data.remote.dto.ResenasResponse
 import com.boticompara.app.data.repository.ErroresResena
 import com.boticompara.app.ui.resenas.ReglasResena
+import com.google.gson.Gson
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -119,5 +120,42 @@ class ResenasTest {
             listOf(resena(2), resena(3))
         )
         assertEquals(listOf(1L, 2L, 3L), resultado.map { it.id })
+    }
+
+    @Test
+    fun laRespuestaDelPutSinAutorSeLeeSinFallar() {
+        // Formato de PUT /boticas/{id}/resenas/mia (API.md, sección 11): no trae autor
+        val json = """
+            {"id":8,"boticaId":2,"estrellas":4,"comentario":"Me atendieron rápido",
+             "respuesta":null,"respondidaEn":null,"oculta":false,
+             "creadoEn":"2026-11-13T18:20:00.123456Z","actualizadoEn":"2026-11-13T18:20:00.123456Z"}
+        """.trimIndent()
+        val r = Gson().fromJson(json, ResenaResponse::class.java)
+        assertNull(r.autor)
+        assertEquals(2L, r.boticaId)
+        assertEquals(false, r.oculta)
+        assertEquals("Comprador", ReglasResena.autorVisible(r))
+    }
+
+    @Test
+    fun miResenaSinAutorYLaListaConAutorSeLeenBien() {
+        val json = """
+            {"boticaId":2,"promedio":4.3,"total":1,"page":0,"totalPages":1,
+             "resenas":[{"id":8,"autor":"Carlos R.","estrellas":4,"comentario":null,"respuesta":null,
+                         "respondidaEn":null,"creadoEn":"2026-11-13T18:20:00Z","actualizadoEn":"2026-11-13T18:20:00Z"}],
+             "miResena":{"id":8,"boticaId":2,"estrellas":4,"comentario":null,"respuesta":null,
+                         "respondidaEn":null,"oculta":true,"creadoEn":"2026-11-13T18:20:00Z",
+                         "actualizadoEn":"2026-11-13T18:20:00Z"}}
+        """.trimIndent()
+        val d = Gson().fromJson(json, ResenasResponse::class.java)
+        assertEquals("Carlos R.", ReglasResena.autorVisible(d.resenas.first()))
+        assertNull(d.miResena?.autor)
+        assertEquals(true, d.miResena?.oculta)
+    }
+
+    @Test
+    fun unAutorVacioNoDejaLaTarjetaSinNombre() {
+        assertEquals("Comprador", ReglasResena.autorVisible(resena(1).copy(autor = "  ")))
+        assertEquals("Carlos R.", ReglasResena.autorVisible(resena(1)))
     }
 }

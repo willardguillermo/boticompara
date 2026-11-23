@@ -34,6 +34,10 @@ object ReglasResena {
         return "$promedioTexto · ${textoCantidad(total)}"
     }
 
+    /** El backend siempre manda autor en la lista; si faltara, la tarjeta no queda vacía. */
+    fun autorVisible(resena: ResenaResponse): String =
+        resena.autor?.takeIf { it.isNotBlank() } ?: "Comprador"
+
     fun textoEstrellas(estrellas: Int): String = "$estrellas de 5 estrellas"
 
     fun estrellasDePromedio(promedio: Double?): Int =
