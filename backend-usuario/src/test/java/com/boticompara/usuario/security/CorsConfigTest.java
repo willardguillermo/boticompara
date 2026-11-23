@@ -1,5 +1,6 @@
 package com.boticompara.usuario.security;
 
+import com.boticompara.usuario.BaseDePrueba;
 import com.boticompara.usuario.service.AuthService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
+/** Levanta la aplicación completa, que necesita la base. Sin base configurada, la clase se omite. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "CORS_ORIGINS=https://boticompara.vercel.app,http://localhost:5173")
@@ -22,6 +24,10 @@ class CorsConfigTest {
 
     @MockitoBean
     AuthService authService;
+
+    CorsConfigTest() {
+        BaseDePrueba.exigir();
+    }
 
     @Test
     void unOrigenPermitidoRecibeLaCabeceraDeCors() throws Exception {
