@@ -7,17 +7,26 @@ import com.boticompara.usuario.dto.RucResponse;
 import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
+import com.boticompara.usuario.repository.UsuarioRepository;
 import com.boticompara.usuario.util.RucValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Normalizer;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+
 @Service
 @RequiredArgsConstructor
 public class BoticaService {
 
+    private static final String APROBADO = "APROBADO";
+
     private final BoticaRepository boticas;
     private final RucSunatService rucSunat;
+    private final UsuarioRepository usuarios;
 
     /** H1, H2, H3: la botica queda PENDIENTE hasta que el admin la apruebe en Django. */
     @Transactional
@@ -30,11 +39,11 @@ public class BoticaService {
         if (boticas.existsByUsuarioId(usuarioId)) {
             throw ApiException.conflict("Ya tienes una botica registrada");
         }
-        if (boticas.existsByRuc(ruc)) {
-            throw ApiException.conflict("El RUC ya está registrado");
-        }
+        exigirRucLibre(ruc);
         // SUNAT al final: no se gasta cuota en registros que igual se rechazarían
-        String razonSocial = razonSocial(r, rucSunat.exigirValido(ruc));
+        RucResponse sunat = rucSunat.exigirValido(ruc);
+        exigirTitular(usuarioId, ruc, sunat);
+        String razonSocial = razonSocial(r, sunat);
         Botica b = new Botica();
         b.setUsuarioId(usuarioId);
         aplicar(b, r, ruc, razonSocial);
@@ -58,11 +67,12 @@ public class BoticaService {
             throw ApiException.badRequest("El RUC no es válido");
         }
         validarUbicacion(r);
-        // Conservar su propio RUC no es un duplicado; solo importa si cambió
-        if (!ruc.equals(b.getRuc()) && boticas.existsByRuc(ruc)) {
-            throw ApiException.conflict("El RUC ya está registrado");
-        }
-        String razonSocial = razonSocial(r, rucSunat.exigirValido(ruc));
+        // Su botica está RECHAZADO, así que nunca choca consigo misma: aunque conserve su RUC,
+        // se revisa por si otra cuenta lo acreditó mientras tanto
+        exigirRucLibre(ruc);
+        RucResponse sunat = rucSunat.exigirValido(ruc);
+        exigirTitular(usuarioId, ruc, sunat);
+        String razonSocial = razonSocial(r, sunat);
         aplicar(b, r, ruc, razonSocial);
         b.setEstado("PENDIENTE");
         b.setMotivoRechazo(null);
@@ -79,6 +89,51 @@ public class BoticaService {
     public Botica obtenerMia(Long usuarioId) {
         return boticas.findByUsuarioId(usuarioId)
                 .orElseThrow(() -> ApiException.notFound("Aún no registraste tu botica"));
+    }
+
+    /**
+     * A5: el RUC solo se reserva al aprobar la botica. Varias cuentas pueden tener solicitudes PENDIENTE o
+     * RECHAZADO con el mismo RUC; solo choca con una botica APROBADO (uq_botica_ruc_aprobado en la BD).
+     */
+    private void exigirRucLibre(String ruc) {
+        if (boticas.existsByRucAndEstado(ruc, APROBADO)) {
+            throw ApiException.conflict("El RUC ya está registrado");
+        }
+    }
+
+    /**
+     * A7: un RUC 10 o 15 es de una persona natural; la cuenta debe estar a su nombre. Cada palabra del nombre
+     * de la cuenta debe aparecer en el nombre que da SUNAT, sin importar tildes, mayúsculas ni orden.
+     * Si SUNAT no respondió (no hay nombre) no se bloquea. Los RUC 17 y 20 no se revisan.
+     */
+    private void exigirTitular(Long usuarioId, String ruc, RucResponse sunat) {
+        if (!esDePersona(ruc) || sunat.razonSocial() == null || sunat.razonSocial().isBlank()) {
+            return;
+        }
+        String nombreCuenta = usuarios.findById(usuarioId).map(u -> u.getNombre()).orElse("");
+        if (!nombreCoincide(nombreCuenta, sunat.razonSocial())) {
+            throw ApiException.badRequest("Este RUC pertenece a una persona: la cuenta debe estar a nombre "
+                    + "del titular (según SUNAT: " + sunat.razonSocial().trim() + ")");
+        }
+    }
+
+    static boolean esDePersona(String ruc) {
+        return ruc.startsWith("10") || ruc.startsWith("15");
+    }
+
+    /** A7: true si cada palabra de la cuenta está entre las del titular. Una cuenta sin palabras no coincide. */
+    static boolean nombreCoincide(String nombreCuenta, String titular) {
+        List<String> palabrasCuenta = palabras(nombreCuenta);
+        List<String> palabrasTitular = palabras(titular);
+        return !palabrasCuenta.isEmpty() && palabrasTitular.containsAll(palabrasCuenta);
+    }
+
+    /** Sin tildes (la Ñ queda como N en los dos lados), en mayúsculas, separadas por lo que no es letra o número. */
+    private static List<String> palabras(String texto) {
+        String sinTildes = Normalizer.normalize(texto == null ? "" : texto, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toUpperCase(Locale.ROOT);
+        return Arrays.stream(sinTildes.split("[^\\p{L}\\p{N}]+")).filter(p -> !p.isEmpty()).toList();
     }
 
     /** H2: la razón social de SUNAT reemplaza a la enviada; si SUNAT no respondió, se usa la enviada. */
