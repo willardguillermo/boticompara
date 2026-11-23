@@ -36,22 +36,23 @@ La rama de producción es `main`. Cada PR genera además una vista previa con ot
 
 | Variable | Valor | ¿Obligatoria? |
 |---|---|---|
-| `VITE_API_URL` | `https://TU-BACKEND.onrender.com/api` (con `/api`, sin `/` al final) | **Sí.** Sin ella la web llama a `http://localhost:8080/api` |
+| `VITE_API_URL` | `https://boticompara-api.onrender.com/api` (con `/api`, sin `/` al final) | **Sí.** Sin ella la web llama a `http://localhost:8080/api` |
 | `VITE_USE_MOCK` | `false` | No. En un build de producción el simulador nunca entra, aunque diga `true`; se pone para que quede claro |
 
 - Se leen **al construir**: si cambias una, hay que volver a desplegar (**Deployments → ⋯ → Redeploy**).
 - Todo lo que empieza con `VITE_` queda visible en el navegador: **nunca** pongas aquí claves ni contraseñas. La web no necesita ninguna.
 
-## 4. CSP: qué cambiar cuando exista la URL de Render
+## 4. CSP: el origen del backend en Render
 
-En `web-usuario/vercel.json`, en `Content-Security-Policy`, cambia el **primer** origen de `connect-src`:
+El backend está en **`https://boticompara-api.onrender.com`** (`GET /api/salud` → `{"estado":"OK"}`), así que en
+`web-usuario/vercel.json`, en `Content-Security-Policy`, el **primer** origen de `connect-src` ya es ese
+(antes era el marcador `https://backend-pendiente.invalid`):
 
 ```
-connect-src https://backend-pendiente.invalid https://nominatim.openstreetmap.org
-            └── cambiar por https://TU-BACKEND.onrender.com
+connect-src https://boticompara-api.onrender.com https://nominatim.openstreetmap.org
 ```
 
-Solo el origen: `https://`, sin `/api` y sin `/` al final. `vercel.json` no puede leer variables de entorno, así que se
+Si el backend cambia de URL, se reemplaza ese origen. Solo el origen: `https://`, sin `/api` y sin `/` al final. `vercel.json` no puede leer variables de entorno, así que se
 cambia con un commit. Mantén el backend en el primer lugar: `npm run preview` lo reemplaza por el de tu `.env`.
 
 | Directiva | Permite | Por qué |
