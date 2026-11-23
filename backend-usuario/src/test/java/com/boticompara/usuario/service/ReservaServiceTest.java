@@ -5,10 +5,12 @@ import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.EstadoReserva;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.entity.Reserva;
+import com.boticompara.usuario.entity.Usuario;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
 import com.boticompara.usuario.repository.ReservaRepository;
+import com.boticompara.usuario.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +36,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,6 +56,7 @@ class ReservaServiceTest {
     ApplicationEventPublisher eventos;
 
     @Mock CondicionVentaService condiciones;
+    @Mock UsuarioRepository usuarios;
 
 
     ReservaService service;
@@ -60,7 +64,45 @@ class ReservaServiceTest {
     @BeforeEach
     void preparar() {
 
-        service = new ReservaService(productos, boticas, reservas, busqueda, eventos, condiciones);
+        service = new ReservaService(productos, boticas, reservas, busqueda, eventos, condiciones, usuarios);
+        // Por defecto el comprador ya verificó su correo
+        lenient().when(usuarios.findById(USUARIO)).thenReturn(Optional.of(comprador(true)));
+    }
+
+    private static Usuario comprador(boolean verificado) {
+        Usuario u = new Usuario();
+        u.setId(USUARIO);
+        u.setCorreoVerificado(verificado);
+        return u;
+    }
+
+    @Test
+    void crear_sinCorreoVerificado_403SinTocarNada() {
+        when(usuarios.findById(USUARIO)).thenReturn(Optional.of(comprador(false)));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+        assertEquals("Verifica tu correo para poder reservar", ex.getMessage());
+        verifyNoInteractions(busqueda, productos, reservas, eventos);
+    }
+
+    @Test
+    void crear_usuarioQueNoExiste_403() {
+        when(usuarios.findById(USUARIO)).thenReturn(Optional.empty());
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+    }
+
+    @Test
+    void crear_cantidadInvalida_el400VaAntesQueEl403() {
+        lenient().when(usuarios.findById(USUARIO)).thenReturn(Optional.of(comprador(false)));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 0));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
     }
 
     private Producto producto(int stock) {
