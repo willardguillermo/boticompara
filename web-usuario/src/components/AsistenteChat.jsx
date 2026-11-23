@@ -259,16 +259,26 @@ function PanelChat({ chat, onCerrar }) {
   )
 }
 
-/** Botón de la cabecera + panel. La conversación se mantiene mientras la página siga abierta. */
-export default function AsistenteChat() {
+/**
+ * Botón de la cabecera + panel. La conversación se conserva hasta 10 minutos
+ * después de cerrar el panel, también al recargar la página (H69).
+ */
+export default function AsistenteChat({ usuarioId }) {
   const [abierto, setAbierto] = useState(false)
-  const chat = useChat()
+  const chat = useChat({ usuarioId })
+  const { alAbrir, alCerrar } = chat
   const boton = useRef(null)
 
+  const abrir = () => {
+    alAbrir()
+    setAbierto(true)
+  }
+
   const cerrar = useCallback(() => {
+    alCerrar()
     setAbierto(false)
     boton.current?.focus()
-  }, [])
+  }, [alCerrar])
 
   return (
     <>
@@ -278,7 +288,7 @@ export default function AsistenteChat() {
         className={`btn btn-icono ${abierto ? 'btn-primario' : 'btn-secundario'}`}
         aria-haspopup="dialog"
         aria-expanded={abierto}
-        onClick={() => (abierto ? cerrar() : setAbierto(true))}
+        onClick={() => (abierto ? cerrar() : abrir())}
       >
         <Icono nombre="chat" /> <span className="texto-asistente">Asistente</span>
       </button>
