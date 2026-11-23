@@ -34,7 +34,7 @@ public class BoticaService {
             throw ApiException.conflict("El RUC ya está registrado");
         }
         // SUNAT al final: no se gasta cuota en registros que igual se rechazarían
-        String razonSocial = razonSocial(r, rucSunat.exigirValido(ruc));
+        String razonSocial = razonSocial(r, rucSunat.exigirValido(ruc, usuarioId));
         Botica b = new Botica();
         b.setUsuarioId(usuarioId);
         aplicar(b, r, ruc, razonSocial);
@@ -62,7 +62,7 @@ public class BoticaService {
         if (!ruc.equals(b.getRuc()) && boticas.existsByRuc(ruc)) {
             throw ApiException.conflict("El RUC ya está registrado");
         }
-        String razonSocial = razonSocial(r, rucSunat.exigirValido(ruc));
+        String razonSocial = razonSocial(r, rucSunat.exigirValido(ruc, usuarioId));
         aplicar(b, r, ruc, razonSocial);
         b.setEstado("PENDIENTE");
         b.setMotivoRechazo(null);
