@@ -695,9 +695,26 @@ class BoticaAdmin(admin.ModelAdmin):
     @admin.action(description='Aprobar boticas seleccionadas', permissions=['change'])
     def aprobar_boticas(self, request, queryset):
         # Solo las que realmente cambian de estado reciben el correo (H6) y quedan en el historial (H47)
-        aprobadas = revision.revisar(queryset.values('pk'), Botica.Estado.APROBADO, request.user.get_username(),
-                                     si_falla_correo=lambda b: self._aviso_correo(request, b))
+        try:
+            aprobadas = revision.revisar(queryset.values('pk'), Botica.Estado.APROBADO, request.user.get_username(),
+                                         si_falla_correo=lambda b: self._aviso_correo(request, b))
+        except revision.RucYaAprobado as e:
+            self.message_user(request, f'No se aprobó ninguna botica. {e}', messages.ERROR)
+            return
         self.message_user(request, f'{len(aprobadas)} botica(s) aprobada(s).', messages.SUCCESS)
+        self._aviso_rechazadas_por_ruc(request, aprobadas)
+
+    def _aviso_rechazadas_por_ruc(self, request, revisadas):
+        """A5: las PENDIENTE con el mismo RUC que se rechazaron solas al aprobar."""
+        rechazadas = getattr(revisadas, 'rechazadas_por_ruc', ())
+        if rechazadas:
+            nombres = ', '.join(f'{b.nombre_comercial} ({b.usuario.correo})' for b in rechazadas)
+            self.message_user(
+                request,
+                f'Se rechazaron {len(rechazadas)} solicitud(es) pendiente(s) con el mismo RUC, con el motivo '
+                f'«{revision.MOTIVO_RUC_ACREDITADO}»: {nombres}.',
+                messages.INFO,
+            )
 
     def _aviso_correo(self, request, botica):
         self.message_user(
@@ -716,10 +733,18 @@ class BoticaAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         # Aprobar o rechazar con el select "estado" pasa por la misma función que la acción y los botones.
         # Si no hay cambio de estado (o pasa a PENDIENTE), solo se guarda lo del formulario, sin historial.
-        if obj.estado in revision.ESTADOS_REVISADOS and revision.revisar(
-                [obj.pk], obj.estado, request.user.get_username(), motivo=obj.motivo_rechazo,
-                si_falla_correo=lambda b: self._aviso_correo(request, b)):
-            return
+        if obj.estado in revision.ESTADOS_REVISADOS:
+            try:
+                revisadas = revision.revisar([obj.pk], obj.estado, request.user.get_username(),
+                                             motivo=obj.motivo_rechazo,
+                                             si_falla_correo=lambda b: self._aviso_correo(request, b))
+            except revision.RucYaAprobado as e:
+                # El formulario ya lo revisa; esto es si otro administrador aprobó el mismo RUC a la vez
+                self.message_user(request, f'No se guardó el cambio de estado. {e}', messages.ERROR)
+                return
+            if revisadas:
+                self._aviso_rechazadas_por_ruc(request, revisadas)
+                return
         # Solo se escribe la revisión, para no pisar datos que el dueño
         # haya cambiado desde la web mientras el admin tenía el formulario abierto
         obj.save(update_fields=['estado', 'motivo_rechazo'])
@@ -804,17 +829,32 @@ class BoticaAdmin(admin.ModelAdmin):
         botica, respuesta = self._botica_para(request, object_id, revision.PUEDE_APROBAR, self.REQUISITO_APROBAR)
         if respuesta:
             return respuesta
+        # A5: si otra cuenta ya acreditó este RUC, ni se pide confirmar
+        aprobada = revision.aprobada_con_ruc(botica)
+        if aprobada:
+            messages.error(request, revision.mensaje_ruc_aprobado(botica.ruc, aprobada))
+            return redirect(self.url_detalle(botica))
         if request.method == 'POST':
-            cambiadas = revision.revisar([botica.pk], Botica.Estado.APROBADO, request.user.get_username(),
-                                         desde=revision.PUEDE_APROBAR,
-                                         si_falla_correo=lambda b: self._aviso_correo(request, b))
-            return self._resultado(request, botica, cambiadas,
-                                   f'Se aprobó la botica {botica.nombre_comercial}. Sus productos ya aparecen '
-                                   'en las búsquedas.', self.REQUISITO_APROBAR)
+            try:
+                cambiadas = revision.revisar([botica.pk], Botica.Estado.APROBADO, request.user.get_username(),
+                                             desde=revision.PUEDE_APROBAR,
+                                             si_falla_correo=lambda b: self._aviso_correo(request, b))
+            except revision.RucYaAprobado as e:
+                messages.error(request, str(e))
+                return redirect(self.url_detalle(botica))
+            respuesta = self._resultado(request, botica, cambiadas,
+                                        f'Se aprobó la botica {botica.nombre_comercial}. Sus productos ya aparecen '
+                                        'en las búsquedas.', self.REQUISITO_APROBAR)
+            self._aviso_rechazadas_por_ruc(request, cambiadas)
+            return respuesta
+        otras = Botica.objects.filter(ruc=botica.ruc, estado=Botica.Estado.PENDIENTE).exclude(pk=botica.pk).count()
+        aviso = ('Sus productos aparecerán en las búsquedas de la app y el dueño recibirá un '
+                 'correo. Revisa antes la licencia y la ubicación en la ficha.')
+        if otras:
+            aviso += (f' Hay {otras} solicitud(es) pendiente(s) más con el RUC {botica.ruc}: se rechazarán con el '
+                      f'motivo «{revision.MOTIVO_RUC_ACREDITADO}» y sus dueños recibirán el correo.')
         return self._pagina(request, botica, None, f'¿Aprobar la botica {botica.nombre_comercial}?',
-                            'Sí, aprobar botica',
-                            aviso='Sus productos aparecerán en las búsquedas de la app y el dueño recibirá un '
-                                  'correo. Revisa antes la licencia y la ubicación en la ficha.')
+                            'Sí, aprobar botica', aviso=aviso)
 
     def rechazar_view(self, request, object_id):
         botica, respuesta = self._botica_para(request, object_id, revision.PUEDE_RECHAZAR, self.REQUISITO_RECHAZAR)

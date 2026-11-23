@@ -72,7 +72,8 @@ class Botica(models.Model):
         verbose_name='dueño',
     )
     nombre_comercial = models.CharField(max_length=150)
-    ruc = models.CharField('RUC', max_length=11, unique=True)
+    # A5: no es único en toda la tabla, solo entre las APROBADO (ver Meta.constraints)
+    ruc = models.CharField('RUC', max_length=11, db_index=True)
     razon_social = models.CharField('razón social', max_length=200)
     direccion = models.CharField('dirección', max_length=255)
     distrito = models.CharField(max_length=100)
@@ -91,6 +92,12 @@ class Botica(models.Model):
         ordering = ['-creado_en']
         verbose_name = 'botica'
         verbose_name_plural = 'boticas'
+        # Igual que uq_botica_ruc_aprobado de schema.sql. Django no la crea en la BD (managed = False),
+        # pero sí en la base de las pruebas
+        constraints = [
+            models.UniqueConstraint(fields=['ruc'], condition=models.Q(estado='APROBADO'),
+                                    name='uq_botica_ruc_aprobado'),
+        ]
 
     def __str__(self):
         return f'{self.nombre_comercial} ({self.ruc})'
