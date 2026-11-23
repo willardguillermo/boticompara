@@ -96,7 +96,8 @@ export default function LoginPage() {
               ¿Tienes una botica y aún no tienes cuenta? <Link to="/registro">Regístrate</Link>
             </p>
 
-            {MODO_SIMULADO && (
+            {/* Con DEV directo el build de producción quita este bloque y su contraseña de prueba */}
+            {import.meta.env.DEV && MODO_SIMULADO && (
               <div className="datos-prueba">
                 <Alerta tipo="info">
                   <p>
