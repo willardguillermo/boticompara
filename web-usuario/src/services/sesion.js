@@ -1,4 +1,6 @@
 // Token y usuario en localStorage (sobreviven a recargar la página)
+import { borrarConversacion } from '../utils/chatGuardado.js'
+
 const CLAVE_TOKEN = 'boticompara.token'
 const CLAVE_USUARIO = 'boticompara.usuario'
 
@@ -34,4 +36,6 @@ export function borrarSesion() {
   } catch {
     // sin almacenamiento disponible: no hay nada que borrar
   }
+  // H69: la conversación del asistente no debe verla otro dueño en la misma computadora
+  borrarConversacion()
 }

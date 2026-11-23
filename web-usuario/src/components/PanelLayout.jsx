@@ -41,7 +41,8 @@ function Cabecera() {
           <span className="nombre-usuario texto-suave">{usuario.nombre}</span>
           <BotonTema />
           <Campana />
-          <AsistenteChat />
+          {/* key: si cambia el usuario, el chat empieza de cero */}
+          <AsistenteChat key={usuario.id} usuarioId={usuario.id} />
           <button type="button" className="btn btn-secundario btn-icono" onClick={cerrarSesion}>
             {/* En celular solo se ve el ícono; el texto queda para el lector de pantalla */}
             <Icono nombre="salir" /> <span className="texto-escritorio">Salir</span>
