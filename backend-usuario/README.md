@@ -70,6 +70,7 @@ Detalle completo, con ejemplos de petición y respuesta, en [`../docs/API.md`](.
 | | `GET /productos/{id}` | H28 | Público |
 | | `GET /productos/{id}/alternativas` | H36, H37, H38, H41, H42 | Público |
 | Alertas | `GET /alertas`, `GET /alertas/resumen`, `PUT /alertas/{id}/leida`, `PUT /alertas/leidas` | H59 | 🔒 cualquier rol |
+| Notificaciones | `GET /notificaciones?soloNoLeidas=`, `GET /notificaciones/no-leidas/total`, `PATCH /notificaciones/{id}/leida`, `PATCH /notificaciones/leidas` | H103 | 🔒 dueño |
 | Favoritos | `POST /favoritos`, `GET /favoritos`, `DELETE /favoritos/{productoId}` | H43, H44 | 🔒 cualquier rol |
 | | `PUT /favoritos/{productoId}/precio-objetivo` | H60 | 🔒 cualquier rol |
 | Asistente | `POST /chat` | H68 | 🔒 comprador y dueño |

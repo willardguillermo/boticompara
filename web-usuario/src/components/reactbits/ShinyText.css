@@ -1,0 +1,25 @@
+/*
+ * Origen: React Bits (https://reactbits.dev), componente "ShinyText", variante JS-CSS.
+ * Licencia: MIT + Commons Clause, (c) 2026 David Haz. Texto completo en ./LICENSE.md.
+ */
+.shiny-text {
+  position: relative;
+  display: inline-block;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.shiny-text__glow {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: blur(0.14em);
+  pointer-events: none;
+  user-select: none;
+}

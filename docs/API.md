@@ -35,7 +35,7 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 | 403 | Rol sin permiso, botica no aprobada intentando crear productos, acción no permitida por el estado de la botica, o reseña sin una reserva entregada (H85) |
 | 404 | Recurso no existe o no pertenece al usuario |
 | 409 | Duplicado (correo o RUC ya registrado), o conflicto con el estado actual: cambio de estado no permitido de una reserva o pedido, stock insuficiente, reserva activa repetida, reserva de un medicamento con receta retenida (H72) |
-| 429 | Demasiados pedidos (solo `POST /chat`) |
+| 429 | Demasiados pedidos (`POST /chat`) o demasiados intentos fallidos (`POST /auth/login`, SEC-05) |
 | 503, 504 | El asistente no está disponible o tardó demasiado (solo `POST /chat`) |
 
 Única excepción al formato JSON: `GET /auth/verificar` responde una página HTML (ver H20).
@@ -788,7 +788,14 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 }
 ```
 
-**`respuesta`:** texto plano en español, sin markdown, sin listas ni enlaces, de hasta 600 caracteres. Está pensada para leerse en voz alta (H71): los precios van escritos como se dicen.
+**`respuesta`:** texto plano en español, sin markdown ni enlaces. Depende del rol:
+
+| Rol | Formato |
+|---|---|
+| `COMPRADOR` | Una sola línea, sin listas, de hasta 600 caracteres. Está pensada para leerse en voz alta en la app (H71): los precios van escritos como se dicen ("2 soles con 50"). |
+| `DUENO_BOTICA` | Hasta 900 caracteres. Puede traer saltos de línea (`\n`) y, si el dueño pide una lista, hasta 8 líneas que empiezan con `- `. Los precios van como `S/ 8.50`. La web la muestra respetando los saltos de línea. |
+
+Con 900 caracteres, la respuesta del dueño cabe en un `texto` del `historial` (máximo 1000), así que el cliente la puede reenviar sin cambios.
 
 **`respaldo`:** `false` en una respuesta normal. `true` cuando el texto no lo escribió Gemini sino el servidor, porque la llamada final falló o no llegó a tiempo (ver "Tiempos y respuesta de respaldo").
 
@@ -807,19 +814,29 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 
 | Herramienta | Rol | Para qué sirve | Parámetros que da el modelo | Servicio que usa |
 |---|---|---|---|---|
-| `buscar_precios` | `COMPRADOR`, `DUENO_BOTICA` | Buscar un medicamento en las boticas aprobadas y comparar precios | `texto` (mínimo 2 caracteres), `tipo` (`nombre` o `principio`), `cerca` (`true` = de la botica más cercana a la más lejana; solo si el pedido trae ubicación) | `BusquedaService.buscar` (`GET /productos/buscar`, vista `v_producto_busqueda`) |
+| `buscar_precios` | `COMPRADOR`, `DUENO_BOTICA` | Buscar un medicamento en las boticas aprobadas y comparar precios | `texto` (mínimo 2 caracteres), `cerca` (`true` = de la botica más cercana a la más lejana; solo si el pedido trae ubicación) | `BusquedaService.buscar` (`GET /productos/buscar`, vista `v_producto_busqueda`), dos veces: por nombre comercial y por principio activo. Ver "Cómo busca `buscar_precios`" |
 | `buscar_alternativas` | `COMPRADOR`, `DUENO_BOTICA` | Equivalentes más baratos de un producto que ya salió en una búsqueda | `productoId` | `AlternativasService.alternativas` (`GET /productos/{id}/alternativas`) |
 | `ver_stock_bajo` | `DUENO_BOTICA` | Productos de su botica con `stock <= stockMinimo` | ninguno | `CatalogoService.listar(usuarioId, null, true)` (`GET /boticas/mia/productos?stockBajo=true`) |
 | `buscar_en_mi_catalogo` | `DUENO_BOTICA` | Buscar un producto en su propio catálogo (precio y stock) | `texto` | `CatalogoService.listar(usuarioId, texto, false)` (`GET /boticas/mia/productos?q=`) |
 | `buscar_medicamento` | `DUENO_BOTICA` | Buscar en el catálogo maestro (DIGEMID) | `texto` (mínimo 2 caracteres) | `MedicamentoService.buscar` (`GET /medicamentos?q=`) |
 
-- Cada herramienta devuelve al modelo como máximo 5 resultados, solo con datos de productos y boticas (`productoId`, nombre, principio activo, presentación, precio, stock, botica, distrito, distancia en km y condición de venta). El `productoId` va porque el modelo lo necesita para pedir `buscar_alternativas`; es un dato del producto, no de una persona. Nunca coordenadas ni datos de personas.
+**Cómo busca `buscar_precios`.** El modelo no elige si busca por nombre o por principio activo: la herramienta busca el texto en los dos (así "amoxicilina" encuentra también "Amoxil"). Junta los resultados sin repetir (`productoId`) y los ordena por precio de menor a mayor (a igual precio, por nombre de botica), como `GET /productos/buscar`; con `cerca=true`, por distancia, con las boticas sin ubicación al final. Se queda con los 5 primeros. Si pregunta el dueño:
+
+- Los productos de su propia botica llevan `tuBotica: true` (solo para el modelo; la tarjeta no cambia).
+- Si ninguno de esos 5 es de su botica pero su botica sí tiene resultados, se agregan además sus 2 más baratos, con `tuBotica: true`, también como tarjetas. Así el asistente siempre puede comparar su precio, aunque sea el más caro.
+- Para el comprador nunca se agrega nada.
+
+- Cada herramienta devuelve al modelo como máximo 5 resultados (salvo los 2 productos propios que `buscar_precios` puede agregar para el dueño), solo con datos de productos y boticas (`productoId`, nombre, principio activo, presentación, precio, stock, botica, distrito, distancia en km y condición de venta; además `tuBotica: true` en los productos de la botica del dueño que pregunta, solo en `buscar_precios` y nunca para el comprador). El `productoId` va porque el modelo lo necesita para pedir `buscar_alternativas`; es un dato del producto, no de una persona. Nunca coordenadas ni datos de personas.
 - Por pregunta hay como máximo 2 rondas de llamadas a herramientas (en una ronda el modelo puede pedir una o varias a la vez; el servidor ejecuta como máximo 3 por ronda y a las demás les responde con un error). Si después de la segunda pide más, el servidor le exige responder con lo que ya tiene. Así una pregunta usa como máximo 3 llamadas a Gemini: 2 rondas de herramientas más la respuesta.
 - Si el dueño aún no registró su botica, sus herramientas devuelven "sin botica registrada" y el asistente lo explica: no es un error.
 - Las búsquedas del asistente **no** se registran en los reportes de búsquedas (H62) ni en el de comparaciones (H42): el texto lo escribe el modelo, no el usuario.
 
 **Límites del asistente:**
-- Solo responde sobre BotiCompara: precios, disponibilidad, boticas, alternativas y, para el dueño, su catálogo.
+- Al comprador solo le responde sobre BotiCompara: precios, disponibilidad, boticas y alternativas.
+- Al dueño también lo ayuda con la gestión de su botica: surtido (incluidos productos que no son medicamentos: aseo y cuidado personal, primeros auxilios, bebé), reposición y rotación de stock, exhibición y orden de la vitrina, atención al cliente, temporadas (por ejemplo, invierno) y precios frente a la competencia. Cuando sirve, se apoya en sus datos reales (`ver_stock_bajo`, `buscar_en_mi_catalogo`, `buscar_precios`). No tiene datos de ventas: no inventa cifras de rotación. Los consejos de surtido hablan de tipos de producto, nunca de qué medicamento tomar para un síntoma.
+- Al dueño, si un nombre de producto parece mal escrito ("amosicilina"), busca con el nombre corregido (amoxicilina) y dice en la respuesta con qué nombre buscó; si hay dos o más nombres posibles, pregunta cuál quiso decir.
+- Al dueño nunca le dice que su botica no tiene un producto, o que no tiene stock, sin un resultado con `tuBotica` o de `buscar_en_mi_catalogo` que lo muestre.
+- Ante un tema ajeno a una botica, responde en una frase que no puede ayudar con eso y redirige a lo que sí hace.
 - No diagnostica, no da dosis y no recomienda medicamentos por síntomas: deriva al químico farmacéutico o al médico. Ante una emergencia indica llamar al SAMU (106).
 - **Condición de venta (H72):** si un producto es `CON_RECETA`, avisa que se necesita receta médica; si es `RECETA_RETENIDA`, avisa que no se puede reservar y que se compra en la botica presentando la receta. Nunca sugiere cómo conseguir un medicamento sin receta.
 - Estos casos responden `200` con `productos: []`; no son errores.
@@ -849,7 +866,7 @@ El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` en
 **Tiempos y respuesta de respaldo:**
 - **Por llamada a Gemini:** plazo de 25 segundos. **Por pregunta completa:** plazo total de 50 segundos, contado desde que el servidor empieza a atender el pedido. Cada llamada espera lo que sea menor: 25 s o lo que falte para los 50 s.
 - **Reintento:** si Google responde 500 o 503, la llamada se reintenta **una sola vez**, y solo si todavía queda tiempo dentro de los 50 s. Otros errores de Google (por ejemplo, cuota agotada) no se reintentan.
-- **Respaldo:** si las herramientas ya devolvieron productos en esta pregunta, pero la llamada final a Gemini falla (también después del reintento) o no llega a tiempo, el servidor responde `200` con un texto armado por él a partir de esas tarjetas y `"respaldo": true`. Ejemplo: "Encontré 3 opciones. La más barata es Paracetamol Genérico a 2 soles con 20 en FarmaVida, Lurigancho-Chosica." Sigue las reglas de `respuesta` (texto plano, precios como se dicen, hasta 600 caracteres).
+- **Respaldo:** si las herramientas ya devolvieron productos en esta pregunta, pero la llamada final a Gemini falla (también después del reintento) o no llega a tiempo, el servidor responde `200` con un texto armado por él a partir de esas tarjetas y `"respaldo": true`. Ejemplo: "Encontré 3 opciones. La más barata es Paracetamol Genérico a 2 soles con 20 en FarmaVida, Lurigancho-Chosica." Sigue las reglas de `respuesta` según el rol (texto plano; para el comprador, precios como se dicen y hasta 600 caracteres; para el dueño, precios como `S/ 8.50`).
 - El texto de respaldo **solo describe productos**: nunca da consejos de salud. Depende de la herramienta que devolvió las tarjetas:
   - `buscar_precios` y `buscar_alternativas`: cuántos hay, el más barato, su botica y su distrito ("Encontré 3 opciones. La más barata es…"; con uno solo, "Encontré 1 opción: …").
   - `ver_stock_bajo`: "Tienes N productos con stock bajo. Los ves en las tarjetas." (con uno solo, "Tienes 1 producto con stock bajo. Lo ves en la tarjeta.").
@@ -1258,6 +1275,121 @@ No es un endpoint de esta API. El administrador oculta reseñas desde el panel D
 5. **`autor` con nombre de pila más la inicial del apellido** (`"Carlos R."`), la misma regla que `compradorNombre` en los pedidos.
 6. **Reseñas de cuentas eliminadas** se conservan con autor `"Usuario eliminado"`.
 7. **Editar no quita el ocultamiento** y las reseñas ocultas no se pueden responder.
+
+---
+
+## 12. Notificaciones del dueño (rol `DUENO_BOTICA`) — H103
+
+Avisos dentro de la web del dueño cuando pasa algo con las reservas de su botica: llega una nueva o el comprador la cancela. Se ven en la campana del panel. No son push (H102) ni correo: los correos siguen siendo los de la sección 10 ("Correos") y no cambian.
+
+**Son avisos del momento: plazo de 7 días.** La lista y el contador solo consideran las notificaciones de los últimos 7 días (`creado_en > now() - interval '7 days'`, con la hora de la base). Al pasar el plazo el aviso deja de verse, leído o no, pero **el pedido sigue en "Pedidos"** (`GET /pedidos`, sección 10). La fila no se borra.
+
+Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño solo ve **sus** notificaciones (`notificacion.usuario_id` = usuario del token). Un dueño que todavía no registró botica no tiene notificaciones: recibe `200` con `[]` o `{ "total": 0 }`, no 404.
+
+**Formato de una notificación:**
+```json
+{
+  "id": 31,
+  "tipo": "NUEVA_RESERVA",
+  "titulo": "Nueva reserva BC-7K2QXM",
+  "mensaje": "Amoxil x 3 · S/ 72.00 · Requiere receta médica",
+  "pedidoId": 15,
+  "leida": false,
+  "creadoEn": "2026-11-22T15:30:00.123456Z"
+}
+```
+- `pedidoId`: la reserva a la que se refiere (`notificacion.reserva_id`). Se abre con `GET /pedidos/{pedidoId}`; en la web lleva a "Pedidos" con ese pedido a la vista.
+- `titulo` y `mensaje` se guardan **ya escritos** al crear la notificación: si después cambia el producto o el pedido, el texto no cambia (dice lo que pasó en ese momento).
+- **Ningún dato del comprador**, ni siquiera el nombre corto: quién reservó se ve en el pedido (`compradorNombre`, sección 10). Así, si el comprador elimina su cuenta (H19), no queda nada suyo en las notificaciones.
+
+### Tipos
+
+| `tipo` | Cuándo se crea | `titulo` | `mensaje` | Lleva a |
+|---|---|---|---|---|
+| `NUEVA_RESERVA` | `POST /reservas` (H72) | "Nueva reserva BC-7K2QXM" | "Amoxil x 3 · S/ 72.00", y si el producto pide receta, "· Requiere receta médica" | El pedido, en `PENDIENTE` |
+| `RESERVA_CANCELADA` | El comprador cancela: `PATCH /reservas/{id}/cancelar` (H75) | "Reserva cancelada BC-7K2QXM" | "Amoxil x 3 · S/ 72.00" | El pedido, en `CANCELADA` |
+| `RESERVA_VENCIDA` | El proceso de H84 la pasa a `VENCIDA` | "Reserva vencida BC-7K2QXM" | "Amoxil x 3 · S/ 72.00" | El pedido, en `VENCIDA` |
+
+- `mensaje`: nombre comercial del producto, la cantidad y el total de la reserva (`cantidad × precio_unitario`), con el precio como en los correos (`S/ 72.00`), separados por " · ".
+- **Receta (H72), solo en `NUEVA_RESERVA`**, que es cuando el dueño prepara el pedido. Sale de la `condicionVenta` del pedido en ese momento: `CON_RECETA` agrega "· Requiere receta médica"; con `SIN_RECETA` o `null` no se agrega nada. Una reserva `RECETA_RETENIDA` no puede crearse (`POST /reservas` responde 409, sección 9).
+- **`RESERVA_VENCIDA` se generará cuando exista la tarea de H84 (fuera del sprint).** Hoy ninguna reserva pasa a `VENCIDA`, así que no se crea ninguna; el tipo ya está en la base para no cambiarla después.
+- **No hay notificación** cuando el dueño cambia el estado él mismo (`CONFIRMADA`, `LISTA`, `ENTREGADA`, `RECHAZADA`): lo acaba de hacer. Por eso `EstadoPedidoCambiado` (H83) no crea notificaciones.
+
+### Cuándo se guarda
+- **Después del commit de la reserva, en una transacción aparte.** Un listener `@TransactionalEventListener(phase = AFTER_COMMIT)`, **sin `@Async`**, guarda la notificación en una transacción nueva (`@Transactional(propagation = REQUIRES_NEW)`).
+- **Si falla, la reserva o la cancelación no se ven afectadas:** ya están guardadas. El listener **captura cualquier error** y solo lo registra en el log (sin datos del comprador). No lo deja salir, porque Spring lo atraparía (al cliente no le llega como 500) pero escribiría en el log su mensaje y toda la traza, que podrían traer datos: el listener solo registra el tipo, el id de la reserva y la clase del error. No se reintenta: esa reserva se queda sin su aviso, pero se ve igual en "Pedidos".
+- **Sin duplicados:** una sola notificación por reserva y tipo (índice único `uq_notificacion_reserva_tipo`). Si el mismo evento llegara dos veces, el segundo `insert` falla por el índice y solo queda en el log.
+- **Los correos no cambian:** siguen saliendo después del commit y en segundo plano (`AFTER_COMMIT` + `@Async`, sección 10), y no dependen de la notificación ni la notificación de ellos.
+- **De dónde sale cada una:**
+  - `NUEVA_RESERVA`: del evento `ReservaCreada` que ya publica `ReservaService.crear`.
+  - `RESERVA_CANCELADA`: hoy `ReservaService.cancelar` **no publica ningún evento**. Al hacer el código se agrega `ReservaCancelada(reservaId)` ahí, después de pasar a `CANCELADA`.
+  - `RESERVA_VENCIDA`: lo publicará la tarea de H84 por cada reserva que venza, cuando exista.
+- La notificación es para el dueño de la botica del producto: `reserva.producto_id → producto.botica_id → botica.usuario_id`.
+
+### `GET /notificaciones?soloNoLeidas=true` 🔒 — H103
+Notificaciones del dueño **de los últimos 7 días**, de la más reciente a la más antigua (por `creadoEn`, y a igual fecha por `id`), **máximo 50**. `soloNoLeidas` es opcional (por defecto `false`).
+```json
+// 200 OK
+[
+  { "id": 32, "tipo": "RESERVA_CANCELADA", "titulo": "Reserva cancelada BC-7K2QXM",
+    "mensaje": "Amoxil x 3 · S/ 72.00", "pedidoId": 15, "leida": false,
+    "creadoEn": "2026-11-22T16:05:00.123456Z" },
+  { "id": 31, "tipo": "NUEVA_RESERVA", "titulo": "Nueva reserva BC-7K2QXM",
+    "mensaje": "Amoxil x 3 · S/ 72.00 · Requiere receta médica", "pedidoId": 15, "leida": true,
+    "creadoEn": "2026-11-22T15:30:00.123456Z" }
+]
+```
+Sin notificaciones en ese plazo → `200` con `[]`. La consulta usa el índice `idx_notificacion_usuario_fecha`.
+Errores: 400 (`soloNoLeidas` no es `true` ni `false`), 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
+
+### `GET /notificaciones/no-leidas/total` 🔒 — H103
+Para el número sobre la campana. La web lo consulta **cada 30 segundos** mientras el panel está abierto (y al volver a la pestaña); es una sola cuenta sobre el índice `idx_notificacion_no_leidas`, sin traer filas.
+```json
+// 200 OK
+{ "total": 3 }
+```
+Cuenta las no leídas **de los últimos 7 días**, el mismo plazo que la lista: así el número nunca incluye avisos que ya no se ven. No tiene el límite de 50. Con más de 9, la web muestra "9+".
+Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
+
+### `PATCH /notificaciones/{id}/leida` 🔒 — H103
+Marca una notificación como leída. Responde `204` sin cuerpo, también si ya estaba leída.
+Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `DUENO_BOTICA`), 404 "La notificación no existe" (no existe **o es de otro usuario**: mismo código y mismo mensaje, para no revelar si existe).
+
+### `PATCH /notificaciones/leidas` 🔒 — H103
+Marca como leídas todas las notificaciones del dueño, **también las de más de 7 días, a propósito**: ya no se ven, pero así ninguna queda pendiente en la base. Responde `204` sin cuerpo, también si no tenía ninguna sin leer.
+Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`).
+
+### Inicio del dueño: alcanza con lo que ya existe
+No hace falta un endpoint de resumen. La pantalla de Inicio arma sus 4 números con endpoints que ya existen, al abrirla (no cada 30 s). Solo **pedidos pendientes** y **por recoger hoy** se vuelven a pedir cuando sube el contador de no leídas (`GET /notificaciones/no-leidas/total`); stock bajo y calificación quedan como se cargaron:
+
+| Dato | Endpoint | Cómo se obtiene |
+|---|---|---|
+| Pedidos pendientes | `GET /pedidos?estado=PENDIENTE` (H77) | Cantidad de elementos. La lista trae como máximo 100: con 100, la web muestra "100+" |
+| Por recoger hoy | `GET /pedidos?estado=LISTA` (H77) | Los que tienen `venceEn` con fecha de hoy en hora de Lima (`America/Lima`) |
+| Productos con stock bajo | `GET /boticas/mia/productos?stockBajo=true` (H12) | Cantidad de elementos |
+| Calificación promedio | `GET /boticas/mia` (H5) para el `id` y luego `GET /boticas/{id}/resenas?page=0` (H87) | `promedio` y `total` (`promedio` es `null` sin reseñas) |
+
+Si más adelante el Inicio se vuelve lento o hace falta contar más de 100 pendientes, se propondrá `GET /boticas/mia/resumen`, actualizando primero este contrato.
+
+### Notas para el backend (sección 12)
+- `SecurityConfig`: `/notificaciones/**` con `DUENO_BOTICA`. El CORS ya permite `PATCH` (se agregó para `/pedidos`).
+- La tabla es `notificacion` (`database/v7_notificaciones.sql`). Solo la API escribe en ella; Django no la usa.
+- `ReservaCancelada` se agrega en `ReservaService.cancelar` cuando se haga el código; el cambio es mínimo y lo revisa Alexander en el PR.
+- No se borran notificaciones en este sprint: la lista muestra como máximo las 50 más recientes de los últimos 7 días. Borrar las de **más de 30 días** queda para una tarea programada futura, junto con la de H84.
+
+---
+
+## 13. Salud del servicio
+
+### `GET /salud`
+Público, sin token. Lo usa Render como health check: si responde 200, el proceso está vivo y atiende peticiones.
+```json
+// 200 OK
+{ "estado": "OK" }
+```
+- **No consulta la base ni ningún servicio externo:** si Supabase falla un momento, Render no debe reiniciar la API por eso. Un 200 no significa que la base responda.
+- Sin datos internos: ni versión, ni configuración, ni nombres de servicios.
+- La web y la app no lo necesitan. Solo `GET`: con otro método y sin token responde 401.
 
 ---
 

@@ -15,6 +15,11 @@ class TextoRespaldoTest {
 
     private static final Set<String> PRECIOS = Set.of("buscar_precios");
 
+    /** Las reglas de siempre son las del comprador; las del dueño tienen sus propias pruebas. */
+    private static String de(List<ChatProducto> productos, Set<String> herramientas) {
+        return TextoRespaldo.de(productos, herramientas, "COMPRADOR");
+    }
+
     private static List<ChatProducto> propios(int cuantos) {
         return java.util.stream.LongStream.rangeClosed(1, cuantos)
                 .mapToObj(i -> producto(i, "Amoxicilina " + i, "6.00", "Botica Salud Total")).toList();
@@ -23,30 +28,30 @@ class TextoRespaldoTest {
     @Test
     void stockBajoDelDueno_diceCuantosTieneSinCompararPrecios() {
         assertEquals("Tienes 3 productos con stock bajo. Los ves en las tarjetas.",
-                TextoRespaldo.de(propios(3), Set.of("ver_stock_bajo")));
+                de(propios(3), Set.of("ver_stock_bajo")));
         assertEquals("Tienes 1 producto con stock bajo. Lo ves en la tarjeta.",
-                TextoRespaldo.de(propios(1), Set.of("ver_stock_bajo")));
+                de(propios(1), Set.of("ver_stock_bajo")));
     }
 
     @Test
     void catalogoDelDueno_diceCuantosEncontroEnSuCatalogo() {
         assertEquals("Encontré 2 productos en tu catálogo. Los ves en las tarjetas.",
-                TextoRespaldo.de(propios(2), Set.of("buscar_en_mi_catalogo")));
+                de(propios(2), Set.of("buscar_en_mi_catalogo")));
         assertEquals("Encontré 1 producto en tu catálogo. Lo ves en la tarjeta.",
-                TextoRespaldo.de(propios(1), Set.of("buscar_en_mi_catalogo")));
+                de(propios(1), Set.of("buscar_en_mi_catalogo")));
     }
 
     @Test
     void stockBajoYCatalogoJuntos_seDescribenComoSuCatalogo() {
         assertEquals("Encontré 4 productos en tu catálogo. Los ves en las tarjetas.",
-                TextoRespaldo.de(propios(4), Set.of("ver_stock_bajo", "buscar_en_mi_catalogo")));
+                de(propios(4), Set.of("ver_stock_bajo", "buscar_en_mi_catalogo")));
     }
 
     @Test
     void alternativasOCatalogoMezcladoConUnaBusqueda_nombranLaMasBarata() {
         for (Set<String> herramientas : List.of(Set.of("buscar_alternativas"),
                 Set.of("buscar_precios", "buscar_en_mi_catalogo"))) {
-            assertTrue(TextoRespaldo.de(propios(2), herramientas)
+            assertTrue(de(propios(2), herramientas)
                     .startsWith("Encontré 2 opciones. La más barata es Amoxicilina 1 a 6 soles"), herramientas.toString());
         }
     }
@@ -58,7 +63,7 @@ class TextoRespaldoTest {
 
     @Test
     void variosProductos_diceCuantosYCualEsElMasBarato() {
-        String texto = TextoRespaldo.de(List.of(producto(3, "Paracetamol MK", "2.50", "Botica Salud Total"),
+        String texto = de(List.of(producto(3, "Paracetamol MK", "2.50", "Botica Salud Total"),
                 producto(9, "Paracetamol Genérico", "2.20", "FarmaVida"), producto(5, "Panadol", "4.00", "FarmaVida")),
                 PRECIOS);
 
@@ -69,7 +74,7 @@ class TextoRespaldoTest {
     @Test
     void unSoloProducto_loDiceEnSingular() {
         assertEquals("Encontré 1 opción: Amoxicilina a 6 soles en Botica Salud Total, Lurigancho-Chosica.",
-                TextoRespaldo.de(List.of(producto(4, "Amoxicilina", "6.00", "Botica Salud Total")), PRECIOS));
+                de(List.of(producto(4, "Amoxicilina", "6.00", "Botica Salud Total")), PRECIOS));
     }
 
     @Test
@@ -85,7 +90,7 @@ class TextoRespaldoTest {
 
     @Test
     void esTextoPlanoCortoYSinEnlacesAunqueElDuenoLosPongaEnElNombre() {
-        String texto = TextoRespaldo.de(List.of(
+        String texto = de(List.of(
                 producto(1, "**Oferta** [clic](https://malo.example) " + "x".repeat(300), "2.20", "FarmaVida"),
                 producto(2, "Otro", "3.00", "FarmaVida")), PRECIOS);
 
@@ -99,11 +104,28 @@ class TextoRespaldoTest {
         List<ChatProducto> dos = List.of(producto(9, "Paracetamol Genérico", "2.20", "FarmaVida"),
                 producto(3, "Paracetamol MK", "2.50", "Botica Salud Total"));
         for (Set<String> herramientas : List.of(PRECIOS, Set.of("ver_stock_bajo"), Set.of("buscar_en_mi_catalogo"))) {
-            String texto = TextoRespaldo.de(dos, herramientas).toLowerCase();
+            String texto = de(dos, herramientas).toLowerCase();
 
             for (String palabra : List.of("toma", "dosis", "recomiendo", "sirve para", "cada 8 horas", "mg cada")) {
                 assertFalse(texto.contains(palabra), palabra);
             }
         }
+    }
+
+    @Test
+    void paraElDueno_losPreciosVanConSimboloYDosDecimales() {
+        String texto = TextoRespaldo.de(List.of(producto(3, "Paracetamol MK", "2.50", "Botica Salud Total"),
+                producto(9, "Paracetamol Genérico", "2.2", "FarmaVida")), PRECIOS, "DUENO_BOTICA");
+
+        assertTrue(texto.contains("Paracetamol Genérico a S/ 2.20 en FarmaVida"), texto);
+        assertFalse(texto.contains("soles"));
+    }
+
+    @Test
+    void elPrecioConSimboloSiempreLlevaDosDecimales() {
+        assertEquals("S/ 8.50", TextoRespaldo.precioConSimbolo(new BigDecimal("8.5")));
+        assertEquals("S/ 6.00", TextoRespaldo.precioConSimbolo(new BigDecimal("6")));
+        assertEquals("S/ 0.50", TextoRespaldo.precioConSimbolo(new BigDecimal("0.50")));
+        assertEquals("S/ 120.90", TextoRespaldo.precioConSimbolo(new BigDecimal("120.899")));
     }
 }

@@ -81,4 +81,9 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     /** Baja de un producto: hay pedidos confirmados o listos (API.md, sección 4). */
     boolean existsByProductoIdAndEstadoIn(Long productoId, Collection<EstadoReserva> estados);
 
+    /** Regla de API.md, sección 11: el comprador solo reseña si recogió una reserva ENTREGADA de esa botica. */
+    @Query("select count(r) > 0 from Reserva r, Producto p "
+            + "where r.usuarioId = :usuarioId and r.productoId = p.id and p.boticaId = :boticaId "
+            + "and r.estado = com.boticompara.usuario.entity.EstadoReserva.ENTREGADA")
+    boolean hayEntregadaDe(@Param("usuarioId") Long usuarioId, @Param("boticaId") Long boticaId);
 }

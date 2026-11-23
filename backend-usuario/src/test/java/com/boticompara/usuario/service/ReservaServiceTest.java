@@ -315,6 +315,7 @@ class ReservaServiceTest {
         ReservaResponse resp = service.cancelar(USUARIO, 15L);
 
         assertEquals(EstadoReserva.CANCELADA, resp.estado());
+        verify(eventos).publishEvent(new ReservaCancelada(15L));
     }
 
     @Test
@@ -327,6 +328,7 @@ class ReservaServiceTest {
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         assertEquals("No se puede cancelar una reserva ENTREGADA", ex.getMessage());
         verify(reservas, times(0)).save(any(Reserva.class));
+        verifyNoInteractions(eventos);
     }
 
     @Test

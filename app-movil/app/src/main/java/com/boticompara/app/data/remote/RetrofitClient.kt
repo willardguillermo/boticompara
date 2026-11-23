@@ -30,10 +30,10 @@ object RetrofitClient {
         if (retrofit == null) {
             val client = OkHttpClient.Builder()
                 .addInterceptor(AuthInterceptor(context))
-                // El registro y la recuperación envían correos antes de responder (H17, H20),
-                // así que se da más tiempo que los 10 s por defecto
+                // El registro y la recuperación envían correos antes de responder (H17, H20).
+                // El chat espera a Gemini hasta 50 s en el servidor (H70), así que se leen 60 s
                 .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
 

@@ -112,7 +112,7 @@ public class ChatService {
                 GeminiRespuesta respuesta = llamar(
                         new GeminiPedido(sistema, List.copyOf(turnos), declaraciones, permitirHerramientas), limite);
                 if (respuesta.llamadas().isEmpty() || !permitirHerramientas) {
-                    ChatResponse resultado = finalizar(respuesta, productos);
+                    ChatResponse resultado = finalizar(respuesta, productos, yo.rol());
                     // Para vigilar la cuota y los tiempos. Sin el id del usuario ni el texto de la pregunta
                     log.info("Chat {}: {} ronda(s) con Gemini, herramientas {}, {} tarjeta(s), {} ms", yo.rol(),
                             ronda + 1, usadas, resultado.productos().size(),
@@ -132,7 +132,8 @@ public class ChatService {
                         e.esTiempoAgotado() ? "sin tiempo" : "Gemini no disponible");
                 Set<String> herramientasDeLasTarjetas = tarjetas.stream()
                         .map(t -> origen.get(t.productoId())).collect(Collectors.toSet());
-                return new ChatResponse(TextoRespaldo.de(tarjetas, herramientasDeLasTarjetas), tarjetas, true, false);
+                String texto = TextoRespaldo.de(tarjetas, herramientasDeLasTarjetas, yo.rol());
+                return new ChatResponse(texto, tarjetas, true, false);
             }
             // La causa (clave, cuota, modelo) queda solo en el log del cliente de Gemini
             if (e.esTiempoAgotado()) {
@@ -184,8 +185,8 @@ public class ChatService {
         return resultados;
     }
 
-    private static ChatResponse finalizar(GeminiRespuesta respuesta, Map<Long, ChatProducto> productos) {
-        String texto = LimpiadorTexto.limpiar(respuesta.texto());
+    private static ChatResponse finalizar(GeminiRespuesta respuesta, Map<Long, ChatProducto> productos, String rol) {
+        String texto = LimpiadorTexto.limpiar(respuesta.texto(), rol);
         if (texto.isEmpty()) {
             log.warn("Gemini terminó sin texto ({} herramientas pendientes)", respuesta.llamadas().size());
             throw GeminiException.noDisponible("Respuesta sin texto");

@@ -91,6 +91,11 @@ const MINUTO = 60 * 1000
 const HORA = 60 * MINUTO
 const haceMs = (ms) => new Date(Date.now() - ms).toISOString()
 const enMs = (ms) => new Date(Date.now() + ms).toISOString()
+/** Cuánto falta para las 23:59:59 de hoy en Lima (UTC-5 todo el año). */
+const hastaFinDelDiaLima = () => {
+  const DIA = 24 * HORA
+  return DIA - 1000 - ((Date.now() - 5 * HORA) % DIA)
+}
 
 /** [productoId, compradorId, cantidad, estado, creada hace, vence en (negativo = ya pasó), código, motivo] */
 db.reservas = [
@@ -107,6 +112,8 @@ db.reservas = [
   [9, 4, 2, 'PENDIENTE', 50 * MINUTO, 23 * HORA + 10 * MINUTO, 'BC-C7HS2M'],
   [11, 5, 1, 'CONFIRMADA', 5 * HORA, 19 * HORA, 'BC-J4RT6V'],
   [14, 4, 2, 'PENDIENTE', 2 * HORA, 22 * HORA, 'BC-P3GU7R'],
+  // Salud Total (rosa@): lista y vence hoy en hora de Lima, para "Por recoger hoy" del Inicio (H103)
+  [1, 4, 1, 'LISTA', 30 * HORA, hastaFinDelDiaLima(), 'BC-K8DN4F'],
 ].map(([productoId, usuarioId, cantidad, estado, creada, vence, codigo, motivoRechazo = null], i) => {
   const producto = db.productos.find((p) => p.id === productoId)
   const creadoEn = haceMs(creada)
@@ -116,6 +123,17 @@ db.reservas = [
     actualizadoEn: estado === 'PENDIENTE' ? creadoEn : haceMs(Math.max(creada / 2, MINUTO)),
   }
 })
+
+// ---------- Reseñas de prueba (sección 11): Salud Total tiene 3 (promedio 4.3); FarmaVida, ninguna ----------
+/** [boticaId, usuarioId, estrellas, comentario, respuesta, creada hace] */
+db.resenas = [
+  [1, 4, 5, 'Me atendieron rápido y tenían todo.', '¡Gracias, Carlos! Te esperamos.', 3 * 24 * HORA],
+  [1, 5, 4, 'Buen precio y el pedido estaba listo.', null, 6 * 24 * HORA],
+  [1, 6, 4, null, null, 20 * 24 * HORA],
+].map(([boticaId, usuarioId, estrellas, comentario, respuesta, creada], i) => ({
+  id: i + 1, boticaId, usuarioId, estrellas, comentario, respuesta, oculta: false,
+  respondidaEn: respuesta ? haceMs(creada / 2) : null, creadoEn: haceMs(creada), actualizadoEn: haceMs(creada),
+}))
 
 const siguienteId = (lista) => Math.max(0, ...lista.map((x) => x.id)) + 1
 const esperar = () => new Promise((r) => setTimeout(r, 250))
@@ -502,6 +520,9 @@ async function leerFilasProductos(archivo) {
 // con los datos reales de la simulación, con la misma forma que docs/API.md.
 // Para probar errores, escribe en el mensaje: error429, error503, error504 o error401.
 // Si el mensaje contiene "respaldo", la respuesta llega con "respaldo": true.
+// Al dueño le responde como el backend: precios como "S/ 8.50", listas de hasta 8 líneas con "- "
+// (stock bajo, su catálogo y consejos de temporada: "¿qué conviene tener en invierno?") y, al comparar
+// precios, "en tu botica: S/ X" frente a la opción más barata de las otras boticas.
 // Si contiene una frase del filtro de crisis (por ejemplo "hacerme daño" o "me falta el aire"),
 // llega el texto de ayuda con "ayuda": true y sin tarjetas.
 const ESPERA_CHAT_MS = 2000
@@ -539,6 +560,21 @@ const PALABRAS_GENERICAS = new Set(['generico', 'generica'])
 const PIDE_STOCK_BAJO = /\b(stock bajo|poco stock|reponer|por agotarse|se me acaba)\b/
 // buscar_en_mi_catalogo: el dueño pregunta por lo que tiene en su propia botica
 const PIDE_MI_CATALOGO = /\b(tengo|tenemos|mi catalogo|mis productos|mi botica)\b/
+// Consejo de negocio del dueño (surtido, vitrina, temporadas): sin herramientas ni tarjetas
+const PIDE_CONSEJO_NEGOCIO = /\b(consejos?|surtido|vitrina|temporadas?|invierno|verano|vender mas|que mas (puedo )?vender)\b/
+// Respuesta del dueño (docs/API.md, sección 8): hasta 900 caracteres y listas de hasta 8 líneas con "- "
+const MAX_LINEAS_LISTA = 8
+const MAX_RESPUESTA_DUENO = 900
+const CONSEJO_INVIERNO = [
+  'Pañuelos desechables y bálsamo para labios',
+  'Termómetros digitales',
+  'Mascarillas y alcohol en gel',
+  'Caramelos para la garganta (sin receta)',
+  'Vaporizadores y humidificadores pequeños',
+  'Cremas humectantes para manos y rostro',
+  'Sueros de rehidratación oral',
+  'Medias y guantes térmicos, si tienes espacio en vitrina',
+]
 
 /** Espera cancelable: si se aborta `signal`, rechaza con su motivo. */
 function esperarCancelable(ms, signal) {
@@ -562,9 +598,17 @@ function precioHablado(valor) {
   return resto ? `${base} con ${String(resto).padStart(2, '0')}` : base
 }
 
-/** "a, b y c" */
-const enumerar = (lista) =>
-  lista.length <= 1 ? lista.join('') : `${lista.slice(0, -1).join(', ')} y ${lista.at(-1)}`
+/** Para el dueño: 8.5 -> "S/ 8.50" (como TextoRespaldo.precioConSimbolo del backend) */
+const precioConSimbolo = (valor) => `S/ ${Number(valor).toFixed(2)}`
+
+/** El precio como lo escribe el backend según el rol: hablado para el comprador (H71), con símbolo para el dueño. */
+const precioSegunRol = (valor, esDueno) => (esDueno ? precioConSimbolo(valor) : precioHablado(valor))
+
+/** Frase corta y una lista de hasta 8 líneas que empiezan con "- " (respuesta del dueño). */
+function textoLista(frase, lineas) {
+  const texto = [frase, ...lineas.slice(0, MAX_LINEAS_LISTA).map((l) => `- ${l}`)].join('\n')
+  return texto.length <= MAX_RESPUESTA_DUENO ? texto : `${texto.slice(0, MAX_RESPUESTA_DUENO - 1)}…`
+}
 
 /** Distancia en línea recta (haversine), con 2 decimales, como GET /productos/buscar. */
 function distanciaKm(lat, lng, botica) {
@@ -591,6 +635,8 @@ function tarjetaChat(p, { propio = false, lat, lng } = {}) {
     boticaNombre: botica.nombreComercial,
     boticaDistrito: botica.distrito,
     distanciaKm: distanciaKm(lat, lng, botica),
+    // H72: condición de venta del medicamento enlazado; null si no está enlazado o no tiene el dato
+    condicionVenta: db.medicamentos.find((m) => m.id === p.medicamentoId)?.condicionVenta ?? null,
   }
 }
 
@@ -637,10 +683,10 @@ function respuestaMiCatalogo(usuario, mensaje) {
   if (propios.length === 0) {
     return { respuesta: `No encontré ${palabra} en el catálogo de ${botica.nombreComercial}. Puedes agregarlo desde Catálogo.`, productos: [] }
   }
-  const detalle = propios.map((p) =>
-    `${p.nombreComercial}, ${p.presentacion}, a ${precioHablado(p.precio)}, ${p.stock === 0 ? 'agotado' : `con ${p.stock} ${p.stock === 1 ? 'unidad' : 'unidades'}`}`)
+  const lineas = propios.map((p) =>
+    `${p.nombreComercial}, ${p.presentacion}: ${precioConSimbolo(p.precio)}, ${p.stock === 0 ? 'agotado' : `${p.stock} ${p.stock === 1 ? 'unidad' : 'unidades'}`}`)
   return {
-    respuesta: `En ${botica.nombreComercial} tienes ${enumerar(detalle)}.`,
+    respuesta: textoLista(`En tu catálogo tienes ${propios.length === 1 ? 'este producto' : 'estos productos'}:`, lineas),
     productos: propios.map((p) => tarjetaChat(p, { propio: true })),
   }
 }
@@ -658,21 +704,45 @@ function buscarPreciosChat(principio, lat, lng) {
   return tarjetas.slice(0, MAX_TARJETAS_HERRAMIENTA)
 }
 
-function textoPrecios(principio, tarjetas) {
+function textoPrecios(principio, tarjetas, usuario) {
+  const esDueno = usuario.rol === 'DUENO_BOTICA'
+  // tuBotica (buscar_precios del backend): los productos de la botica del dueño que pregunta
+  const miBoticaId = esDueno ? db.boticas.find((b) => b.usuarioId === usuario.id)?.id : null
+  const propias = tarjetas.filter((t) => t.boticaId === miBoticaId)
+  const otras = tarjetas.filter((t) => t.boticaId !== miBoticaId)
+  const precio = (valor) => precioSegunRol(valor, esDueno)
+
+  if (esDueno && propias.length) {
+    // Al dueño se le dice "en tu botica: S/ X" (nunca el nombre de su botica) y se compara con la más barata de las otras
+    const mia = [...propias].sort((a, b) => a.precio - b.precio)[0]
+    if (!otras.length) {
+      return `Solo encontré ${principio.toLowerCase()} en tu botica: S/ ${mia.precio.toFixed(2)} (${mia.nombreComercial}). Ninguna otra botica aprobada lo tiene con stock.`
+    }
+    const rival = [...otras].sort((a, b) => a.precio - b.precio)[0]
+    const diferencia = Math.abs(mia.precio - rival.precio)
+    const comparacion = mia.precio < rival.precio
+      ? `Estás ${precioConSimbolo(diferencia)} por debajo.`
+      : mia.precio > rival.precio
+        ? `Estás ${precioConSimbolo(diferencia)} por encima.`
+        : 'Están al mismo precio.'
+    return `${mia.nombreComercial} en tu botica: ${precioConSimbolo(mia.precio)}. La opción más barata de las otras boticas es ${rival.nombreComercial} en ${rival.boticaNombre}, a ${precioConSimbolo(rival.precio)}. ${comparacion}`
+  }
+
   const masBarata = [...tarjetas].sort((a, b) => a.precio - b.precio)[0]
   const distancia = masBarata.distanciaKm != null ? `, a ${masBarata.distanciaKm.toFixed(1)} kilómetros de ti` : ''
-  let texto = `Encontré ${tarjetas.length === 1 ? 'una opción' : `${tarjetas.length} opciones`} de ${principio.toLowerCase()} en boticas aprobadas. La más barata es ${masBarata.nombreComercial} en ${masBarata.boticaNombre}, ${masBarata.boticaDistrito}, a ${precioHablado(masBarata.precio)}${distancia}.`
+  let texto = `Encontré ${tarjetas.length === 1 ? 'una opción' : `${tarjetas.length} opciones`} de ${principio.toLowerCase()} en boticas aprobadas. La más barata es ${masBarata.nombreComercial} en ${masBarata.boticaNombre}, ${masBarata.boticaDistrito}, a ${precio(masBarata.precio)}${distancia}.`
   const otraMarca = tarjetas.find((t) => t.nombreComercial !== masBarata.nombreComercial)
   if (otraMarca) {
-    texto += ` Si prefieres ${otraMarca.nombreComercial}, está desde ${precioHablado(otraMarca.precio)} en ${otraMarca.boticaNombre}.`
+    texto += ` Si prefieres ${otraMarca.nombreComercial}, está desde ${precio(otraMarca.precio)} en ${otraMarca.boticaNombre}.`
   }
   return texto
 }
 
-/** Texto de respaldo: lo arma "el servidor" solo con datos de las tarjetas. */
-function textoRespaldo(tarjetas) {
+/** Texto de respaldo: lo arma "el servidor" solo con datos de las tarjetas. Precios según el rol. */
+function textoRespaldo(tarjetas, usuario) {
   const masBarata = [...tarjetas].sort((a, b) => a.precio - b.precio)[0]
-  return `Encontré ${tarjetas.length === 1 ? '1 opción' : `${tarjetas.length} opciones`}. La más barata es ${masBarata.nombreComercial} a ${precioHablado(masBarata.precio)} en ${masBarata.boticaNombre}, ${masBarata.boticaDistrito}.`
+  const precio = precioSegunRol(masBarata.precio, usuario.rol === 'DUENO_BOTICA')
+  return `Encontré ${tarjetas.length === 1 ? '1 opción' : `${tarjetas.length} opciones`}. La más barata es ${masBarata.nombreComercial} a ${precio} en ${masBarata.boticaNombre}, ${masBarata.boticaDistrito}.`
 }
 
 /** Herramienta ver_stock_bajo del dueño. */
@@ -688,11 +758,11 @@ function respuestaStockBajo(usuario) {
   if (bajos.length === 0) {
     return { respuesta: `No tienes productos con stock bajo en ${botica.nombreComercial}. Todos están por encima de su stock mínimo.`, productos: [] }
   }
-  const detalle = bajos.map((p) =>
-    `${p.nombreComercial}, ${p.stock === 0 ? 'agotado' : `con ${p.stock} ${p.stock === 1 ? 'unidad' : 'unidades'}`}`)
+  const lineas = bajos.map((p) =>
+    `${p.nombreComercial}: ${p.stock === 0 ? 'agotado' : `${p.stock} ${p.stock === 1 ? 'unidad' : 'unidades'}`} (mínimo ${p.stockMinimo})`)
   const cuantos = bajos.length === 1 ? '1 producto' : `${bajos.length} productos`
   return {
-    respuesta: `Tienes ${cuantos} con stock bajo: ${enumerar(detalle)}. Te conviene ${bajos.length === 1 ? 'reponerlo' : 'reponerlos'} pronto.`,
+    respuesta: textoLista(`Tienes ${cuantos} con stock bajo. Te conviene ${bajos.length === 1 ? 'reponerlo' : 'reponerlos'} pronto:`, lineas),
     productos: bajos.map((p) => tarjetaChat(p, { propio: true })),
   }
 }
@@ -700,7 +770,7 @@ function respuestaStockBajo(usuario) {
 function textoAyuda(usuario) {
   const nombre = usuario.nombre.split(' ')[0]
   return usuario.rol === 'DUENO_BOTICA'
-    ? `Hola, ${nombre}. Soy el asistente de BotiCompara. Puedo comparar el precio de un medicamento en las boticas aprobadas o decirte qué productos de tu botica tienen stock bajo. Por ejemplo, pregúntame qué productos tengo con stock bajo.`
+    ? `Hola, ${nombre}. Soy el asistente de BotiCompara. Puedo revisar tu stock, comparar tus precios con la competencia, ver alternativas y darte consejos para tu negocio: surtido, vitrina y temporadas. Por ejemplo, pregúntame qué productos tengo con stock bajo o qué conviene tener en invierno.`
     : `Hola, ${nombre}. Soy el asistente de BotiCompara. Puedo ayudarte a encontrar dónde está más barato un medicamento en las boticas aprobadas. Por ejemplo, pregúntame dónde está más barato el paracetamol.`
 }
 
@@ -718,12 +788,93 @@ function validarPedidoChat({ mensaje, historial, lat, lng }) {
   return limpio
 }
 
+// ---------- 12. Notificaciones del dueño (H103, mismas reglas que docs/API.md) ----------
+const MAX_NOTIFICACIONES = 50
+const PLAZO_NOTIFICACIONES_MS = 7 * 24 * HORA
+const ESPERA_NUEVA_RESERVA_MS = 60 * 1000
+const TITULOS_NOTIFICACION = {
+  NUEVA_RESERVA: 'Nueva reserva',
+  RESERVA_CANCELADA: 'Reserva cancelada',
+  RESERVA_VENCIDA: 'Reserva vencida',
+}
+db.notificaciones = []
+
+/** Texto ya escrito al crearla y sin datos del comprador; como máximo una por reserva y tipo. */
+function crearNotificacion(tipo, reserva, { creadoEn = ahoraIso(), leida = false } = {}) {
+  if (db.notificaciones.some((n) => n.pedidoId === reserva.id && n.tipo === tipo)) return
+  const producto = db.productos.find((p) => p.id === reserva.productoId)
+  const condicion = db.medicamentos.find((m) => m.id === producto.medicamentoId)?.condicionVenta
+  const partes = [`${producto.nombreComercial} x ${reserva.cantidad}`, precioConSimbolo(reserva.cantidad * reserva.precioUnitario)]
+  if (tipo === 'NUEVA_RESERVA' && condicion === 'CON_RECETA') partes.push('Requiere receta médica')
+  db.notificaciones.push({
+    id: siguienteId(db.notificaciones),
+    usuarioId: db.boticas.find((b) => b.id === producto.boticaId).usuarioId,
+    tipo, titulo: `${TITULOS_NOTIFICACION[tipo]} ${reserva.codigo}`, mensaje: partes.join(' · '),
+    pedidoId: reserva.id, leida, creadoEn,
+  })
+}
+
+// Tres de ejemplo para rosa@: una cancelada ya leída y dos reservas nuevas sin leer
+for (const [tipo, codigo, leida] of [
+  ['RESERVA_CANCELADA', 'BC-W3FJ8N', true],
+  ['NUEVA_RESERVA', 'BC-H4NP2T', false],
+  ['NUEVA_RESERVA', 'BC-7K2QXM', false],
+]) {
+  const reserva = db.reservas.find((r) => r.codigo === codigo)
+  crearNotificacion(tipo, reserva, { leida, creadoEn: tipo === 'NUEVA_RESERVA' ? reserva.creadoEn : reserva.actualizadoEn })
+}
+
+const LETRAS_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+function codigoReserva() {
+  const bytes = crypto.getRandomValues(new Uint8Array(6))
+  return `BC-${Array.from(bytes, (b) => LETRAS_CODIGO[b % LETRAS_CODIGO.length]).join('')}`
+}
+
+/** Imita POST /reservas desde la app del comprador: la reserva y la notificación al dueño. */
+function simularReserva(productoId, cantidad = 1) {
+  const producto = db.productos.find((p) => p.id === Number(productoId) && p.activo)
+  if (!producto) return null
+  const creadoEn = ahoraIso()
+  const reserva = {
+    id: siguienteId(db.reservas), codigo: codigoReserva(), estado: 'PENDIENTE', productoId: producto.id,
+    usuarioId: 5, cantidad, precioUnitario: producto.precio, motivoRechazo: null,
+    venceEn: enMs(24 * HORA), creadoEn, actualizadoEn: creadoEn,
+  }
+  db.reservas.push(reserva)
+  crearNotificacion('NUEVA_RESERVA', reserva)
+  return reserva
+}
+
+// A los 60 s de iniciar sesión (o de recargar la página con sesión) a rosa@ le llega una reserva nueva
+let temporizadorReserva
+function programarReservaNueva(usuarioId) {
+  clearTimeout(temporizadorReserva)
+  if (usuarioId === 1) temporizadorReserva = setTimeout(() => simularReserva(1, 2), ESPERA_NUEVA_RESERVA_MS)
+}
+programarReservaNueva(Number((obtenerToken() ?? '').split('.')[1]))
+
+const notificacionDto = ({ id, tipo, titulo, mensaje, pedidoId, leida, creadoEn }) =>
+  ({ id, tipo, titulo, mensaje, pedidoId, leida, creadoEn })
+
+const misNotificaciones = () => {
+  const dueno = duenoActual()
+  return db.notificaciones.filter((n) => n.usuarioId === dueno.id)
+}
+
+/** Deja las de los últimos 7 días; a los 7 días justos ya no (docs/API.md). Se exporta para probarla. */
+export const soloRecientes = (notificaciones, ahora = Date.now()) =>
+  notificaciones.filter((n) => new Date(n.creadoEn).getTime() > ahora - PLAZO_NOTIFICACIONES_MS)
+
+/** Lo que ven la campana (lista y contador) y la actividad reciente. */
+const misNotificacionesRecientes = () => soloRecientes(misNotificaciones())
+
 export const apiMock = {
   // ---------- 1. Autenticación ----------
   async login({ correo, password }) {
     await esperar()
     const usuario = db.usuarios.find((u) => u.correo === String(correo ?? '').trim().toLowerCase())
     if (!usuario || usuario.password !== password) throw crearError(401, 'Correo o contraseña incorrectos.')
+    programarReservaNueva(usuario.id)
     return {
       token: `mock-token.${usuario.id}.${crypto.randomUUID()}`,
       tipo: 'Bearer',
@@ -1006,6 +1157,71 @@ export const apiMock = {
       .map(medicamentoDto)
   },
 
+  // ---------- 11. Reseñas ----------
+  // H87: público, páginas de 10, sin las ocultas
+  async listarResenas(boticaId, page = 0) {
+    await esperar()
+    if (!/^\d+$/.test(String(boticaId)) || !/^\d+$/.test(String(page))) {
+      throw crearError(400, 'El id de la botica y la página deben ser números enteros desde 0.')
+    }
+    const botica = db.boticas.find((b) => b.id === Number(boticaId) && b.estado === 'APROBADO')
+    if (!botica) throw crearError(404, 'La botica no existe o no está aprobada.')
+    const visibles = db.resenas
+      .filter((r) => r.boticaId === botica.id && !r.oculta)
+      .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))
+    const suma = visibles.reduce((total, r) => total + r.estrellas, 0)
+    return {
+      boticaId: botica.id,
+      promedio: visibles.length ? Math.round((suma / visibles.length) * 10) / 10 : null,
+      total: visibles.length,
+      page: Number(page),
+      totalPages: Math.ceil(visibles.length / 10),
+      resenas: visibles
+        .slice(page * 10, page * 10 + 10)
+        .map(({ id, usuarioId, estrellas, comentario, respuesta, respondidaEn, creadoEn, actualizadoEn }) => ({
+          id, autor: nombreCorto(db.usuarios.find((u) => u.id === usuarioId)),
+          estrellas, comentario, respuesta, respondidaEn, creadoEn, actualizadoEn,
+        })),
+      miResena: null,
+    }
+  },
+
+  // ---------- 12. Notificaciones del dueño (H103) ----------
+  // Últimos 7 días, de la más reciente a la más antigua, máximo 50. Sin botica: lista vacía, no 404
+  async listarNotificaciones({ soloNoLeidas = false } = {}) {
+    await esperar()
+    const propias = misNotificacionesRecientes()
+    if (typeof soloNoLeidas !== 'boolean') throw crearError(400, 'soloNoLeidas debe ser true o false.')
+    return propias
+      .filter((n) => !soloNoLeidas || !n.leida)
+      .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn) || b.id - a.id)
+      .slice(0, MAX_NOTIFICACIONES)
+      .map(notificacionDto)
+  },
+
+  // Cuenta las no leídas de los últimos 7 días, sin el límite de 50
+  async contarNotificacionesNoLeidas() {
+    await esperar()
+    return { total: misNotificacionesRecientes().filter((n) => !n.leida).length }
+  },
+
+  // 204 también si ya estaba leída; 404 si no existe o es de otro usuario
+  async marcarNotificacionLeida(id) {
+    await esperar()
+    const propias = misNotificaciones()
+    if (!/^\d+$/.test(String(id))) throw crearError(400, 'El id de la notificación debe ser numérico.')
+    const notificacion = propias.find((n) => n.id === Number(id))
+    if (!notificacion) throw crearError(404, 'La notificación no existe')
+    notificacion.leida = true
+    return null
+  },
+
+  async marcarNotificacionesLeidas() {
+    await esperar()
+    for (const n of misNotificaciones()) n.leida = true
+    return null
+  },
+
   // ---------- 8. Asistente (H68) ----------
   async enviarChat(pedido, { signal } = {}) {
     const usuario = usuarioActual()
@@ -1034,17 +1250,21 @@ function responderChat(usuario, mensaje, { lat, lng }) {
     const mencionado = principioMencionado(mensaje)
     const encontrados = mencionado ? buscarPreciosChat(mencionado, lat, lng) : []
     const productos = encontrados.length ? encontrados : buscarPreciosChat('Paracetamol', lat, lng)
-    return { respuesta: textoRespaldo(productos), productos, respaldo: true }
+    return { respuesta: textoRespaldo(productos, usuario), productos, respaldo: true }
   }
   if (PIDE_CONSEJO.test(consulta)) return { respuesta: TEXTO_FUERA_DE_ALCANCE, productos: [] }
   if (esDueno && PIDE_STOCK_BAJO.test(consulta)) return respuestaStockBajo(usuario)
+  if (esDueno && PIDE_CONSEJO_NEGOCIO.test(consulta)) {
+    // Consejo de surtido: tipos de producto, sin marcas, precios ni stock (instrucciones del dueño)
+    return { respuesta: textoLista('En invierno se piden más estos tipos de producto. Revisa si los tienes y ponlos a la vista:', CONSEJO_INVIERNO), productos: [] }
+  }
   if (esDueno && PIDE_MI_CATALOGO.test(consulta)) return respuestaMiCatalogo(usuario, mensaje)
 
   const principio = principioMencionado(mensaje)
   if (principio) {
     const productos = buscarPreciosChat(principio, lat, lng)
     const respuesta = productos.length
-      ? textoPrecios(principio, productos)
+      ? textoPrecios(principio, productos, usuario)
       : `No encontré ${principio.toLowerCase()} con stock en las boticas aprobadas. Prueba con otro nombre o con el principio activo.`
     return { respuesta, productos }
   }
@@ -1059,6 +1279,7 @@ function responderChat(usuario, mensaje, { lat, lng }) {
 //   boticomparaMock.pedidos()                      (H77: pedidos de todas las boticas)
 //   boticomparaMock.vencerPedido(1)                (H79: venceEn pasa a ayer, para el 409 "La reserva ya venció")
 //   boticomparaMock.cancelarPedido(1)              (H79: el comprador lo cancela desde el móvil)
+//   boticomparaMock.nuevaReserva(1)                (H103: un comprador reserva el producto 1 y llega la notificación)
 //   boticomparaMock.condicionVenta(24, 'RECETA_RETENIDA')  (H72: cambia la condición de un medicamento; null = sin información)
 export function registrarAyudaConsola() {
   const cambiarEstado = (id, estado, motivoRechazo = null) => {
@@ -1102,7 +1323,11 @@ export function registrarAyudaConsola() {
       if (!reserva) return `No existe el pedido ${id}`
       if (!ESTADOS_ACTIVOS.includes(reserva.estado)) return `No se puede cancelar una reserva ${reserva.estado}`
       Object.assign(reserva, { estado: 'CANCELADA', actualizadoEn: ahoraIso() })
+      crearNotificacion('RESERVA_CANCELADA', reserva)
       return `${reserva.codigo}: CANCELADA`
     },
+    // H103: imita una reserva nueva desde la app, con su notificación al dueño
+    nuevaReserva: (productoId = 1, cantidad = 1) =>
+      simularReserva(productoId, cantidad)?.codigo ?? `No existe el producto ${productoId}`,
   }
 }

@@ -1,10 +1,11 @@
 // Pedidos de la botica (sección 10 de docs/API.md)
 // H77 - Ver los pedidos de mi botica (GET /pedidos)
-// H81 - Filtrar por estado (?estado=), guardado en la URL
+// H81 - Filtrar por estado con píldoras (?estado=), guardado en la URL
 // H78 - Detalle de un pedido (ver PedidoModales)
 // H79 - Confirmar, marcar listo para recoger y entregar (PATCH /pedidos/{id}/estado)
 // H80 - Rechazar con motivo (PATCH /pedidos/{id}/rechazar)
-import { useCallback, useEffect, useState } from 'react'
+// H103 - Abrir un pedido desde su notificación (?pedido=15)
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Cargando from '../components/Cargando.jsx'
@@ -18,6 +19,7 @@ import {
 } from '../components/PedidoModales.jsx'
 import { useBotica } from '../context/BoticaContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
+import { useAhora } from '../hooks/useAhora.js'
 import { api } from '../services/index.js'
 import { formatoFechaHora, formatoSoles } from '../utils/formato.js'
 import {
@@ -30,16 +32,6 @@ import {
   siguienteAccion,
   sinStockParaAceptar,
 } from '../utils/pedidos.js'
-
-/** Hora actual que se renueva cada minuto, para el "Vence en ..." */
-function useAhora() {
-  const [ahora, setAhora] = useState(() => Date.now())
-  useEffect(() => {
-    const intervalo = setInterval(() => setAhora(Date.now()), 60 * 1000)
-    return () => clearInterval(intervalo)
-  }, [])
-  return ahora
-}
 
 function TablaPedidos({ pedidos, ahora, procesando, onVer, onAvanzar, onRechazar }) {
   return (
@@ -165,6 +157,10 @@ export default function PedidosPage() {
   const [procesando, setProcesando] = useState(null) // id del pedido que se está guardando desde la tabla
   // Un solo diálogo a la vez por tipo: detalle y, encima, entrega o rechazo
   const [detalleId, setDetalleId] = useState(null)
+  // H103: pedido abierto desde una notificación; puede no estar en la lista (más de 100 o recién llegado)
+  const [pedidoSuelto, setPedidoSuelto] = useState(null)
+  const pedidoUrl = parametros.get('pedido')
+  const pedidosVistos = useRef(null)
   const [entregando, setEntregando] = useState(null)
   const [rechazando, setRechazando] = useState(null)
 
@@ -191,8 +187,46 @@ export default function PedidosPage() {
 
   /** Reemplaza solo la fila del pedido, sin volver a pedir la lista. */
   const reemplazar = useCallback((pedido) => {
+    setPedidoSuelto((suelto) => (suelto?.id === pedido.id ? pedido : suelto))
     setPedidos((lista) => lista?.map((p) => (p.id === pedido.id ? pedido : p)) ?? lista)
   }, [])
+
+  useEffect(() => {
+    pedidosVistos.current = pedidos
+  }, [pedidos])
+
+  // H103: ?pedido=15 abre ese pedido y se quita de la URL, para poder abrirlo otra vez después
+  useEffect(() => {
+    if (pedidoUrl === null) return undefined
+    let activo = true
+    const quitarDeLaUrl = () =>
+      setParametros(
+        (actuales) => {
+          actuales.delete('pedido')
+          return actuales
+        },
+        { replace: true },
+      )
+    api
+      .obtenerPedido(encodeURIComponent(pedidoUrl))
+      .then((pedido) => {
+        if (!activo) return
+        setPedidoSuelto(pedido)
+        setDetalleId(pedido.id)
+        // Si llegó después de cargar la lista, se trae de nuevo
+        if (pedidosVistos.current?.some((p) => p.id === pedido.id)) reemplazar(pedido)
+        else if (pedidosVistos.current) setRecarga((n) => n + 1)
+        quitarDeLaUrl()
+      })
+      .catch((err) => {
+        if (!activo) return
+        toast(err.mensaje ?? 'No se pudo abrir el pedido.', 'error')
+        quitarDeLaUrl()
+      })
+    return () => {
+      activo = false
+    }
+  }, [pedidoUrl, reemplazar, setParametros, toast])
 
   /** Tras un 409 (cambio ya no válido, falta de stock, vencido) se trae el estado real de la fila. */
   const refrescarFila = useCallback(
@@ -249,7 +283,10 @@ export default function PedidosPage() {
     setParametros(estado ? { estado } : {})
   }
 
-  const detalle = detalleId === null ? null : pedidos?.find((p) => p.id === detalleId) ?? null
+  const detalle =
+    detalleId === null
+      ? null
+      : pedidos?.find((p) => p.id === detalleId) ?? (pedidoSuelto?.id === detalleId ? pedidoSuelto : null)
 
   return (
     <>
@@ -264,16 +301,20 @@ export default function PedidosPage() {
       </div>
 
       <div className="barra-catalogo barra-pedidos">
-        <div className="campo filtro-estado">
-          <label htmlFor="filtro-estado">Estado</label>
-          <select id="filtro-estado" value={filtro} onChange={(e) => cambiarFiltro(e.target.value)}>
-            <option value="">Todos</option>
-            {Object.entries(ESTADOS_PEDIDO).map(([estado, info]) => (
-              <option key={estado} value={estado}>
-                {info.plural}
-              </option>
-            ))}
-          </select>
+        <div className="filtros-pildora" role="group" aria-label="Filtrar por estado">
+          {[['', 'Todos'], ...Object.entries(ESTADOS_PEDIDO).map(([estado, info]) => [estado, info.plural])].map(
+            ([estado, texto]) => (
+              <button
+                key={estado}
+                type="button"
+                className="pildora"
+                aria-pressed={filtro === estado}
+                onClick={() => cambiarFiltro(estado)}
+              >
+                {texto}
+              </button>
+            ),
+          )}
         </div>
         <button
           type="button"

@@ -136,7 +136,10 @@ public class ReservaService {
             throw ApiException.conflict("La reserva ya venció");
         }
         r.setEstado(EstadoReserva.CANCELADA);
-        return respuesta(reservas.save(r));
+        Reserva cancelada = reservas.save(r);
+        // H103: el aviso al dueño se guarda después del commit
+        eventos.publishEvent(new ReservaCancelada(cancelada.getId()));
+        return respuesta(cancelada);
     }
 
     /** H76: detalle de una reserva propia. */

@@ -1,8 +1,11 @@
 import { NavLink, Outlet } from 'react-router'
 import { useAuth } from '../context/AuthContext.jsx'
 import { BoticaProvider, useBotica } from '../context/BoticaContext.jsx'
+import { NotificacionesProvider } from '../context/NotificacionesContext.jsx'
 import Alerta from './Alerta.jsx'
 import AsistenteChat from './AsistenteChat.jsx'
+import BotonTema from './BotonTema.jsx'
+import Campana from './Campana.jsx'
 import Cargando from './Cargando.jsx'
 import Icono from './Icono.jsx'
 import Marca from './Marca.jsx'
@@ -18,6 +21,11 @@ function Cabecera() {
         <Marca />
         {botica && (
           <nav className="navegacion" aria-label="Secciones del panel">
+            {aprobada && (
+              <NavLink to="/panel/inicio">
+                <Icono nombre="casa" /> Inicio
+              </NavLink>
+            )}
             <NavLink to="/panel/estado">
               <Icono nombre="tienda" /> Mi botica
             </NavLink>
@@ -31,7 +39,10 @@ function Cabecera() {
         )}
         <div className="usuario-sesion">
           <span className="nombre-usuario texto-suave">{usuario.nombre}</span>
-          <AsistenteChat />
+          <BotonTema />
+          <Campana />
+          {/* key: si cambia el usuario, el chat empieza de cero */}
+          <AsistenteChat key={usuario.id} usuarioId={usuario.id} />
           <button type="button" className="btn btn-secundario btn-icono" onClick={cerrarSesion}>
             {/* En celular solo se ve el ícono; el texto queda para el lector de pantalla */}
             <Icono nombre="salir" /> <span className="texto-escritorio">Salir</span>
@@ -67,10 +78,12 @@ function Contenido() {
 export default function PanelLayout() {
   return (
     <BoticaProvider>
-      <Cabecera />
-      <main className="contenido">
-        <Contenido />
-      </main>
+      <NotificacionesProvider>
+        <Cabecera />
+        <main className="contenido">
+          <Contenido />
+        </main>
+      </NotificacionesProvider>
     </BoticaProvider>
   )
 }

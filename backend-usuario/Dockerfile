@@ -16,8 +16,10 @@ RUN ./mvnw -B -q package -DskipTests && cp target/backend-usuario-*.jar /fuente/
 # ---------- Etapa 2: solo el JRE 17 y el .jar ----------
 FROM eclipse-temurin:17-jre
 
-# Usuario sin permisos de administrador
-RUN groupadd --system boticompara && useradd --system --gid boticompara --no-create-home boticompara
+# Usuario sin permisos de administrador. El grupo 1000 es el único que puede leer los Secret Files de Render (Firebase)
+RUN (getent group 1000 > /dev/null || groupadd --gid 1000 secretos) \
+    && groupadd --system boticompara \
+    && useradd --system --gid boticompara --groups 1000 --no-create-home boticompara
 
 WORKDIR /app
 COPY --from=compilacion --chown=boticompara:boticompara /fuente/app.jar app.jar

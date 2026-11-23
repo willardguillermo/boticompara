@@ -5,6 +5,7 @@ import com.boticompara.usuario.dto.LoginResponse;
 import com.boticompara.usuario.dto.RegistroRequest;
 import com.boticompara.usuario.dto.UsuarioResponse;
 import com.boticompara.usuario.entity.Usuario;
+import com.boticompara.usuario.auth.LimitadorLogin;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.UsuarioRepository;
 import com.boticompara.usuario.security.GoogleIdentidad;
@@ -28,6 +29,7 @@ public class AuthService {
     private final PasswordEncoder encoder;
     private final JwtService jwt;
     private final VerificadorGoogle verificador;
+    private final LimitadorLogin limitador;
 
     /** H1, H15: la contraseña se guarda siempre con BCrypt. */
     @Transactional
@@ -45,15 +47,26 @@ public class AuthService {
         return UsuarioResponse.from(usuarios.save(u));
     }
 
-    /** H18: devuelve un JWT que lleva el rol del usuario. */
+    /** Compatibilidad: sin IP conocida (tests o llamadas internas). */
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest r) {
-        Usuario u = usuarios.findByCorreoIgnoreCase(r.correo().trim())
-                .orElseThrow(() -> ApiException.unauthorized("Correo o contraseña incorrectos"));
-        // Primero la credencial: el estado de la cuenta solo se revela a quien la tiene
-        if (u.getPasswordHash() == null || !encoder.matches(r.password(), u.getPasswordHash())) {
+        return login(r, "desconocida");
+    }
+
+    /** H18 y SEC-05: cuenta los fallos por correo e IP antes de comparar la clave. */
+    @Transactional(readOnly = true)
+    public LoginResponse login(LoginRequest r, String ip) {
+        String correo = r.correo().trim().toLowerCase(Locale.ROOT);
+        limitador.verificarNoBloqueado(correo, ip);
+
+        Usuario u = usuarios.findByCorreoIgnoreCase(correo).orElse(null);
+        // Correo inexistente, cuenta sin contraseña y clave incorrecta cuentan igual: mismo 401
+        if (u == null || u.getPasswordHash() == null || !encoder.matches(r.password(), u.getPasswordHash())) {
+            limitador.registrarFallo(correo, ip);
             throw ApiException.unauthorized("Correo o contraseña incorrectos");
         }
+        limitador.limpiar(correo, ip);
+
         if (!u.isActivo()) {
             throw ApiException.forbidden("Tu cuenta fue dada de baja");
         }

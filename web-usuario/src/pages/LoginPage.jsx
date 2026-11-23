@@ -5,6 +5,7 @@ import Alerta from '../components/Alerta.jsx'
 import AvisoSoloMovil from '../components/AvisoSoloMovil.jsx'
 import Campo from '../components/Campo.jsx'
 import Marca from '../components/Marca.jsx'
+import SpotlightCard from '../components/reactbits/SpotlightCard.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { MODO_SIMULADO } from '../services/index.js'
 import { propsError } from '../utils/validacion.js'
@@ -48,8 +49,9 @@ export default function LoginPage() {
 
   return (
     <main className="acceso">
-      <div className="tarjeta">
-        <Marca a="/login" />
+      {/* Luz suave que sigue al mouse (Spotlight Card); el borde lo pone .tarjeta */}
+      <SpotlightCard className="tarjeta" intensity={0.5} spotlightSize={280} style={{ '--spotlight-card-border': 'transparent' }}>
+        <Marca a="/login" degradado />
         {comprador ? (
           <AvisoSoloMovil nombre={comprador.nombre} onVolver={() => setComprador(null)} />
         ) : (
@@ -94,7 +96,8 @@ export default function LoginPage() {
               ¿Tienes una botica y aún no tienes cuenta? <Link to="/registro">Regístrate</Link>
             </p>
 
-            {MODO_SIMULADO && (
+            {/* Con DEV directo el build de producción quita este bloque y su contraseña de prueba */}
+            {import.meta.env.DEV && MODO_SIMULADO && (
               <div className="datos-prueba">
                 <Alerta tipo="info">
                   <p>
@@ -107,7 +110,7 @@ export default function LoginPage() {
             )}
           </>
         )}
-      </div>
+      </SpotlightCard>
     </main>
   )
 }

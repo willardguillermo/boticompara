@@ -27,6 +27,7 @@ import com.boticompara.app.ui.reservas.ReservaDetalleScreen
 import com.boticompara.app.ui.resenas.RUTA_RESENAS
 import com.boticompara.app.ui.resenas.ResenasBoticaScreen
 import com.boticompara.app.ui.perfil.ProfileScreen
+import com.boticompara.app.ui.chat.ChatScreen
 
 @Composable
 fun AppNav(
@@ -57,6 +58,7 @@ fun AppNav(
         composable("favoritos") { FavoritosScreen(navController) }
         composable("alertas") { AlertasScreen(navController, alertasViewModel) }
         composable("perfil") { ProfileScreen(navController) }
+        composable("chat") { ChatScreen(navController) }
 
         composable(
             route = "detalle/{productoId}",

@@ -7,9 +7,10 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { useChat } from '../hooks/useChat.js'
-import { formatoDistancia, MAX_CARACTERES_CHAT, partirNumerosAyuda } from '../utils/chat.js'
+import { formatoDistancia, MAX_CARACTERES_CHAT, partirNumerosAyuda, unirPrecios } from '../utils/chat.js'
 import { formatoSoles } from '../utils/formato.js'
 import Icono from './Icono.jsx'
+import ShinyText from './reactbits/ShinyText.jsx'
 
 const AVISO = 'No escribas datos personales. El asistente no reemplaza al químico farmacéutico ni al médico.'
 const NOTA_RESPALDO = 'Respuesta resumida: el asistente estaba ocupado.'
@@ -21,7 +22,7 @@ const NOTA_RESPALDO = 'Respuesta resumida: el asistente estaba ocupado.'
 function TextoConTelefonos({ texto }) {
   return partirNumerosAyuda(texto).map((trozo, i) =>
     typeof trozo === 'string' ? (
-      trozo
+      unirPrecios(trozo)
     ) : (
       <a key={i} href={`tel:${trozo.telefono}`} className="chat-telefono" aria-label={`Llamar al ${trozo.telefono}`}>
         {trozo.telefono}
@@ -93,14 +94,15 @@ function Mensaje({ mensaje, onReintentar, puedeReintentar, onNavegar }) {
     <li className="chat-fila">
       <div className={`chat-burbuja chat-burbuja-asistente ${mensaje.ayuda ? 'chat-burbuja-ayuda' : ''}`}>
         <span className="sr-only">Asistente: </span>
-        {/* Texto de un modelo de IA: siempre como texto plano, nunca como HTML */}
+        {/* Texto de un modelo de IA: siempre como texto plano, nunca como HTML.
+            unirPrecios solo cambia lo que se ve: mensaje.texto (y el historial) quedan igual */}
         {mensaje.ayuda ? (
           <>
             <Icono nombre="telefono" className="chat-icono-ayuda" />
             <TextoConTelefonos texto={mensaje.texto} />
           </>
         ) : (
-          mensaje.texto
+          unirPrecios(mensaje.texto)
         )}
         {mensaje.respaldo && <p className="chat-respaldo">{NOTA_RESPALDO}</p>}
       </div>
@@ -209,7 +211,9 @@ function PanelChat({ chat, onCerrar }) {
         )}
         {esperando && (
           <div className="chat-escribiendo" role="status">
-            <span className="spinner" aria-hidden="true" /> El asistente está buscando…
+            <span className="spinner" aria-hidden="true" />
+            {/* Brillo que recorre el texto mientras espera (Shiny Text); quieto con movimiento reducido */}
+            <ShinyText shineColor="var(--rb-brillo)" speed={2.2} delay={0.4} shineWidth={55} glow={0.2}>El asistente está buscando…</ShinyText>
           </div>
         )}
       </div>
@@ -255,16 +259,26 @@ function PanelChat({ chat, onCerrar }) {
   )
 }
 
-/** Botón de la cabecera + panel. La conversación se mantiene mientras la página siga abierta. */
-export default function AsistenteChat() {
+/**
+ * Botón de la cabecera + panel. La conversación se conserva hasta 10 minutos
+ * después de cerrar el panel, también al recargar la página (H69).
+ */
+export default function AsistenteChat({ usuarioId }) {
   const [abierto, setAbierto] = useState(false)
-  const chat = useChat()
+  const chat = useChat({ usuarioId })
+  const { alAbrir, alCerrar } = chat
   const boton = useRef(null)
 
+  const abrir = () => {
+    alAbrir()
+    setAbierto(true)
+  }
+
   const cerrar = useCallback(() => {
+    alCerrar()
     setAbierto(false)
     boton.current?.focus()
-  }, [])
+  }, [alCerrar])
 
   return (
     <>
@@ -274,9 +288,9 @@ export default function AsistenteChat() {
         className={`btn btn-icono ${abierto ? 'btn-primario' : 'btn-secundario'}`}
         aria-haspopup="dialog"
         aria-expanded={abierto}
-        onClick={() => (abierto ? cerrar() : setAbierto(true))}
+        onClick={() => (abierto ? cerrar() : abrir())}
       >
-        <Icono nombre="chat" /> Asistente
+        <Icono nombre="chat" /> <span className="texto-asistente">Asistente</span>
       </button>
       {abierto && createPortal(<PanelChat chat={chat} onCerrar={cerrar} />, document.body)}
     </>
