@@ -189,8 +189,8 @@ export default function CuentaPage() {
         <div>
           <h2 id="titulo-peligro">Zona de peligro</h2>
           <p className="texto-suave">
-            Eliminar tu cuenta anonimiza tus datos y da de baja todos los productos de tu botica. No se puede
-            deshacer.
+            Eliminar tu cuenta anonimiza tus datos, da de baja todos los productos de tu botica, hace que deje de
+            estar aprobada y rechaza sus pedidos activos. No se puede deshacer.
           </p>
         </div>
         <button type="button" className="btn btn-peligro" onClick={() => setConfirmando(true)}>
@@ -203,7 +203,10 @@ export default function CuentaPage() {
           botica={botica}
           onCerrar={() => setConfirmando(false)}
           onEliminada={() =>
-            salirConAviso('Tu cuenta fue eliminada. Tus datos se anonimizaron y tus productos ya no aparecen en las búsquedas.')
+            salirConAviso(
+              'Tu cuenta fue eliminada. Tus datos se anonimizaron, tus productos ya no aparecen en las búsquedas y '
+                + 'tus pedidos activos se rechazaron.',
+            )
           }
         />
       )}

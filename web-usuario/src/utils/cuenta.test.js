@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  avisoBoticaAlEliminar,
   confirmacionValida,
   cuerpoPerfil,
   esErrorDeTitular,
@@ -81,4 +82,11 @@ test('mostrarAyudaTitular: botica RECHAZADO con RUC de persona (A7)', () => {
   assert.equal(mostrarAyudaTitular({ estado: 'RECHAZADO', ruc: '20601234565' }), false)
   assert.equal(mostrarAyudaTitular({ estado: 'APROBADO', ruc: '10461234564' }), false)
   assert.equal(mostrarAyudaTitular(null), false)
+})
+
+test('avisoBoticaAlEliminar: la botica aprobada o pendiente pasa a Rechazado; la rechazada no cambia (H19, S4-02)', () => {
+  assert.match(avisoBoticaAlEliminar({ estado: 'APROBADO' }), /deja de estar aprobada.*RUC queda libre/)
+  assert.match(avisoBoticaAlEliminar({ estado: 'PENDIENTE' }), /pasa a «Rechazado».*RUC queda libre/)
+  assert.equal(avisoBoticaAlEliminar({ estado: 'RECHAZADO' }), null)
+  assert.equal(avisoBoticaAlEliminar(null), null)
 })
