@@ -245,7 +245,13 @@ Con el servicio desplegado. Las IP de las personas no se anotan aquí.
   conectó. El `X-Forwarded-For` inventado de la prueba ya no influye.
 - Registro y recuperar usan la misma IP, así que el arreglo también les sirve; solo se probó el login. La variable quedó en
   `render.yaml` con valor fijo.
-- **Por comprobar:** la prueba 2 (otra red no queda bloqueada) y que un `CF-Connecting-IP` inventado no cambie `cf=`.
+
+El 24/11/2026 se completaron las dos comprobaciones que faltaban:
+
+| Prueba | Resultado |
+|---|---|
+| Enviar `CF-Connecting-IP` inventado (y `X-Forwarded-For` inventado) | Cloudflare rechaza la petición antes de que llegue a la API: **403**, `server: cloudflare`, cuerpo `error code: 1000`, 6 de 6. La cabecera no se puede falsificar |
+| Prueba 2, con `limite2@prueba.invalid` ya bloqueado desde la Mac (`… 401 429`) | El mismo correo desde los datos móviles del celular (otra red) dio **401** "Correo o contraseña incorrectos", sin bloqueo. Cada cliente tiene su propio contador |
 - El access log de la sección anterior se activó solo para este diagnóstico y luego se quitó.
 
 ### Lo que se probó en local (22/11/2026)
