@@ -57,8 +57,9 @@ public class AuthController {
         return auth.loginGoogle(request.idToken());
     }
 
+    /** S4-13: con @Valid, un correo o una contraseña nulos o vacíos dan 400 y no llegan al servicio (antes, 500). */
     @PostMapping("/login")
-    public LoginResponse login(@RequestBody LoginRequest request, HttpServletRequest http) {
+    public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
         return auth.login(request, http.getRemoteAddr());
     }
 
