@@ -167,7 +167,8 @@ const normalizar = (texto) =>
 
 // ---------- Respuestas con la forma exacta de docs/API.md ----------
 const usuarioCorto = ({ id, nombre, correo, rol }) => ({ id, nombre, correo, rol })
-const perfil = ({ id, nombre, correo, telefono, direccion, rol }) => ({ id, nombre, correo, telefono, direccion, rol })
+const perfil = ({ id, nombre, correo, telefono, direccion, rol, correoVerificado = true, notificacionesPrecio = true }) =>
+  ({ id, nombre, correo, telefono, direccion, rol, correoVerificado, notificacionesPrecio })
 // eslint-disable-next-line no-unused-vars
 const boticaDto = ({ usuarioId, ...botica }) => botica
 const productoDto = ({ id, nombreComercial, principioActivo, presentacion, precio, stock, stockMinimo, medicamentoId }) =>
@@ -245,7 +246,8 @@ const datosBotica = (datos) => ({
 function usuarioActual() {
   const [prefijo, id] = (obtenerToken() ?? '').split('.')
   const usuario = prefijo === 'mock-token' && db.usuarios.find((u) => u.id === Number(id))
-  if (!usuario) throw crearError(401, 'Tu sesión expiró. Inicia sesión nuevamente.')
+  // H19: el token de una cuenta eliminada deja de servir
+  if (!usuario || usuario.eliminado) throw crearError(401, 'Tu sesión expiró. Inicia sesión nuevamente.')
   return usuario
 }
 
@@ -953,6 +955,34 @@ export const apiMock = {
   async obtenerPerfil() {
     await esperar()
     return perfil(usuarioActual())
+  },
+
+  // H16: igual que PerfilRequest del backend; el correo y el rol no se editan
+  async actualizarPerfil(datos) {
+    await esperar()
+    const usuario = usuarioActual()
+    const nombre = String(datos?.nombre ?? '').trim()
+    const telefono = String(datos?.telefono ?? '').trim()
+    const direccion = String(datos?.direccion ?? '').trim()
+    if (!nombre) throw crearError(400, 'El nombre es obligatorio')
+    if (nombre.length > 100) throw crearError(400, 'El nombre admite máximo 100 caracteres')
+    if (telefono.length > 20) throw crearError(400, 'El teléfono admite máximo 20 caracteres')
+    if (direccion.length > 255) throw crearError(400, 'La dirección admite máximo 255 caracteres')
+    Object.assign(usuario, { nombre, telefono: telefono || null, direccion: direccion || null })
+    return perfil(usuario)
+  },
+
+  // H19: anonimiza la cuenta (no borra la fila) y da de baja los productos de su botica
+  async eliminarCuenta() {
+    await esperar()
+    const usuario = usuarioActual()
+    Object.assign(usuario, {
+      nombre: 'Usuario eliminado', correo: `eliminado-${usuario.id}@boticompara.local`,
+      telefono: null, direccion: null, password: null, eliminado: true,
+    })
+    const botica = db.boticas.find((b) => b.usuarioId === usuario.id)
+    for (const p of db.productos.filter((p) => p.boticaId === botica?.id)) p.activo = false
+    return null
   },
 
   // ---------- 3. Botica ----------
