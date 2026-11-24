@@ -117,6 +117,7 @@ Errores: 400, 409 (correo ya registrado), 429 (límite por IP).
 ```
 El token dura 24 h. Errores:
 
+- **400:** falta `correo` o `password`, o vienen vacíos (S4-13). Mensaje "El correo es obligatorio" o "La contraseña es obligatoria" (los dos, separados por "; ", si faltan ambos). No cuenta como intento fallido.
 - **401:** correo o contraseña incorrectos, o cuenta sin contraseña (creada con Google). Es el mismo mensaje en todos los casos, para no revelar qué correos existen.
 - **403:** cuenta dada de baja o suspendida, **solo si la contraseña es correcta**. Responde "Tu cuenta fue dada de baja" o "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima). Sin contraseña correcta no se revela el estado de la cuenta.
 - **429:** demasiados intentos fallidos. Se cuenta por correo e IP: 5 contraseñas incorrectas en 15 minutos bloquean nuevos intentos de ese correo desde esa IP durante 15 minutos. Responde con el header `Retry-After` (segundos restantes) y el mensaje "Demasiados intentos fallidos. Espera 15 minutos". Un login correcto limpia el contador de ese correo e IP.
@@ -265,7 +266,7 @@ El RUC se verifica igual que en `validar-ruc` y la consulta a SUNAT cuenta en lo
 
 **El RUC solo se reserva al aprobar la botica (A5).** Varias cuentas pueden tener solicitudes `PENDIENTE` (o `RECHAZADO`) con el mismo RUC; el 409 "El RUC ya está registrado" sale solo si ya hay una botica `APROBADO` con ese RUC. Así, quien registre el RUC de una botica real no la deja sin poder registrarse. Cuando el administrador aprueba una de esas solicitudes, las demás `PENDIENTE` con el mismo RUC pasan a `RECHAZADO` con el motivo "Otra cuenta acreditó la licencia de este RUC" (y su dueño recibe el correo de rechazo). En la BD lo asegura un índice único parcial (`uq_botica_ruc_aprobado`: `ruc` único donde `estado = 'APROBADO'`).
 
-**RUC de persona natural (A7).** Si el RUC empieza con `10` o `15` y SUNAT devolvió el nombre del titular (`razonSocial`), cada palabra del nombre de la cuenta (`nombre` del usuario) debe aparecer en ese nombre, sin importar tildes, mayúsculas ni orden. Si no → 400 "Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular (según SUNAT: {razonSocial})". Ejemplo: cuenta "Rosa Quispe" y SUNAT "QUISPE MAMANI ROSA" → pasa; cuenta "Jorge Mendoza" con ese RUC → 400. Si SUNAT no respondió o se llegó a un límite de consultas (`fuente: LOCAL`), no se bloquea. Los RUC `20` y `17` (empresas y otros) no se revisan. Para corregirlo, el dueño cambia su nombre en el perfil (`PUT /usuarios/me`) o usa el RUC de su empresa.
+**RUC de persona natural (A7).** Si el RUC empieza con `10` o `15` y SUNAT devolvió el nombre del titular (`razonSocial`), cada palabra del nombre de la cuenta (`nombre` del usuario) debe aparecer en ese nombre, sin importar tildes, mayúsculas ni orden. Si no → 400 "Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular del RUC". El mensaje no repite el nombre que da SUNAT (S4-06). Ejemplo: cuenta "Rosa Quispe" y SUNAT "QUISPE MAMANI ROSA" → pasa; cuenta "Jorge Mendoza" con ese RUC → 400. Si SUNAT no respondió o se llegó a un límite de consultas (`fuente: LOCAL`), no se bloquea. Los RUC `20` y `17` (empresas y otros) no se revisan. Para corregirlo, el dueño cambia su nombre en el perfil (`PUT /usuarios/me`) o usa el RUC de su empresa.
 
 Errores: 400 (RUC inválido, inexistente en SUNAT, que no está `ACTIVO` o no está `HABIDO`; RUC de persona que no está a nombre de la cuenta; coordenadas inválidas o incompletas), 409 (el RUC ya pertenece a una botica aprobada, o el dueño ya tiene botica).
 
@@ -713,7 +714,7 @@ Roles: `COMPRADOR` y `DUENO_BOTICA`. El rol del token decide qué herramientas t
 | Campo | Obligatorio | Validación |
 |---|---|---|
 | `mensaje` | sí | Texto de 1 a 500 caracteres, sin contar espacios al inicio ni al final |
-| `historial` | no | Lista de mensajes anteriores, del más antiguo al más reciente. Cada uno con `rol` (`usuario` o `asistente`) y `texto` (1 a 1000 caracteres). Si llegan más de 10, el servidor usa solo los 10 últimos. Sin historial: se omite, `null` o `[]` |
+| `historial` | no | Lista de mensajes anteriores, del más antiguo al más reciente. Cada uno con `rol` (`usuario` o `asistente`) y `texto` (1 a 1000 caracteres). Como máximo 20 elementos (S4-16): con más, 400. De los que llegan, el servidor usa solo los 10 últimos. Sin historial: se omite, `null` o `[]` |
 | `lat`, `lng` | no | Ubicación del usuario; se envían juntas, con los mismos rangos que en `GET /productos/buscar`. Solo sirven para calcular distancias en el servidor: **no se envían a Gemini ni se guardan** |
 
 El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` enviados (`usuario`) y las `respuesta` recibidas (`asistente`). Los `productos` de respuestas anteriores no se reenvían.
@@ -871,11 +872,11 @@ Con 900 caracteres, la respuesta del dueño cabe en un `texto` del `historial` (
 
    | Grupo | Frases que lo activan | Texto de la respuesta |
    |---|---|---|
-   | Autolesión | "hacerme daño", "matarme", "quiero matarme", "suicid…" (suicidio, suicidarme), "quitarme la vida", "no quiero vivir", "no quiero seguir viviendo", "quiero morir", "me quiero morir", "acabar con mi vida", "cortarme las venas", "hacerme cortes" | "Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento." |
-   | Emergencia física | "no puedo respirar", "no puedo respirar bien", "me falta el aire", "dolor de pecho", "dolor en el pecho", "me duele el pecho", "intoxicación", "envenenamiento", "convulsión", "desmayo" | "Llama al SAMU al 106 de inmediato. BotiCompara solo compara precios de medicamentos y no puede atender una emergencia: ahora lo más importante es tu salud." |
+   | Autolesión | "hacerme daño", "matarme", "quiero matarme", "suicid…" (suicidio, suicidarme), "quitarme la vida", "no quiero vivir", "no quiero seguir viviendo", "quiero morir", "me quiero morir", "acabar con mi vida", "cortarme las venas", "hacerme cortes", "dosis letal", "dosis mortal", "todas las pastillas juntas", "todas las pastillas de golpe", "todas las pastillas a la vez" (S4-15) | "Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento." |
+   | Emergencia física | "no puedo respirar", "no puedo respirar bien", "me falta el aire", "dolor de pecho", "dolor en el pecho", "me duele el pecho", "intoxicación", "envenenamiento", "convulsión", "desmayo", "sobredosis" (S4-15) | "Llama al SAMU al 106 de inmediato. BotiCompara solo compara precios de medicamentos y no puede atender una emergencia: ahora lo más importante es tu salud." |
 
    - Si el mensaje tiene frases de los dos grupos, responde el de autolesión.
-   - La lista es corta a propósito. Un falso positivo solo muestra números de ayuda, pero no debe activarse con frases comunes: "me duele la cabeza", "dolor de cabeza" o "cortarme el pelo" siguen su camino normal.
+   - La lista es corta a propósito. Un falso positivo solo muestra números de ayuda, pero no debe activarse con frases comunes: "me duele la cabeza", "dolor de cabeza", "cortarme el pelo" o "¿tengo que tomarme todas las pastillas del antibiótico?" siguen su camino normal.
    - Si el filtro no detecta nada, todo sigue igual: responde Gemini con sus instrucciones, que también indican el SAMU 106 y la Línea 113.
 2. **Red de seguridad en los errores.** Todos los mensajes de error propios del chat (429, 503 y 504) terminan con: "Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5." Así, aunque el asistente no pueda responder, nadie se queda sin esos números. Los 400 y el 401 no lo llevan.
 
@@ -906,6 +907,7 @@ Errores:
 | 400 | `mensaje` vacío o solo espacios | "Escribe tu pregunta" |
 | 400 | `mensaje` de más de 500 caracteres | "La pregunta no puede pasar de 500 caracteres" |
 | 400 | `historial` con un `rol` distinto de `usuario` o `asistente`, o un `texto` vacío o de más de 1000 caracteres | "El historial no es válido" |
+| 400 | `historial` con más de 20 elementos (S4-16) | "El historial no puede pasar de 20 mensajes" |
 | 400 | Solo una de `lat` y `lng`, o coordenadas fuera de rango | Los mismos mensajes que `GET /productos/buscar` |
 | 401 | El token no es válido o la cuenta no está habilitada (dada de baja o suspendida) | El mismo que el resto de la API |
 | 403 | Dueño cuya botica no está `APROBADO` (o sin botica) | "El asistente se activa cuando tu botica sea aprobada" |
