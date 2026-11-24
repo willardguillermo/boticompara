@@ -66,7 +66,9 @@ export default function LoginPage() {
                   <p>{state.exito}</p>
                 </Alerta>
               )}
-              {aviso && (
+              {/* H17 y H19: "Contraseña actualizada" es lo más reciente; no se mezcla con un aviso anterior
+                  del contexto (por ejemplo "Tu cuenta fue eliminada" o "Tu sesión expiró") */}
+              {aviso && !state?.exito && (
                 <Alerta tipo="aviso">
                   <p>{aviso}</p>
                 </Alerta>
