@@ -127,7 +127,7 @@ export default function EstadoPage() {
         </dl>
       </section>
 
-      <SeccionLicencia tieneLicencia={botica.tieneLicencia} />
+      <SeccionLicencia tieneLicencia={botica.tieneLicencia} aprobada={botica.estado === 'APROBADO'} />
 
       {/* Las reseñas solo existen para una botica aprobada: con otro estado el endpoint responde 404 */}
       {botica.estado === 'APROBADO' && <SeccionResenas boticaId={botica.id} />}

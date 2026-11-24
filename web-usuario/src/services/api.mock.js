@@ -1035,6 +1035,8 @@ export const apiMock = {
   async subirLicencia(archivo) {
     await esperar()
     const botica = boticaActual()
+    // S4-07: igual que la API, una botica aprobada no cambia su licencia
+    if (botica.estado === 'APROBADO') throw crearError(409, 'La licencia de una botica aprobada no se puede cambiar')
     const error = validarArchivoLicencia(archivo)
     if (error) throw crearError(400, error)
     if (!(await contenidoPermitido(archivo))) {
