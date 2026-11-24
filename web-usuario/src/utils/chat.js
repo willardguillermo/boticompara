@@ -28,6 +28,8 @@ export function errorTiempoAgotado() {
 
 /**
  * Texto que ve el usuario cuando falla el pedido.
+ * - 403: el `mensaje` del cuerpo (botica todavía no aprobada o correo sin
+ *   verificar), para que el usuario sepa qué le falta.
  * - 429, 503 y 504: el `mensaje` del cuerpo, completo (termina con los números
  *   de ayuda). No depende del header Retry-After.
  * - 504 sin cuerpo o los 60 s agotados: "tardó demasiado".
@@ -37,7 +39,7 @@ export function errorTiempoAgotado() {
 export function mensajeDeError(error) {
   if (error?.name === 'TimeoutError') return MENSAJE_TARDO
   const delCuerpo = error?.mensaje && error.mensaje !== MENSAJE_INESPERADO ? error.mensaje : null
-  if ([429, 503, 504].includes(error?.status) && delCuerpo) return delCuerpo
+  if ([403, 429, 503, 504].includes(error?.status) && delCuerpo) return delCuerpo
   if (error?.status === 504) return MENSAJE_TARDO
   return MENSAJE_GENERICO
 }
