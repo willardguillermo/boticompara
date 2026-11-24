@@ -58,9 +58,14 @@ export function esRucDePersona(ruc) {
   return /^(10|15)\d{9}$/.test(String(ruc ?? ''))
 }
 
-/** A7: el 400 de POST /boticas o PUT /boticas/mia cuando la cuenta no está a nombre del titular. */
+/**
+ * A7: el 400 de POST /boticas o PUT /boticas/mia cuando la cuenta no está a nombre del titular.
+ * Solo mira el principio, igual en el mensaje viejo ("... (según SUNAT: X)") y en el de S4-06 ("... del RUC").
+ */
+export const INICIO_ERROR_TITULAR = 'Este RUC pertenece a una persona'
+
 export function esErrorDeTitular(mensaje) {
-  return /pertenece a una persona/i.test(String(mensaje ?? ''))
+  return String(mensaje ?? '').trim().toLowerCase().startsWith(INICIO_ERROR_TITULAR.toLowerCase())
 }
 
 /** A7: mostrar en Mi cuenta el paso a paso de corregir el nombre y reenviar la botica. */

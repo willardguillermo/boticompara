@@ -64,10 +64,15 @@ test('esRucDePersona: solo RUC 10 y 15 de 11 dígitos (A7)', () => {
   assert.equal(esRucDePersona(null), false)
 })
 
-test('esErrorDeTitular: reconoce el 400 de A7 del backend', () => {
-  const a7 = 'Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular (según SUNAT: QUISPE MAMANI ROSA)'
-  assert.equal(esErrorDeTitular(a7), true)
+test('esErrorDeTitular: reconoce el 400 de A7 con el mensaje viejo y con el de S4-06', () => {
+  const viejo = 'Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular (según SUNAT: QUISPE MAMANI ROSA)'
+  const nuevo = 'Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular del RUC'
+  assert.equal(esErrorDeTitular(viejo), true)
+  assert.equal(esErrorDeTitular(nuevo), true)
+  assert.equal(esErrorDeTitular('Este RUC pertenece a una persona'), true)
   assert.equal(esErrorDeTitular('El RUC ya está registrado'), false)
+  // Solo el principio: la frase en medio de otro mensaje no cuenta
+  assert.equal(esErrorDeTitular('Aviso: este RUC pertenece a una persona'), false)
   assert.equal(esErrorDeTitular(undefined), false)
 })
 
