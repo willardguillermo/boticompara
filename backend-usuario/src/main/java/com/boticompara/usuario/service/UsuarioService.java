@@ -32,6 +32,7 @@ public class UsuarioService {
     private final FavoritoService favoritos;
     private final AlertaService alertas;
     private final PedidoService pedidos;
+    private final ReservaService reservas;
     private final PasswordEncoder encoder;
 
     private final SecureRandom azar = new SecureRandom();
@@ -64,7 +65,8 @@ public class UsuarioService {
      * botica. Los códigos y tokens pendientes también quedan sin efecto.
      * D1: también borra sus favoritos (como la fila del usuario no se borra, el on delete cascade no actúa).
      * S4-02: si es dueño, su botica pasa a RECHAZADO (libera el RUC de uq_botica_ruc_aprobado) y sus reservas
-     * activas se rechazan. Todo en esta transacción; los correos a los compradores salen después del commit.
+     * activas se rechazan. Si es comprador, sus reservas activas se cancelan (H103: aviso a cada dueño).
+     * Todo en esta transacción; los correos y las notificaciones salen después del commit.
      */
     @Transactional
     public void eliminar(Long id) {
@@ -84,6 +86,9 @@ public class UsuarioService {
         usuarios.save(u);
 
         boticas.bloquearPorUsuarioId(id).ifPresent(this::cerrarBotica);
+        if ("COMPRADOR".equals(u.getRol())) {
+            reservas.cancelarActivasDe(id);
+        }
         tokens.invalidarPendientes(id);
         favoritos.quitarTodos(id);
         alertas.borrarTodas(id);   // H59: también sus alertas de precio

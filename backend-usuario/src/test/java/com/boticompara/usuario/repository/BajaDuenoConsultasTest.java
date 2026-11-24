@@ -11,9 +11,9 @@ import org.springframework.test.context.TestPropertySource;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * S4-02: las dos consultas con bloqueo de la baja del dueño corren en PostgreSQL (select ... for update). Usan ids que
- * no existen, así que no bloquean ni cambian nada, y @DataJpaTest deshace la transacción al terminar. Sin base
- * configurada, la clase se omite.
+ * S4-02 y H19: las consultas con bloqueo de la baja del dueño y del comprador corren en PostgreSQL
+ * (select ... for update). Usan ids que no existen, así que no bloquean ni cambian nada, y @DataJpaTest deshace la
+ * transacción al terminar. Sin base configurada, la clase se omite.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -38,5 +38,10 @@ class BajaDuenoConsultasTest {
     @Test
     void bloquearLasReservasActivasDeUnaBoticaCorreEnLaBase() {
         assertTrue(reservas.bloquearDeBoticaConEstados(NADIE, EstadoReserva.ACTIVAS).isEmpty());
+    }
+
+    @Test
+    void bloquearLasReservasActivasDeUnCompradorCorreEnLaBase() {
+        assertTrue(reservas.bloquearPropiasConEstados(NADIE, EstadoReserva.ACTIVAS).isEmpty());
     }
 }

@@ -124,6 +124,7 @@ class BajaDuenoTransaccionTest {
     @MockitoBean CondicionVentaService condiciones;
     @MockitoBean NamedParameterJdbcTemplate jdbc;
     @MockitoBean CorreoService correo;
+    @MockitoBean ReservaService reservaService;
 
     @Autowired UsuarioService usuarioService;
     @Autowired Transacciones transacciones;

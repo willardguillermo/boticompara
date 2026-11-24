@@ -59,6 +59,9 @@ class UsuarioServiceTest {
     @Mock
     PedidoService pedidos;
 
+    @Mock
+    ReservaService reservas;
+
     @InjectMocks
     UsuarioService service;
 
@@ -195,6 +198,29 @@ class UsuarioServiceTest {
         verifyNoInteractions(pedidos);
     }
 
+    // ---------- H19: el comprador que elimina su cuenta ----------
+
+    @Test
+    void unCompradorCancelaSusReservasActivas() {
+        Usuario u = usuario(true);
+        u.setRol("COMPRADOR");
+        when(usuarios.findById(10L)).thenReturn(Optional.of(u));
+
+        service.eliminar(10L);
+
+        verify(reservas).cancelarActivasDe(10L);
+    }
+
+    @Test
+    void unDuenoNoCancelaReservasComoComprador() {
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+        when(boticas.bloquearPorUsuarioId(10L)).thenReturn(Optional.of(botica(5L)));
+
+        service.eliminar(10L);
+
+        verifyNoInteractions(reservas);
+    }
+
     @Test
     void sinBoticaNoTocaProductos() {
         when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
@@ -290,7 +316,7 @@ class UsuarioServiceTest {
 
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
         verify(usuarios, never()).save(any(Usuario.class));
-        verifyNoInteractions(boticas, productos, tokens, favoritos, alertas, encoder, pedidos);
+        verifyNoInteractions(boticas, productos, tokens, favoritos, alertas, encoder, pedidos, reservas);
     }
 
     @Test
@@ -303,6 +329,6 @@ class UsuarioServiceTest {
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
         assertEquals("Ana Torres", u.getNombre());
         verify(usuarios, never()).save(any(Usuario.class));
-        verifyNoInteractions(boticas, productos, tokens, favoritos, alertas, encoder, pedidos);
+        verifyNoInteractions(boticas, productos, tokens, favoritos, alertas, encoder, pedidos, reservas);
     }
 }

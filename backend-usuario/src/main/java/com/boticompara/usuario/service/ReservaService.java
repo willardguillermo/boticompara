@@ -152,6 +152,22 @@ public class ReservaService {
         return respuesta(cancelada);
     }
 
+    /**
+     * H19: el comprador eliminó su cuenta. Sus reservas PENDIENTE, CONFIRMADA y LISTA pasan a CANCELADA (liberan las
+     * unidades), aunque ya hayan pasado su venceEn: nadie las va a recoger. Igual que en cancelar, cada dueño recibe
+     * RESERVA_CANCELADA (H103) después del commit. Corre en la transacción de quien la llama. Devuelve cuántas.
+     */
+    @Transactional
+    public int cancelarActivasDe(Long usuarioId) {
+        List<Reserva> activas = reservas.bloquearPropiasConEstados(usuarioId, EstadoReserva.ACTIVAS);
+        for (Reserva r : activas) {
+            r.setEstado(EstadoReserva.CANCELADA);
+            Reserva cancelada = reservas.save(r);
+            eventos.publishEvent(new ReservaCancelada(cancelada.getId()));
+        }
+        return activas.size();
+    }
+
     /** H76: detalle de una reserva propia. */
     @Transactional(readOnly = true)
     public ReservaResponse detalle(Long usuarioId, Long id) {
