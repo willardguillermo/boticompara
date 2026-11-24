@@ -38,7 +38,10 @@ function Cabecera() {
           </nav>
         )}
         <div className="usuario-sesion">
-          <span className="nombre-usuario texto-suave">{usuario.nombre}</span>
+          {/* H16: el nombre lleva a Mi cuenta; en celular solo se ve el ícono */}
+          <NavLink to="/panel/cuenta" className="enlace-cuenta" aria-label={`Mi cuenta: ${usuario.nombre}`} title="Mi cuenta">
+            <Icono nombre="usuario" /> <span className="nombre-usuario">{usuario.nombre}</span>
+          </NavLink>
           <BotonTema />
           <Campana />
           {/* key: si cambia el usuario, el chat empieza de cero */}

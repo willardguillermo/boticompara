@@ -8,6 +8,7 @@ import { DISTRITOS } from '../utils/distritos.js'
 import { validarRuc } from '../utils/ruc.js'
 import { propsError, telefonoInvalido } from '../utils/validacion.js'
 import Alerta from './Alerta.jsx'
+import AyudaTitular from './AyudaTitular.jsx'
 import Campo from './Campo.jsx'
 import MapaUbicacion from './MapaUbicacion.jsx'
 
@@ -142,6 +143,7 @@ export default function BoticaForm({
           />
         </Campo>
       </div>
+      <AyudaTitular mensaje={rucEnVivo.error} />
 
       <Campo
         id="razonSocial"

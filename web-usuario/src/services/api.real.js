@@ -60,6 +60,8 @@ export const apiReal = {
 
   // 2. Perfil
   obtenerPerfil: () => solicitar('GET', '/usuarios/me'),
+  actualizarPerfil: (datos) => solicitar('PUT', '/usuarios/me', datos),
+  eliminarCuenta: () => solicitar('DELETE', '/usuarios/me'),
 
   // 3. Botica
   validarRuc: (ruc) => solicitar('GET', `/boticas/validar-ruc/${encodeURIComponent(ruc)}`),
