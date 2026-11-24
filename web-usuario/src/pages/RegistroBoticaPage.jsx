@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
+import AyudaTitular from '../components/AyudaTitular.jsx'
 import Campo from '../components/Campo.jsx'
 import Icono from '../components/Icono.jsx'
 import MapaUbicacion from '../components/MapaUbicacion.jsx'
@@ -264,6 +265,11 @@ export default function RegistroBoticaPage() {
                 placeholder="20601234565"
               />
             </Campo>
+            {rucEnVivo.error && (
+              <div className="campo-ancho">
+                <AyudaTitular mensaje={rucEnVivo.error} />
+              </div>
+            )}
             <div className="campo-ancho">
               <Campo
                 id="razonSocial"
