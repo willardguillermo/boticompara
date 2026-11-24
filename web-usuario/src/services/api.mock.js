@@ -54,6 +54,12 @@ const db = {
     { id: 5, nombre: 'Ana María Flores', correo: 'ana@ejemplo.test', password: PASSWORD_PRUEBA, telefono: null, direccion: null, rol: 'COMPRADOR' },
     // H19: cuenta eliminada (datos anonimizados)
     { id: 6, nombre: 'Usuario eliminado', correo: 'eliminado-6@boticompara.invalid', password: null, telefono: null, direccion: null, rol: 'COMPRADOR', eliminado: true },
+    // H87: más compradores con reseña en Salud Total, para que la lista tenga 2 páginas y se vea "Ver más"
+    ...['Miguel Ángel Paredes', 'Sofía Huamán', 'Luis Castillo', 'Patricia Rojas', 'Diego', 'Elena Vargas',
+      'Jorge Luis Chávez', 'Carmen Salazar', 'Ricardo Ñique', 'Valeria Mendoza', 'Pedro Gómez'].map((nombre, i) => ({
+      id: 7 + i, nombre, correo: `comprador${7 + i}@ejemplo.test`, password: PASSWORD_PRUEBA,
+      telefono: null, direccion: null, rol: 'COMPRADOR',
+    })),
   ],
   boticas: [
     { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', latitud: -11.942500, longitud: -76.699000, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
@@ -124,14 +130,27 @@ db.reservas = [
   }
 })
 
-// ---------- Reseñas de prueba (sección 11): Salud Total tiene 3 (promedio 4.3); FarmaVida, ninguna ----------
-/** [boticaId, usuarioId, estrellas, comentario, respuesta, creada hace] */
+// ---------- Reseñas de prueba (sección 11): Salud Total tiene 13 en 2 páginas (promedio 4.2), una de una cuenta
+// eliminada y una oculta que no cuenta; FarmaVida, ninguna (para ver "Aún no tienes reseñas") ----------
+/** [boticaId, usuarioId, estrellas, comentario, respuesta, creada hace, oculta] */
 db.resenas = [
   [1, 4, 5, 'Me atendieron rápido y tenían todo.', '¡Gracias, Carlos! Te esperamos.', 3 * 24 * HORA],
   [1, 5, 4, 'Buen precio y el pedido estaba listo.', null, 6 * 24 * HORA],
   [1, 6, 4, null, null, 20 * 24 * HORA],
-].map(([boticaId, usuarioId, estrellas, comentario, respuesta, creada], i) => ({
-  id: i + 1, boticaId, usuarioId, estrellas, comentario, respuesta, oculta: false,
+  [1, 7, 5, 'La señorita me explicó cómo tomar el antibiótico. Muy amable.', null, 2 * HORA],
+  [1, 8, 3, 'Tuve que esperar un rato, pero encontré el medicamento que en otras boticas no había.', null, 1 * 24 * HORA],
+  [1, 9, 5, 'Siempre compro aquí, precios justos.', null, 2 * 24 * HORA],
+  [1, 10, 4, null, null, 4 * 24 * HORA],
+  [1, 11, 5, 'Reservé por la app y al llegar ya estaba separado.', null, 8 * 24 * HORA],
+  [1, 12, 2, 'El precio en la app no coincidía con el de la tienda.', null, 10 * 24 * HORA],
+  [1, 13, 4, 'Buena atención.', null, 12 * 24 * HORA],
+  [1, 14, 5, 'Local limpio y ordenado.', null, 15 * 24 * HORA],
+  [1, 15, 4, 'Todo bien.', null, 25 * 24 * HORA],
+  [1, 16, 5, 'Muy recomendable, atienden hasta tarde.', null, 30 * 24 * HORA],
+  // Oculta por el administrador (H89): no aparece ni cuenta en el promedio
+  [1, 17, 1, 'Comentario ofensivo de prueba.', null, 5 * 24 * HORA, true],
+].map(([boticaId, usuarioId, estrellas, comentario, respuesta, creada, oculta = false], i) => ({
+  id: i + 1, boticaId, usuarioId, estrellas, comentario, respuesta, oculta,
   respondidaEn: respuesta ? haceMs(creada / 2) : null, creadoEn: haceMs(creada), actualizadoEn: haceMs(creada),
 }))
 
