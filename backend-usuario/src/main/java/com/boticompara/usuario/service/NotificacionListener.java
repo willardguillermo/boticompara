@@ -29,6 +29,12 @@ public class NotificacionListener {
         guardar(TipoNotificacion.RESERVA_CANCELADA, evento.reservaId());
     }
 
+    /** H84 (S4-01): una por cada reserva que VencimientoReservasService pasó a VENCIDA. */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void alVencerseReserva(ReservaVencida evento) {
+        guardar(TipoNotificacion.RESERVA_VENCIDA, evento.reservaId());
+    }
+
     /** En el log solo van el tipo, el id de la reserva y la clase del error: nunca su mensaje. */
     private void guardar(TipoNotificacion tipo, Long reservaId) {
         try {

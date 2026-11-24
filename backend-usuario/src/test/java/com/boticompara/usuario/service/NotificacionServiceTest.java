@@ -167,6 +167,7 @@ class NotificacionServiceTest {
     void titulos_comoElContrato() {
         assertEquals("Nueva reserva BC-7K2QXM", TipoNotificacion.NUEVA_RESERVA.titulo("BC-7K2QXM"));
         assertEquals("Reserva cancelada BC-7K2QXM", TipoNotificacion.RESERVA_CANCELADA.titulo("BC-7K2QXM"));
+        assertEquals("Reserva vencida BC-7K2QXM", TipoNotificacion.RESERVA_VENCIDA.titulo("BC-7K2QXM"));
     }
 
     @Test
@@ -187,6 +188,12 @@ class NotificacionServiceTest {
     void mensaje_canceladaNuncaAgregaLaReceta() {
         assertEquals("Amoxil x 3 · S/ 72.00",
                 NotificacionService.mensaje(TipoNotificacion.RESERVA_CANCELADA, amoxil("CON_RECETA")));
+    }
+
+    @Test
+    void mensaje_vencidaNuncaAgregaLaReceta() {
+        assertEquals("Amoxil x 3 · S/ 72.00",
+                NotificacionService.mensaje(TipoNotificacion.RESERVA_VENCIDA, amoxil("CON_RECETA")));
     }
 
     @Test

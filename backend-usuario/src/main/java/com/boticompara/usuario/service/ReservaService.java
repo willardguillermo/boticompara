@@ -12,6 +12,7 @@ import com.boticompara.usuario.repository.ProductoRepository;
 import com.boticompara.usuario.repository.ReservaRepository;
 import com.boticompara.usuario.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ public class ReservaService {
     static final int CANTIDAD_MAXIMA = 10;
     static final long HORAS_DE_PLAZO = 24;
     static final String CORREO_SIN_VERIFICAR = "Verifica tu correo para poder reservar";
+    static final String YA_VENCIO = "La reserva ya venció";
 
     /** Sin 0, O, 1 ni I, para que el código no se confunda al dictarlo. */
     private static final String ALFABETO = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -49,6 +51,10 @@ public class ReservaService {
 
     private final UsuarioRepository usuarios;
 
+    /** S4-03: máximo de reservas activas sin vencer por comprador (API.md, sección 9). */
+    @Value("${reservas.limite.activas-por-comprador:5}")
+    private int maximoActivas = 5;
+
 
     /**
      * H72-H74: crea la reserva en PENDIENTE. El producto se bloquea dentro de la transacción,
@@ -60,8 +66,9 @@ public class ReservaService {
             throw ApiException.badRequest("La cantidad debe estar entre 1 y " + CANTIDAD_MAXIMA);
         }
 
-        // Cada reserva envía un correo al dueño: una cuenta con un correo ajeno no debe poder gastar el cupo
-        if (!usuarios.findById(usuarioId).map(Usuario::isCorreoVerificado).orElse(false)) {
+        // Cada reserva envía un correo al dueño: una cuenta con un correo ajeno no debe poder gastar el cupo.
+        // S4-03: la fila del comprador queda bloqueada hasta el commit, así dos reservas suyas a la vez se esperan
+        if (!usuarios.bloquearPorId(usuarioId).map(Usuario::isCorreoVerificado).orElse(false)) {
             throw ApiException.forbidden(CORREO_SIN_VERIFICAR);
         }
 
@@ -82,11 +89,18 @@ public class ReservaService {
                     "Este medicamento se vende con receta retenida: acércate a la botica con tu receta médica");
         }
 
-        if (reservas.existsByUsuarioIdAndProductoIdAndEstadoIn(usuarioId, productoId, EstadoReserva.ACTIVAS)) {
+        // S4-01: las que ya pasaron venceEn no cuentan, aunque H84 todavía no las haya marcado VENCIDA
+        Instant ahora = Instant.now();
+        if (reservas.existeActivaDelProducto(usuarioId, productoId, EstadoReserva.ACTIVAS, ahora)) {
             throw ApiException.conflict("Ya tienes una reserva activa de este producto");
         }
 
-        long disponible = p.getStock() - reservas.unidadesApartadas(productoId, EstadoReserva.ACTIVAS);
+        // S4-03: antes de calcular lo disponible
+        if (reservas.contarActivasDe(usuarioId, EstadoReserva.ACTIVAS, ahora) >= maximoActivas) {
+            throw ApiException.conflict(demasiadasActivas(maximoActivas));
+        }
+
+        long disponible = p.getStock() - reservas.unidadesApartadas(productoId, EstadoReserva.ACTIVAS, ahora);
         if (disponible <= 0) {
             throw ApiException.conflict("Todas las unidades de este producto ya están reservadas");
         }
@@ -139,11 +153,14 @@ public class ReservaService {
     public ReservaResponse cancelar(Long usuarioId, Long id) {
         Reserva r = reservas.bloquearPropia(id, usuarioId)
                 .orElseThrow(() -> ApiException.notFound("La reserva no existe"));
+        if (r.getEstado() == EstadoReserva.VENCIDA) {
+            throw ApiException.conflict(YA_VENCIO);
+        }
         if (!r.getEstado().estaActiva()) {
             throw ApiException.conflict("No se puede cancelar una reserva " + r.getEstado());
         }
         if (!r.getVenceEn().isAfter(Instant.now())) {
-            throw ApiException.conflict("La reserva ya venció");
+            throw ApiException.conflict(YA_VENCIO);
         }
         r.setEstado(EstadoReserva.CANCELADA);
         Reserva cancelada = reservas.save(r);
@@ -164,6 +181,16 @@ public class ReservaService {
         Producto p = productos.findById(r.getProductoId()).orElse(null);
         Botica b = p == null ? null : boticas.findById(p.getBoticaId()).orElse(null);
         return ReservaResponse.from(r, p, b, p == null ? null : condiciones.deMedicamento(p.getMedicamentoId()));
+    }
+
+    static String demasiadasActivas(int maximo) {
+        return "Tienes demasiadas reservas activas: el máximo es " + maximo
+                + ". Recoge o cancela alguna antes de hacer otra";
+    }
+
+    /** Para las pruebas: el máximo sale de reservas.limite.activas-por-comprador. */
+    void setMaximoActivas(int maximo) {
+        this.maximoActivas = maximo;
     }
 
     /** H72: BC- + 6 caracteres del alfabeto, sin repetir (hasta 3 intentos). */

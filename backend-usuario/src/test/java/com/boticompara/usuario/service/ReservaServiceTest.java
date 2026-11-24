@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -33,6 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -66,7 +69,7 @@ class ReservaServiceTest {
 
         service = new ReservaService(productos, boticas, reservas, busqueda, eventos, condiciones, usuarios);
         // Por defecto el comprador ya verificó su correo
-        lenient().when(usuarios.findById(USUARIO)).thenReturn(Optional.of(comprador(true)));
+        lenient().when(usuarios.bloquearPorId(USUARIO)).thenReturn(Optional.of(comprador(true)));
     }
 
     private static Usuario comprador(boolean verificado) {
@@ -78,7 +81,7 @@ class ReservaServiceTest {
 
     @Test
     void crear_sinCorreoVerificado_403SinTocarNada() {
-        when(usuarios.findById(USUARIO)).thenReturn(Optional.of(comprador(false)));
+        when(usuarios.bloquearPorId(USUARIO)).thenReturn(Optional.of(comprador(false)));
 
         ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
 
@@ -89,7 +92,7 @@ class ReservaServiceTest {
 
     @Test
     void crear_usuarioQueNoExiste_403() {
-        when(usuarios.findById(USUARIO)).thenReturn(Optional.empty());
+        when(usuarios.bloquearPorId(USUARIO)).thenReturn(Optional.empty());
 
         ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
 
@@ -98,7 +101,7 @@ class ReservaServiceTest {
 
     @Test
     void crear_cantidadInvalida_el400VaAntesQueEl403() {
-        lenient().when(usuarios.findById(USUARIO)).thenReturn(Optional.of(comprador(false)));
+        lenient().when(usuarios.bloquearPorId(USUARIO)).thenReturn(Optional.of(comprador(false)));
 
         ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 0));
 
@@ -157,7 +160,7 @@ class ReservaServiceTest {
     @Test
     void yaTieneUnaReservaActivaDelMismoProductoEs409() {
         when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(5)));
-        when(reservas.existsByUsuarioIdAndProductoIdAndEstadoIn(USUARIO, PRODUCTO, EstadoReserva.ACTIVAS))
+        when(reservas.existeActivaDelProducto(eq(USUARIO), eq(PRODUCTO), eq(EstadoReserva.ACTIVAS), any()))
                 .thenReturn(true);
 
         ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
@@ -171,7 +174,7 @@ class ReservaServiceTest {
     void cantidadMayorQueLaDisponibleEs409() {
         // stock 5 y 3 apartadas por otros compradores: quedan 2
         when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(5)));
-        when(reservas.unidadesApartadas(any(), any())).thenReturn(3L);
+        when(reservas.unidadesApartadas(any(), any(), any())).thenReturn(3L);
 
         ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 3));
 
@@ -183,7 +186,7 @@ class ReservaServiceTest {
     void sinUnidadesDisponiblesEs409() {
         // stock 5 y 5 apartadas: disponible 0
         when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(5)));
-        when(reservas.unidadesApartadas(any(), any())).thenReturn(5L);
+        when(reservas.unidadesApartadas(any(), any(), any())).thenReturn(5L);
 
         ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
 
@@ -404,5 +407,100 @@ class ReservaServiceTest {
 
         assertEquals("BC-7K2QXM", resp.codigo());
         assertEquals("FarmaVida", resp.boticaNombre());
+    }
+
+    // ---------- S4-01: las reservas con venceEn pasado no cuentan ----------
+
+    @Test
+    void lasReglasDeReservasActivasUsanLaHoraActual() {
+        Producto p = producto(5);
+        stubCreacionExitosa(p);
+        Instant antes = Instant.now();
+
+        service.crear(USUARIO, PRODUCTO, 1);
+
+        ArgumentCaptor<Instant> enExiste = ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<Instant> enContar = ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<Instant> enApartadas = ArgumentCaptor.forClass(Instant.class);
+        verify(reservas).existeActivaDelProducto(eq(USUARIO), eq(PRODUCTO), eq(EstadoReserva.ACTIVAS), enExiste.capture());
+        verify(reservas).contarActivasDe(eq(USUARIO), eq(EstadoReserva.ACTIVAS), enContar.capture());
+        verify(reservas).unidadesApartadas(eq(PRODUCTO), eq(EstadoReserva.ACTIVAS), enApartadas.capture());
+        // La misma hora en las tres, y es la de ahora: así no cuentan las que ya pasaron venceEn
+        assertEquals(enExiste.getValue(), enContar.getValue());
+        assertEquals(enExiste.getValue(), enApartadas.getValue());
+        assertTrue(!enExiste.getValue().isBefore(antes) && !enExiste.getValue().isAfter(Instant.now()));
+    }
+
+    @Test
+    void crearBloqueaLaFilaDelComprador() {
+        stubCreacionExitosa(producto(5));
+
+        service.crear(USUARIO, PRODUCTO, 1);
+
+        verify(usuarios).bloquearPorId(USUARIO);
+        verify(usuarios, never()).findById(any());
+    }
+
+    @Test
+    void cancelarUnaReservaVencidaDa409ConElMensajeDeVencida() {
+        when(reservas.bloquearPropia(15L, USUARIO))
+                .thenReturn(Optional.of(reservaDe(EstadoReserva.VENCIDA, Instant.now().minus(2, ChronoUnit.HOURS))));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.cancelar(USUARIO, 15L));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("La reserva ya venció", ex.getMessage());
+        verify(reservas, never()).save(any(Reserva.class));
+        verifyNoInteractions(eventos);
+    }
+
+    // ---------- S4-03: máximo de reservas activas por comprador ----------
+
+    @Test
+    void conCincoReservasActivasEs409YNoCalculaElStock() {
+        when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(5)));
+        when(reservas.contarActivasDe(eq(USUARIO), eq(EstadoReserva.ACTIVAS), any())).thenReturn(5L);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("Tienes demasiadas reservas activas: el máximo es 5. Recoge o cancela alguna antes de hacer otra",
+                ex.getMessage());
+        verify(reservas, never()).unidadesApartadas(any(), any(), any());
+        verify(reservas, never()).save(any(Reserva.class));
+        verifyNoInteractions(eventos);
+    }
+
+    @Test
+    void conCuatroReservasActivasTodaviaPuedeReservar() {
+        stubCreacionExitosa(producto(5));
+        when(reservas.contarActivasDe(eq(USUARIO), eq(EstadoReserva.ACTIVAS), any())).thenReturn(4L);
+
+        ReservaResponse resp = service.crear(USUARIO, PRODUCTO, 1);
+
+        assertEquals(EstadoReserva.PENDIENTE, resp.estado());
+    }
+
+    @Test
+    void elMaximoSeConfigura() {
+        service.setMaximoActivas(2);
+        when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(5)));
+        when(reservas.contarActivasDe(eq(USUARIO), eq(EstadoReserva.ACTIVAS), any())).thenReturn(2L);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
+
+        assertTrue(ex.getMessage().startsWith("Tienes demasiadas reservas activas: el máximo es 2."));
+    }
+
+    @Test
+    void laReservaActivaDelMismoProductoSeRevisaAntesQueElMaximo() {
+        when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(5)));
+        when(reservas.existeActivaDelProducto(eq(USUARIO), eq(PRODUCTO), eq(EstadoReserva.ACTIVAS), any()))
+                .thenReturn(true);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
+
+        assertEquals("Ya tienes una reserva activa de este producto", ex.getMessage());
+        verify(reservas, never()).contarActivasDe(any(), any(), any());
     }
 }
