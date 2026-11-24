@@ -249,7 +249,9 @@ class UsuarioAdmin(SoloLecturaAdmin):
 
     ADVERTENCIA_BAJA = ('La baja es definitiva y no se puede revertir: la cuenta no podrá volver a entrar a '
                         'BotiCompara y no existe ninguna acción para reactivarla. Si es dueño de una botica, '
-                        'sus productos dejan de aparecer en las búsquedas.')
+                        'sus productos dejan de aparecer en las búsquedas, la botica pasa a «Rechazado» '
+                        f'(«{usuarios.MOTIVO_BOTICA_BAJA}», así su RUC queda libre) y sus reservas pendientes, '
+                        'confirmadas o listas se rechazan con un correo a cada comprador.')
 
     def dar_baja_view(self, request, object_id):
         """H93: primero el motivo, luego una página de confirmación; solo el segundo envío da de baja."""

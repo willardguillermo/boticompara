@@ -9,6 +9,9 @@ No hay columna estado; se calcula con activo y suspendido_hasta (database/v5_spr
 Cada acción es un UPDATE que lleva en su WHERE el estado que exige. Si otro administrador cambió
 la cuenta un instante antes, el UPDATE no toca ninguna fila y la acción se rechaza: no hace falta
 bloquear la fila ni puede quedar en el historial algo que no ocurrió.
+
+S4-02: al dar de baja a un dueño, su botica pasa a RECHAZADO (libera el RUC, A5) y sus reservas activas se
+rechazan, como cuando el dueño elimina su cuenta desde la web (DELETE /usuarios/me).
 """
 from datetime import datetime, time, timedelta
 
@@ -16,7 +19,9 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import Usuario, UsuarioAccion
+from . import revision
+from .models import Botica, Reserva, Usuario, UsuarioAccion
+from .notificaciones import notificar_reserva_rechazada
 
 ACTIVO = 'ACTIVO'
 SUSPENDIDO = 'SUSPENDIDO'
@@ -120,6 +125,11 @@ def reactivar(usuario_id, motivo, realizado_por):
 PUEDE_DAR_BAJA = (ACTIVO, SUSPENDIDO)
 REQUISITO_DAR_BAJA = 'La cuenta ya fue dada de baja y no se puede revertir.'
 
+# S4-02: la botica y las reservas de un dueño dado de baja. El de las reservas es el mismo de la API
+MOTIVO_BOTICA_BAJA = 'Cuenta dada de baja por el administrador'
+MOTIVO_RESERVAS_BAJA = 'La botica dejó de atender en BotiCompara'
+RESERVAS_ACTIVAS = (Reserva.Estado.PENDIENTE, Reserva.Estado.CONFIRMADA, Reserva.Estado.LISTA)
+
 
 def dar_baja(usuario_id, motivo, realizado_por):
     """H93: cuenta activa o suspendida. Un solo UPDATE que también quita la suspensión, para cumplir
@@ -131,3 +141,28 @@ def dar_baja(usuario_id, motivo, realizado_por):
             _rechazar(usuario_id, 'dar de baja', REQUISITO_DAR_BAJA)
         UsuarioAccion.objects.create(usuario_id=usuario_id, accion=UsuarioAccion.Accion.DAR_BAJA,
                                      motivo=motivo, realizado_por=realizado_por)
+        _cerrar_botica(usuario_id, realizado_por)
+
+
+def _cerrar_botica(usuario_id, realizado_por):
+    """S4-02, dentro de la transacción de la baja. Los correos a los compradores salen después del commit."""
+    botica_id = Botica.objects.filter(usuario_id=usuario_id).values_list('pk', flat=True).first()
+    if botica_id is None:
+        return
+    # La misma función que el botón Rechazar: bloquea la fila y deja la revisión en el historial (H47). Una botica
+    # ya RECHAZADO no cambia (su RUC ya está libre). Sin correo al dueño: ya no puede corregir ni reenviar nada
+    revision.revisar([botica_id], Botica.Estado.RECHAZADO, realizado_por, motivo=MOTIVO_BOTICA_BAJA,
+                     desde=revision.PUEDE_RECHAZAR, avisar_dueno=False)
+    _rechazar_reservas_activas(botica_id)
+
+
+def _rechazar_reservas_activas(botica_id):
+    activas = list(Reserva.objects.filter(producto__botica_id=botica_id, estado__in=RESERVAS_ACTIVAS)
+                   .select_related('usuario', 'producto__botica').order_by('pk').select_for_update(of=('self',)))
+    if not activas:
+        return
+    Reserva.objects.filter(pk__in=[r.pk for r in activas]).update(estado=Reserva.Estado.RECHAZADA,
+                                                                 motivo_rechazo=MOTIVO_RESERVAS_BAJA)
+    for reserva in activas:
+        reserva.estado, reserva.motivo_rechazo = Reserva.Estado.RECHAZADA, MOTIVO_RESERVAS_BAJA
+        transaction.on_commit(lambda r=reserva: notificar_reserva_rechazada(r))
