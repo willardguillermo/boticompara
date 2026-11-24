@@ -112,8 +112,8 @@ public class BoticaService {
         }
         String nombreCuenta = usuarios.findById(usuarioId).map(u -> u.getNombre()).orElse("");
         if (!nombreCoincide(nombreCuenta, sunat.razonSocial())) {
-            throw ApiException.badRequest("Este RUC pertenece a una persona: la cuenta debe estar a nombre "
-                    + "del titular (según SUNAT: " + sunat.razonSocial().trim() + ")");
+            // S4-06: no repite el nombre que da SUNAT, para no dictar el nombre que hay que ponerse
+            throw ApiException.badRequest("Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular del RUC");
         }
     }
 
