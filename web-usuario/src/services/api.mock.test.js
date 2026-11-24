@@ -1,7 +1,7 @@
 // Pruebas del modo simulado: npm test
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { soloRecientes } from './api.mock.js'
+import { soloRecientes, titularCoincide } from './api.mock.js'
 
 const DIA = 24 * 60 * 60 * 1000
 const AHORA = Date.parse('2026-11-22T15:30:00Z')
@@ -18,4 +18,12 @@ test('soloRecientes: a los 7 días justos ya no se ve, como en el contrato (H103
   const justo = hace(7 * DIA)
   assert.deepEqual(soloRecientes([casi, justo], AHORA), [casi])
   assert.deepEqual(soloRecientes([], AHORA), [])
+})
+
+test('titularCoincide: cada palabra de la cuenta está en el titular, sin tildes, mayúsculas ni orden (A7)', () => {
+  assert.equal(titularCoincide('Rosa Quispe', 'QUISPE MAMANI ROSA'), true)
+  assert.equal(titularCoincide('josé  peña', 'PEÑA RAMIREZ JOSE'), true)
+  assert.equal(titularCoincide('Jorge Mendoza', 'QUISPE MAMANI ROSA'), false)
+  assert.equal(titularCoincide('Ros Quispe', 'QUISPE MAMANI ROSA'), false)
+  assert.equal(titularCoincide('   ', 'QUISPE MAMANI ROSA'), false)
 })

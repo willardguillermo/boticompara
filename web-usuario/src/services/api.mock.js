@@ -15,6 +15,11 @@ const RUCS_SUNAT = {
     // Como la manda SUNAT: en mayúsculas y con un espacio al final
     direccion: 'CAL. LAS CAMELIAS NRO 256 INT. 701A URB. JARDIN ', distrito: 'SAN ISIDRO',
   },
+  // A7: RUC de persona natural; su titular es Rosa Quispe (la cuenta rosa@ coincide, otra cuenta no)
+  10461234564: {
+    ruc: '10461234564', razonSocial: 'QUISPE MAMANI ROSA', estado: 'ACTIVO', condicion: 'HABIDO',
+    direccion: 'JR. LOS PINOS NRO 120 ', distrito: 'LURIGANCHO',
+  },
   // H7: Botica Nueva Era, con una dirección fiscal distinta a la de su local
   20712345676: {
     ruc: '20712345676', razonSocial: 'NUEVA ERA SALUD S.A.C.', estado: 'ACTIVO', condicion: 'HABIDO',
@@ -868,6 +873,32 @@ export const soloRecientes = (notificaciones, ahora = Date.now()) =>
 /** Lo que ven la campana (lista y contador) y la actividad reciente. */
 const misNotificacionesRecientes = () => soloRecientes(misNotificaciones())
 
+/** A5: el RUC solo choca con una botica APROBADO (las PENDIENTE y RECHAZADO pueden repetirlo). */
+function exigirRucLibre(ruc) {
+  if (db.boticas.some((b) => b.ruc === ruc && b.estado === 'APROBADO')) {
+    throw crearError(409, 'El RUC ya está registrado')
+  }
+}
+
+const palabras = (texto) =>
+  (texto ?? '').normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+
+/** A7: cada palabra del nombre de la cuenta está en el del titular, sin tildes, mayúsculas ni orden. */
+export function titularCoincide(nombreCuenta, titular) {
+  const delTitular = new Set(palabras(titular))
+  const deLaCuenta = palabras(nombreCuenta)
+  return deLaCuenta.length > 0 && deLaCuenta.every((p) => delTitular.has(p))
+}
+
+/** A7: un RUC 10 o 15 (persona) con titular conocido en SUNAT debe estar a nombre de la cuenta. */
+function exigirTitular(dueno, ruc) {
+  const titular = RUCS_SUNAT[ruc]?.razonSocial
+  if (!/^(10|15)/.test(ruc) || !titular) return
+  if (!titularCoincide(dueno.nombre, titular)) {
+    throw crearError(400, `Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular (según SUNAT: ${titular})`)
+  }
+}
+
 export const apiMock = {
   // ---------- 1. Autenticación ----------
   async login({ correo, password }) {
@@ -923,7 +954,8 @@ export const apiMock = {
     const dueno = duenoActual()
     validarDatosBotica(datos)
     if (db.boticas.some((b) => b.usuarioId === dueno.id)) throw crearError(409, 'Ya registraste una botica con esta cuenta.')
-    if (db.boticas.some((b) => b.ruc === datos.ruc)) throw crearError(409, 'El RUC ya está registrado.')
+    exigirRucLibre(datos.ruc)
+    exigirTitular(dueno, datos.ruc)
 
     const botica = {
       id: siguienteId(db.boticas), usuarioId: dueno.id, ...datosBotica(datos),
@@ -947,9 +979,8 @@ export const apiMock = {
       throw crearError(403, 'Solo puedes corregir tu botica cuando la solicitud fue rechazada.')
     }
     validarDatosBotica(datos)
-    if (db.boticas.some((b) => b.ruc === datos.ruc && b.id !== botica.id)) {
-      throw crearError(409, 'El RUC ya está registrado por otra botica.')
-    }
+    exigirRucLibre(datos.ruc)
+    exigirTitular(duenoActual(), datos.ruc)
     Object.assign(botica, datosBotica(datos), { estado: 'PENDIENTE', motivoRechazo: null })
     return copia(boticaDto(botica))
   },

@@ -34,7 +34,7 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 | 401 | Sin token, token vencido o credenciales incorrectas |
 | 403 | Rol sin permiso, botica no aprobada intentando crear productos, acción no permitida por el estado de la botica, o reseña sin una reserva entregada (H85) |
 | 404 | Recurso no existe o no pertenece al usuario |
-| 409 | Duplicado (correo o RUC ya registrado), o conflicto con el estado actual: cambio de estado no permitido de una reserva o pedido, stock insuficiente, reserva activa repetida, reserva de un medicamento con receta retenida (H72) |
+| 409 | Duplicado (correo ya registrado, o RUC de una botica ya aprobada), o conflicto con el estado actual: cambio de estado no permitido de una reserva o pedido, stock insuficiente, reserva activa repetida, reserva de un medicamento con receta retenida (H72) |
 | 429 | Demasiados pedidos (`POST /chat`) o demasiados intentos fallidos (`POST /auth/login`, SEC-05) |
 | 503, 504 | El asistente no está disponible o tardó demasiado (solo `POST /chat`) |
 
@@ -248,7 +248,12 @@ El RUC se verifica igual que en `validar-ruc`. Si SUNAT responde, se guarda su r
   "razonSocial": "SALUD TOTAL FARMA S.A.C.", "estado": "PENDIENTE" }
 ```
 `latitud` y `longitud` son opcionales (H3), pero si se envía una hay que enviar la otra. Rangos: latitud entre -90 y 90, longitud entre -180 y 180, hasta 6 decimales.
-Errores: 400 (RUC inválido, inexistente en SUNAT, que no está `ACTIVO` o no está `HABIDO`; coordenadas inválidas o incompletas), 409 (RUC ya registrado o el dueño ya tiene botica).
+
+**El RUC solo se reserva al aprobar la botica (A5).** Varias cuentas pueden tener solicitudes `PENDIENTE` (o `RECHAZADO`) con el mismo RUC; el 409 "El RUC ya está registrado" sale solo si ya hay una botica `APROBADO` con ese RUC. Así, quien registre el RUC de una botica real no la deja sin poder registrarse. Cuando el administrador aprueba una de esas solicitudes, las demás `PENDIENTE` con el mismo RUC pasan a `RECHAZADO` con el motivo "Otra cuenta acreditó la licencia de este RUC" (y su dueño recibe el correo de rechazo). En la BD lo asegura un índice único parcial (`uq_botica_ruc_aprobado`: `ruc` único donde `estado = 'APROBADO'`).
+
+**RUC de persona natural (A7).** Si el RUC empieza con `10` o `15` y SUNAT devolvió el nombre del titular (`razonSocial`), cada palabra del nombre de la cuenta (`nombre` del usuario) debe aparecer en ese nombre, sin importar tildes, mayúsculas ni orden. Si no → 400 "Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular (según SUNAT: {razonSocial})". Ejemplo: cuenta "Rosa Quispe" y SUNAT "QUISPE MAMANI ROSA" → pasa; cuenta "Jorge Mendoza" con ese RUC → 400. Si SUNAT no respondió (`fuente: LOCAL`) no se bloquea. Los RUC `20` y `17` (empresas y otros) no se revisan. Para corregirlo, el dueño cambia su nombre en el perfil (`PUT /usuarios/me`) o usa el RUC de su empresa.
+
+Errores: 400 (RUC inválido, inexistente en SUNAT, que no está `ACTIVO` o no está `HABIDO`; RUC de persona que no está a nombre de la cuenta; coordenadas inválidas o incompletas), 409 (el RUC ya pertenece a una botica aprobada, o el dueño ya tiene botica).
 
 ### `GET /boticas/mia` 🔒 — H5
 ```json
@@ -272,9 +277,9 @@ Errores: 400 (RUC inválido, inexistente en SUNAT, que no está `ACTIVO` o no es
 
 ### `PUT /boticas/mia` 🔒 — H7
 Corrige y reenvía una solicitud rechazada. **Solo se permite si el estado es `RECHAZADO`.** Al guardar, la botica vuelve a `PENDIENTE` y `motivoRechazo` se borra. La licencia ya subida se conserva.
-Cuerpo igual al de `POST /boticas` (incluye `latitud` y `longitud` opcionales). El RUC se verifica en SUNAT con las mismas reglas.
+Cuerpo igual al de `POST /boticas` (incluye `latitud` y `longitud` opcionales). El RUC se verifica en SUNAT con las mismas reglas, incluida la del titular de un RUC `10` o `15` (A7), y el 409 sale con la misma regla de A5: solo si otra botica `APROBADO` tiene ese RUC (también si es el mismo RUC que ya tenía la solicitud).
 Respuesta: 200 con el mismo formato que `GET /boticas/mia` (con `estado: "PENDIENTE"` y `motivoRechazo: null`).
-Errores: 400 (datos inválidos), 403 (el estado no es `RECHAZADO`), 404 (no tiene botica), 409 (el RUC pertenece a otra botica).
+Errores: 400 (datos inválidos o RUC de persona que no está a nombre de la cuenta), 403 (el estado no es `RECHAZADO`), 404 (no tiene botica), 409 (el RUC pertenece a una botica aprobada).
 
 ### `POST /boticas/mia/licencia` 🔒 — H4
 Sube la licencia de funcionamiento. Es `multipart/form-data` con un campo `archivo`.

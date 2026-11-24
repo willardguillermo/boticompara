@@ -72,7 +72,8 @@ create table if not exists botica (
   usuario_id       bigint       not null unique
                    references usuario(id) on delete cascade,
   nombre_comercial varchar(150) not null,
-  ruc              varchar(11)  not null unique
+  -- A5: el RUC no es único en toda la tabla (ver uq_botica_ruc_aprobado)
+  ruc              varchar(11)  not null
                    check (ruc ~ '^(10|15|17|20)[0-9]{9}$'),
   razon_social     varchar(200) not null,
   direccion        varchar(255) not null,
@@ -91,6 +92,12 @@ create table if not exists botica (
 );
 
 create index if not exists idx_botica_estado on botica(estado);
+-- A5: un RUC solo se reserva al aprobar. Varias cuentas pueden tener una
+-- solicitud PENDIENTE (o RECHAZADO) con el mismo RUC; solo una botica
+-- APROBADO puede tenerlo. En la BD que ya existe: v8_ruc_solo_aprobadas.sql.
+create unique index if not exists uq_botica_ruc_aprobado
+  on botica(ruc) where estado = 'APROBADO';
+create index if not exists idx_botica_ruc on botica(ruc);
 
 create trigger trg_botica_actualizado
 before update on botica
