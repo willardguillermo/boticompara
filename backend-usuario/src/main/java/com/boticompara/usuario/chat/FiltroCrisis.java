@@ -27,11 +27,15 @@ final class FiltroCrisis {
     /** Las frases van ya normalizadas: en minúsculas y sin tildes ("daño" queda como "dano"). */
     static final List<String> AUTOLESION = List.of("hacerme dano", "matarme", "quiero matarme", "suicid",
             "quitarme la vida", "no quiero vivir", "no quiero seguir viviendo", "quiero morir", "me quiero morir",
-            "acabar con mi vida", "cortarme las venas", "hacerme cortes");
+            "acabar con mi vida", "cortarme las venas", "hacerme cortes",
+            // S4-15: sobredosis intencional. "tomarme todas las pastillas" sola no está: es la duda común de
+            // terminar un tratamiento ("¿tengo que tomarme todas las pastillas del antibiótico?")
+            "dosis letal", "dosis mortal", "todas las pastillas juntas", "todas las pastillas de golpe",
+            "todas las pastillas a la vez");
     /** "cortarme" sola no está: se activaba con "cortarme el pelo". */
     static final List<String> EMERGENCIA = List.of("no puedo respirar", "no puedo respirar bien", "me falta el aire",
             "dolor de pecho", "dolor en el pecho", "me duele el pecho", "intoxicacion", "envenenamiento",
-            "convulsion", "desmayo");
+            "convulsion", "desmayo", "sobredosis");
 
     enum Grupo {
         AUTOLESION(TEXTO_AUTOLESION), EMERGENCIA(TEXTO_EMERGENCIA);
