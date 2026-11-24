@@ -3219,3 +3219,52 @@ a.resumen-inicio:active {
     animation: none;
   }
 }
+
+/* ---------- Recuperar contraseña (H17) ---------- */
+.enlace-olvido {
+  margin: -0.5rem 0 0;
+  text-align: right;
+  font-size: 0.9rem;
+}
+
+.input-codigo {
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5em;
+  text-align: center;
+}
+
+.correo-recuperacion {
+  overflow-wrap: anywhere;
+  color: var(--color-texto);
+}
+
+.acciones-recuperacion {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-top: 1rem;
+}
+
+.btn-enlace {
+  padding: 0.25rem 0;
+  border: 0;
+  background: none;
+  color: var(--color-primario);
+  font: inherit;
+  font-size: 0.95rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.btn-enlace:focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.btn-enlace:disabled {
+  color: var(--color-texto-suave);
+  cursor: not-allowed;
+}
