@@ -8,6 +8,7 @@ import { ToastProvider } from './context/ToastContext.jsx'
 import CargaMasivaPage from './pages/CargaMasivaPage.jsx'
 import CatalogoPage from './pages/CatalogoPage.jsx'
 import CorregirBoticaPage from './pages/CorregirBoticaPage.jsx'
+import CuentaPage from './pages/CuentaPage.jsx'
 import EstadoPage from './pages/EstadoPage.jsx'
 import InicioPage from './pages/InicioPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
@@ -40,6 +41,8 @@ export default function App() {
                 <Route path="estado" element={<ConBotica><EstadoPage /></ConBotica>} />
                 <Route path="catalogo" element={<ConBotica><CatalogoPage /></ConBotica>} />
                 <Route path="pedidos" element={<ConBotica><PedidosPage /></ConBotica>} />
+                {/* H16, H19: sin ConBotica, para corregir el nombre aunque aún no tenga botica (A7) */}
+                <Route path="cuenta" element={<CuentaPage />} />
                 <Route
                   path="catalogo/carga-masiva"
                   element={<ConBotica><SoloAprobada><CargaMasivaPage /></SoloAprobada></ConBotica>}

@@ -57,9 +57,30 @@ export function AuthProvider({ children }) {
     navigate('/login', { replace: true })
   }, [navigate])
 
+  /** H16: tras guardar el perfil, la cabecera muestra el nombre nuevo (y lo recuerda al recargar). */
+  const actualizarUsuario = useCallback((perfil) => {
+    setUsuario((actual) => {
+      const nuevo = { ...actual, nombre: perfil.nombre }
+      const token = obtenerToken()
+      if (token) guardarSesion(token, nuevo)
+      return nuevo
+    })
+  }, [])
+
+  /** H19: después de eliminar la cuenta, cierra la sesión y deja un aviso en el login. */
+  const salirConAviso = useCallback(
+    (mensaje) => {
+      borrarSesion()
+      setAviso(mensaje)
+      setUsuario(null)
+      navigate('/login', { replace: true })
+    },
+    [navigate],
+  )
+
   const valor = useMemo(
-    () => ({ usuario, aviso, iniciarSesion, registrarDueno, cerrarSesion }),
-    [usuario, aviso, iniciarSesion, registrarDueno, cerrarSesion],
+    () => ({ usuario, aviso, iniciarSesion, registrarDueno, cerrarSesion, actualizarUsuario, salirConAviso }),
+    [usuario, aviso, iniciarSesion, registrarDueno, cerrarSesion, actualizarUsuario, salirConAviso],
   )
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>
 }
