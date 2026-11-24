@@ -117,6 +117,23 @@ public class PedidoService {
     }
 
     /**
+     * S4-02: la botica dejó de atender (su dueño eliminó la cuenta). Sus reservas PENDIENTE, CONFIRMADA y LISTA
+     * pasan a RECHAZADA con el motivo, y cada comprador recibe el correo de rechazo de H83 después del commit.
+     * Corre dentro de la transacción de quien la llama. Devuelve cuántas se rechazaron.
+     */
+    @Transactional
+    public int rechazarActivasDeBotica(Long boticaId, String motivo) {
+        List<Reserva> activas = reservas.bloquearDeBoticaConEstados(boticaId, EstadoReserva.ACTIVAS);
+        for (Reserva r : activas) {
+            r.setEstado(EstadoReserva.RECHAZADA);
+            r.setMotivoRechazo(motivo);
+            Reserva guardada = reservas.save(r);
+            eventos.publishEvent(new EstadoPedidoCambiado(guardada.getId(), EstadoReserva.RECHAZADA));
+        }
+        return activas.size();
+    }
+
+    /**
      * Lo disponible para este pedido: stock menos las otras reservas activas, sin contar esta.
      * Nunca es negativo. Es el mismo cálculo que el campo disponible y que la validación al confirmar.
      */
