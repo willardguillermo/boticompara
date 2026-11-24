@@ -19,7 +19,8 @@ LISTA = reverse('admin:boticas_botica_changelist')
 MOTIVO = 'La licencia no corresponde al RUC registrado'
 
 
-def crear_botica(estado=Botica.Estado.PENDIENTE, nombre=None):
+def crear_botica(estado=Botica.Estado.PENDIENTE, nombre=None, licencia=True):
+    """licencia=False: sin licencia de funcionamiento cargada (S4-08 no deja aprobarla)."""
     n = next(_numero)
     ahora = timezone.now()
     dueno = Usuario.objects.create(nombre=f'Dueño {n}', correo=f'dueno{n}@prueba.pe', password_hash='x',
@@ -27,6 +28,7 @@ def crear_botica(estado=Botica.Estado.PENDIENTE, nombre=None):
     return Botica.objects.create(usuario=dueno, nombre_comercial=nombre or f'Botica {n}', ruc=f'{20500000000 + n}',
                                  razon_social=f'Razón {n}', direccion='Av. 1', distrito='Lima', estado=estado,
                                  motivo_rechazo=MOTIVO if estado == Botica.Estado.RECHAZADO else None,
+                                 licencia_url=f'botica-{n}/licencia.pdf' if licencia else None,
                                  creado_en=ahora, actualizado_en=ahora)
 
 
@@ -262,18 +264,22 @@ class MismaLogicaEnLosTresLugaresTests(ConAdmin):
         datos.update(cambios)
         return datos
 
-    def test_accion_masiva_aprueba_solo_las_que_cambian(self):
+    def test_accion_masiva_aprueba_solo_las_pendientes(self):
+        # S4-08: como el botón Aprobar, solo desde PENDIENTE. La rechazada no cambia y se avisa que se omitió
         pendiente, rechazada = crear_botica(), crear_botica(Botica.Estado.RECHAZADO)
         aprobada = crear_botica(Botica.Estado.APROBADO)
 
         respuesta = self.post(LISTA, {'action': 'aprobar_boticas',
                                       '_selected_action': [pendiente.pk, rechazada.pk, aprobada.pk]})
 
-        self.assertIn('2 botica(s) aprobada(s).', self.mensajes(respuesta))
-        for botica in (pendiente, rechazada, aprobada):
-            self.assertEqual(self.estado(botica), (Botica.Estado.APROBADO, None))
-        self.assertEqual(set(BoticaRevision.objects.values_list('botica_id', flat=True)), {pendiente.pk, rechazada.pk})
-        self.assertEqual(len(mail.outbox), 2)
+        self.assertIn('1 botica(s) aprobada(s).', self.mensajes(respuesta))
+        self.assertIn('Se omitieron 2 botica(s) que no estaban pendientes. Solo se aprueba una botica pendiente.',
+                      self.mensajes(respuesta))
+        self.assertEqual(self.estado(pendiente), (Botica.Estado.APROBADO, None))
+        self.assertEqual(self.estado(rechazada), (Botica.Estado.RECHAZADO, MOTIVO))
+        self.assertEqual(self.estado(aprobada), (Botica.Estado.APROBADO, None))
+        self.assertEqual(set(BoticaRevision.objects.values_list('botica_id', flat=True)), {pendiente.pk})
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_select_estado_rechaza_con_historial_y_correo(self):
         botica = crear_botica()

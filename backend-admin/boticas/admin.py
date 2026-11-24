@@ -694,14 +694,20 @@ class BoticaAdmin(admin.ModelAdmin):
 
     @admin.action(description='Aprobar boticas seleccionadas', permissions=['change'])
     def aprobar_boticas(self, request, queryset):
-        # Solo las que realmente cambian de estado reciben el correo (H6) y quedan en el historial (H47)
+        # Solo las que realmente cambian de estado reciben el correo (H6) y quedan en el historial (H47).
+        # S4-08: como los botones, solo desde PENDIENTE (una RECHAZADO vuelve a PENDIENTE cuando el dueño la corrige)
+        elegidas = queryset.count()
         try:
             aprobadas = revision.revisar(queryset.values('pk'), Botica.Estado.APROBADO, request.user.get_username(),
+                                         desde=revision.PUEDE_APROBAR,
                                          si_falla_correo=lambda b: self._aviso_correo(request, b))
-        except revision.RucYaAprobado as e:
+        except revision.NoSePuedeAprobar as e:
             self.message_user(request, f'No se aprobó ninguna botica. {e}', messages.ERROR)
             return
         self.message_user(request, f'{len(aprobadas)} botica(s) aprobada(s).', messages.SUCCESS)
+        if elegidas > len(aprobadas):
+            self.message_user(request, f'Se omitieron {elegidas - len(aprobadas)} botica(s) que no estaban '
+                                       f'pendientes. {self.REQUISITO_APROBAR}', messages.WARNING)
         self._aviso_rechazadas_por_ruc(request, aprobadas)
 
     def _aviso_rechazadas_por_ruc(self, request, revisadas):
@@ -738,7 +744,7 @@ class BoticaAdmin(admin.ModelAdmin):
                 revisadas = revision.revisar([obj.pk], obj.estado, request.user.get_username(),
                                              motivo=obj.motivo_rechazo,
                                              si_falla_correo=lambda b: self._aviso_correo(request, b))
-            except revision.RucYaAprobado as e:
+            except revision.NoSePuedeAprobar as e:
                 # El formulario ya lo revisa; esto es si otro administrador aprobó el mismo RUC a la vez
                 self.message_user(request, f'No se guardó el cambio de estado. {e}', messages.ERROR)
                 return
@@ -829,7 +835,10 @@ class BoticaAdmin(admin.ModelAdmin):
         botica, respuesta = self._botica_para(request, object_id, revision.PUEDE_APROBAR, self.REQUISITO_APROBAR)
         if respuesta:
             return respuesta
-        # A5: si otra cuenta ya acreditó este RUC, ni se pide confirmar
+        # S4-08 y A5: sin licencia, o si otra cuenta ya acreditó este RUC, ni se pide confirmar
+        if not revision.tiene_licencia(botica):
+            messages.error(request, revision.mensaje_sin_licencia([botica]))
+            return redirect(self.url_detalle(botica))
         aprobada = revision.aprobada_con_ruc(botica)
         if aprobada:
             messages.error(request, revision.mensaje_ruc_aprobado(botica.ruc, aprobada))
@@ -839,7 +848,7 @@ class BoticaAdmin(admin.ModelAdmin):
                 cambiadas = revision.revisar([botica.pk], Botica.Estado.APROBADO, request.user.get_username(),
                                              desde=revision.PUEDE_APROBAR,
                                              si_falla_correo=lambda b: self._aviso_correo(request, b))
-            except revision.RucYaAprobado as e:
+            except revision.NoSePuedeAprobar as e:
                 messages.error(request, str(e))
                 return redirect(self.url_detalle(botica))
             respuesta = self._resultado(request, botica, cambiadas,

@@ -2,7 +2,8 @@ from django import forms
 
 from . import usuarios
 from .models import Botica
-from .revision import MENSAJE_SIN_MOTIVO, aprobada_con_ruc, mensaje_ruc_aprobado
+from .revision import (MENSAJE_SIN_MOTIVO, aprobada_con_ruc, mensaje_ruc_aprobado, mensaje_sin_licencia,
+                       tiene_licencia)
 
 
 class BoticaRevisionForm(forms.ModelForm):
@@ -24,6 +25,9 @@ class BoticaRevisionForm(forms.ModelForm):
         motivo = (datos.get('motivo_rechazo') or '').strip()
 
         if estado == Botica.Estado.APROBADO and self.instance.estado != Botica.Estado.APROBADO:
+            # S4-08: sin licencia no hay qué revisar
+            if not tiene_licencia(self.instance):
+                self.add_error('estado', mensaje_sin_licencia([self.instance]))
             # A5: el RUC ya lo acreditó otra cuenta
             aprobada = aprobada_con_ruc(self.instance)
             if aprobada:
