@@ -7,6 +7,13 @@ import { crearError } from './ApiError.js'
 import { obtenerToken } from './sesion.js'
 
 const PASSWORD_PRUEBA = 'Boti2026!'
+// H17: textos iguales a los del backend (docs/API.md)
+const CODIGO_RECUPERACION_PRUEBA = '123456'
+const MENSAJE_RECUPERAR = 'Si el correo está registrado, te enviamos las instrucciones para restablecer tu contraseña'
+const MENSAJE_RECUPERAR_429 = 'Hiciste demasiadas solicitudes desde esta conexión. Intenta más tarde'
+const MENSAJE_CODIGO_INVALIDO = 'El código no es válido o venció. Pide uno nuevo'
+const MAX_RECUPERAR_HORA = 5
+let recuperaciones = []
 const STOCK_MINIMO_DEFECTO = 5 // H12: igual que el default de la columna stock_minimo
 // H2: únicos RUC que el modo simulado "encuentra" en SUNAT
 const RUCS_SUNAT = {
@@ -947,6 +954,27 @@ export const apiMock = {
     }
     db.usuarios.push(usuario)
     return usuarioCorto(usuario)
+  },
+
+  // H17: siempre el mismo mensaje, exista o no el correo. Imita el límite de 5 solicitudes por hora por IP.
+  async recuperarPassword(correo) {
+    await esperar()
+    if (!String(correo ?? '').trim()) throw crearError(400, 'El correo es obligatorio')
+    const ahora = Date.now()
+    recuperaciones = recuperaciones.filter((t) => ahora - t < HORA)
+    if (recuperaciones.length >= MAX_RECUPERAR_HORA) throw crearError(429, MENSAJE_RECUPERAR_429)
+    recuperaciones.push(ahora)
+    return { mensaje: MENSAJE_RECUPERAR }
+  },
+
+  // H17: en el simulador el código válido es siempre 123456
+  async restablecerPassword({ correo, token, password }) {
+    await esperar()
+    if (String(password ?? '').length < 8) throw crearError(400, 'La contraseña debe tener al menos 8 caracteres')
+    const usuario = db.usuarios.find((u) => u.correo === String(correo ?? '').trim().toLowerCase())
+    if (!usuario || token !== CODIGO_RECUPERACION_PRUEBA) throw crearError(400, MENSAJE_CODIGO_INVALIDO)
+    usuario.password = password
+    return { mensaje: 'Contraseña actualizada' }
   },
 
   // ---------- 2. Perfil ----------
