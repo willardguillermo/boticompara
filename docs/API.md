@@ -199,7 +199,10 @@ Elimina la cuenta del usuario logueado. Los datos se **anonimizan**, no se borra
   `RECHAZADO`, se deja como está). Así el RUC queda libre para otra cuenta (A5).
 - Si es dueño de botica, sus reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) pasan a `RECHAZADA` con el motivo
   "La botica dejó de atender en BotiCompara", y cada comprador recibe el correo de rechazo de siempre (H83).
-- Todo lo anterior se guarda en la misma transacción; los correos salen después de confirmarla.
+- Si es comprador, sus reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) pasan a `CANCELADA` (liberan las
+  unidades), igual que con `PATCH /reservas/{id}/cancelar`: el dueño de cada botica recibe la notificación
+  `RESERVA_CANCELADA` (H103), sin datos del comprador.
+- Todo lo anterior se guarda en la misma transacción; los correos y las notificaciones salen después de confirmarla.
 - Se borran todos sus favoritos (D1).
 - Se borran todas sus alertas de precio (H59).
 
@@ -1341,7 +1344,7 @@ Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño 
 | `tipo` | Cuándo se crea | `titulo` | `mensaje` | Lleva a |
 |---|---|---|---|---|
 | `NUEVA_RESERVA` | `POST /reservas` (H72) | "Nueva reserva BC-7K2QXM" | "Amoxil x 3 · S/ 72.00", y si el producto pide receta, "· Requiere receta médica" | El pedido, en `PENDIENTE` |
-| `RESERVA_CANCELADA` | El comprador cancela: `PATCH /reservas/{id}/cancelar` (H75) | "Reserva cancelada BC-7K2QXM" | "Amoxil x 3 · S/ 72.00" | El pedido, en `CANCELADA` |
+| `RESERVA_CANCELADA` | El comprador cancela: `PATCH /reservas/{id}/cancelar` (H75), o elimina su cuenta con reservas activas (`DELETE /usuarios/me`, H19) | "Reserva cancelada BC-7K2QXM" | "Amoxil x 3 · S/ 72.00" | El pedido, en `CANCELADA` |
 | `RESERVA_VENCIDA` | El proceso de H84 la pasa a `VENCIDA` | "Reserva vencida BC-7K2QXM" | "Amoxil x 3 · S/ 72.00" | El pedido, en `VENCIDA` |
 
 - `mensaje`: nombre comercial del producto, la cantidad y el total de la reserva (`cantidad × precio_unitario`), con el precio como en los correos (`S/ 72.00`), separados por " · ".
