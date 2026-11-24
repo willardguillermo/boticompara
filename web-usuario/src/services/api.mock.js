@@ -15,6 +15,11 @@ const RUCS_SUNAT = {
     // Como la manda SUNAT: en mayúsculas y con un espacio al final
     direccion: 'CAL. LAS CAMELIAS NRO 256 INT. 701A URB. JARDIN ', distrito: 'SAN ISIDRO',
   },
+  // A7: RUC de persona natural; su titular es Rosa Quispe (la cuenta rosa@ coincide, otra cuenta no)
+  10461234564: {
+    ruc: '10461234564', razonSocial: 'QUISPE MAMANI ROSA', estado: 'ACTIVO', condicion: 'HABIDO',
+    direccion: 'JR. LOS PINOS NRO 120 ', distrito: 'LURIGANCHO',
+  },
   // H7: Botica Nueva Era, con una dirección fiscal distinta a la de su local
   20712345676: {
     ruc: '20712345676', razonSocial: 'NUEVA ERA SALUD S.A.C.', estado: 'ACTIVO', condicion: 'HABIDO',
@@ -54,6 +59,12 @@ const db = {
     { id: 5, nombre: 'Ana María Flores', correo: 'ana@ejemplo.test', password: PASSWORD_PRUEBA, telefono: null, direccion: null, rol: 'COMPRADOR' },
     // H19: cuenta eliminada (datos anonimizados)
     { id: 6, nombre: 'Usuario eliminado', correo: 'eliminado-6@boticompara.invalid', password: null, telefono: null, direccion: null, rol: 'COMPRADOR', eliminado: true },
+    // H87: más compradores con reseña en Salud Total, para que la lista tenga 2 páginas y se vea "Ver más"
+    ...['Miguel Ángel Paredes', 'Sofía Huamán', 'Luis Castillo', 'Patricia Rojas', 'Diego', 'Elena Vargas',
+      'Jorge Luis Chávez', 'Carmen Salazar', 'Ricardo Ñique', 'Valeria Mendoza', 'Pedro Gómez'].map((nombre, i) => ({
+      id: 7 + i, nombre, correo: `comprador${7 + i}@ejemplo.test`, password: PASSWORD_PRUEBA,
+      telefono: null, direccion: null, rol: 'COMPRADOR',
+    })),
   ],
   boticas: [
     { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', latitud: -11.942500, longitud: -76.699000, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
@@ -124,14 +135,27 @@ db.reservas = [
   }
 })
 
-// ---------- Reseñas de prueba (sección 11): Salud Total tiene 3 (promedio 4.3); FarmaVida, ninguna ----------
-/** [boticaId, usuarioId, estrellas, comentario, respuesta, creada hace] */
+// ---------- Reseñas de prueba (sección 11): Salud Total tiene 13 en 2 páginas (promedio 4.2), una de una cuenta
+// eliminada y una oculta que no cuenta; FarmaVida, ninguna (para ver "Aún no tienes reseñas") ----------
+/** [boticaId, usuarioId, estrellas, comentario, respuesta, creada hace, oculta] */
 db.resenas = [
   [1, 4, 5, 'Me atendieron rápido y tenían todo.', '¡Gracias, Carlos! Te esperamos.', 3 * 24 * HORA],
   [1, 5, 4, 'Buen precio y el pedido estaba listo.', null, 6 * 24 * HORA],
   [1, 6, 4, null, null, 20 * 24 * HORA],
-].map(([boticaId, usuarioId, estrellas, comentario, respuesta, creada], i) => ({
-  id: i + 1, boticaId, usuarioId, estrellas, comentario, respuesta, oculta: false,
+  [1, 7, 5, 'La señorita me explicó cómo tomar el antibiótico. Muy amable.', null, 2 * HORA],
+  [1, 8, 3, 'Tuve que esperar un rato, pero encontré el medicamento que en otras boticas no había.', null, 1 * 24 * HORA],
+  [1, 9, 5, 'Siempre compro aquí, precios justos.', null, 2 * 24 * HORA],
+  [1, 10, 4, null, null, 4 * 24 * HORA],
+  [1, 11, 5, 'Reservé por la app y al llegar ya estaba separado.', null, 8 * 24 * HORA],
+  [1, 12, 2, 'El precio en la app no coincidía con el de la tienda.', null, 10 * 24 * HORA],
+  [1, 13, 4, 'Buena atención.', null, 12 * 24 * HORA],
+  [1, 14, 5, 'Local limpio y ordenado.', null, 15 * 24 * HORA],
+  [1, 15, 4, 'Todo bien.', null, 25 * 24 * HORA],
+  [1, 16, 5, 'Muy recomendable, atienden hasta tarde.', null, 30 * 24 * HORA],
+  // Oculta por el administrador (H89): no aparece ni cuenta en el promedio
+  [1, 17, 1, 'Comentario ofensivo de prueba.', null, 5 * 24 * HORA, true],
+].map(([boticaId, usuarioId, estrellas, comentario, respuesta, creada, oculta = false], i) => ({
+  id: i + 1, boticaId, usuarioId, estrellas, comentario, respuesta, oculta,
   respondidaEn: respuesta ? haceMs(creada / 2) : null, creadoEn: haceMs(creada), actualizadoEn: haceMs(creada),
 }))
 
@@ -868,6 +892,32 @@ export const soloRecientes = (notificaciones, ahora = Date.now()) =>
 /** Lo que ven la campana (lista y contador) y la actividad reciente. */
 const misNotificacionesRecientes = () => soloRecientes(misNotificaciones())
 
+/** A5: el RUC solo choca con una botica APROBADO (las PENDIENTE y RECHAZADO pueden repetirlo). */
+function exigirRucLibre(ruc) {
+  if (db.boticas.some((b) => b.ruc === ruc && b.estado === 'APROBADO')) {
+    throw crearError(409, 'El RUC ya está registrado')
+  }
+}
+
+const palabras = (texto) =>
+  (texto ?? '').normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+
+/** A7: cada palabra del nombre de la cuenta está en el del titular, sin tildes, mayúsculas ni orden. */
+export function titularCoincide(nombreCuenta, titular) {
+  const delTitular = new Set(palabras(titular))
+  const deLaCuenta = palabras(nombreCuenta)
+  return deLaCuenta.length > 0 && deLaCuenta.every((p) => delTitular.has(p))
+}
+
+/** A7: un RUC 10 o 15 (persona) con titular conocido en SUNAT debe estar a nombre de la cuenta. */
+function exigirTitular(dueno, ruc) {
+  const titular = RUCS_SUNAT[ruc]?.razonSocial
+  if (!/^(10|15)/.test(ruc) || !titular) return
+  if (!titularCoincide(dueno.nombre, titular)) {
+    throw crearError(400, `Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular (según SUNAT: ${titular})`)
+  }
+}
+
 export const apiMock = {
   // ---------- 1. Autenticación ----------
   async login({ correo, password }) {
@@ -923,7 +973,8 @@ export const apiMock = {
     const dueno = duenoActual()
     validarDatosBotica(datos)
     if (db.boticas.some((b) => b.usuarioId === dueno.id)) throw crearError(409, 'Ya registraste una botica con esta cuenta.')
-    if (db.boticas.some((b) => b.ruc === datos.ruc)) throw crearError(409, 'El RUC ya está registrado.')
+    exigirRucLibre(datos.ruc)
+    exigirTitular(dueno, datos.ruc)
 
     const botica = {
       id: siguienteId(db.boticas), usuarioId: dueno.id, ...datosBotica(datos),
@@ -947,9 +998,8 @@ export const apiMock = {
       throw crearError(403, 'Solo puedes corregir tu botica cuando la solicitud fue rechazada.')
     }
     validarDatosBotica(datos)
-    if (db.boticas.some((b) => b.ruc === datos.ruc && b.id !== botica.id)) {
-      throw crearError(409, 'El RUC ya está registrado por otra botica.')
-    }
+    exigirRucLibre(datos.ruc)
+    exigirTitular(duenoActual(), datos.ruc)
     Object.assign(botica, datosBotica(datos), { estado: 'PENDIENTE', motivoRechazo: null })
     return copia(boticaDto(botica))
   },

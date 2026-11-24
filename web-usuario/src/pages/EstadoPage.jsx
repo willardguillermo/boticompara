@@ -1,6 +1,7 @@
 // H5 - Estado de la solicitud de la botica: PENDIENTE, APROBADO o RECHAZADO
 // H4 - Carga de la licencia de funcionamiento (SeccionLicencia)
 // H7 - Si fue rechazada, enlace para corregir y reenviar
+// H87 - Si está aprobada, sus reseñas en solo lectura (SeccionResenas)
 // H6 - Aviso destacado, una sola vez por cambio, cuando la botica se aprueba o se rechaza (AvisoCambioEstado)
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -10,6 +11,7 @@ import EstadoBadge from '../components/EstadoBadge.jsx'
 import Icono from '../components/Icono.jsx'
 import StarBorder from '../components/reactbits/StarBorder.jsx'
 import SeccionLicencia from '../components/SeccionLicencia.jsx'
+import SeccionResenas from '../components/SeccionResenas.jsx'
 import { useBotica } from '../context/BoticaContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 
@@ -126,6 +128,9 @@ export default function EstadoPage() {
       </section>
 
       <SeccionLicencia tieneLicencia={botica.tieneLicencia} />
+
+      {/* Las reseñas solo existen para una botica aprobada: con otro estado el endpoint responde 404 */}
+      {botica.estado === 'APROBADO' && <SeccionResenas boticaId={botica.id} />}
     </>
   )
 }

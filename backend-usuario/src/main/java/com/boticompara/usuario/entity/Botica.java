@@ -22,7 +22,8 @@ public class Botica {
     @Column(name = "nombre_comercial", nullable = false, length = 150)
     private String nombreComercial;
 
-    @Column(nullable = false, length = 11, unique = true)
+    // A5: no es único en toda la tabla; solo entre las APROBADO (uq_botica_ruc_aprobado)
+    @Column(nullable = false, length = 11)
     private String ruc;
 
     @Column(name = "razon_social", nullable = false, length = 200)

@@ -12,7 +12,8 @@ public interface BoticaRepository extends JpaRepository<Botica, Long> {
 
     boolean existsByUsuarioId(Long usuarioId);
 
-    boolean existsByRuc(String ruc);
+    /** A5: el RUC solo choca con una botica APROBADO. */
+    boolean existsByRucAndEstado(String ruc, String estado);
 
     List<Botica> findByEstado(String estado);
 }

@@ -5,8 +5,10 @@ import com.boticompara.usuario.dto.BoticaDetalleResponse;
 import com.boticompara.usuario.dto.BoticaRequest;
 import com.boticompara.usuario.dto.RucResponse;
 import com.boticompara.usuario.entity.Botica;
+import com.boticompara.usuario.entity.Usuario;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
+import com.boticompara.usuario.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,8 +22,10 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -43,6 +47,9 @@ class BoticaServiceTest {
 
     @Mock
     RucSunatService rucSunat;
+
+    @Mock
+    UsuarioRepository usuarios;
 
     @InjectMocks
     BoticaService service;
@@ -131,15 +138,15 @@ class BoticaServiceTest {
         assertEquals("Botica Corregida", b.getNombreComercial());
         assertEquals("Av. Nueva 123", b.getDireccion());
         assertEquals(LAT, b.getLatitud());
-        // Su propio RUC no cuenta como duplicado: ni se consulta
-        verify(boticas, never()).existsByRuc(any());
+        // Su propia botica está RECHAZADO: conservar el RUC no choca consigo misma
+        verify(boticas).existsByRucAndEstado(RUC_A, "APROBADO");
     }
 
     @Test
     void corregirPermiteCambiarElRucSiNoLoUsaOtraBotica() {
         Botica b = botica("RECHAZADO", RUC_A);
         when(boticas.findByUsuarioId(10L)).thenReturn(Optional.of(b));
-        when(boticas.existsByRuc(RUC_B)).thenReturn(false);
+        when(boticas.existsByRucAndEstado(RUC_B, "APROBADO")).thenReturn(false);
         when(boticas.save(any(Botica.class))).thenAnswer(i -> i.getArgument(0));
 
         BoticaDetalleResponse resp = service.corregir(10L, request(RUC_B, null, null));
@@ -149,10 +156,10 @@ class BoticaServiceTest {
     }
 
     @Test
-    void corregirRechazaSiElRucPerteneceAOtraBotica() {
+    void corregirRechazaSiElRucPerteneceAOtraBoticaAprobada() {
         Botica b = botica("RECHAZADO", RUC_A);
         when(boticas.findByUsuarioId(10L)).thenReturn(Optional.of(b));
-        when(boticas.existsByRuc(RUC_B)).thenReturn(true);
+        when(boticas.existsByRucAndEstado(RUC_B, "APROBADO")).thenReturn(true);
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.corregir(10L, request(RUC_B, null, null)));
@@ -242,8 +249,8 @@ class BoticaServiceTest {
     }
 
     @Test
-    void registrarConRucDuplicadoNoConsultaSunat() {
-        when(boticas.existsByRuc(RUC_A)).thenReturn(true);
+    void registrarConRucDeUnaBoticaAprobadaNoConsultaSunat() {
+        when(boticas.existsByRucAndEstado(RUC_A, "APROBADO")).thenReturn(true);
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.registrar(10L, request(RUC_A, null, null)));
@@ -262,5 +269,147 @@ class BoticaServiceTest {
         BoticaDetalleResponse resp = service.corregir(10L, request(RUC_A, null, null));
 
         assertEquals("SALUD TOTAL FARMA S.A.C.", resp.razonSocial());
+    }
+
+    // ---------- A5: el RUC solo se reserva al aprobar ----------
+
+    @Test
+    void registrarConRucDeOtraSolicitudPendienteSeAcepta() {
+        // existsByRucAndEstado(RUC_A, "APROBADO") es false: otra cuenta solo lo tiene PENDIENTE o RECHAZADO
+        when(boticas.save(any(Botica.class))).thenAnswer(i -> i.getArgument(0));
+
+        BoticaCreadaResponse resp = service.registrar(10L, request(RUC_A, null, null));
+
+        assertEquals("PENDIENTE", resp.estado());
+        verify(boticas).existsByRucAndEstado(RUC_A, "APROBADO");
+    }
+
+    @Test
+    void registrarConRucDeUnaBoticaAprobadaDa409() {
+        when(boticas.existsByRucAndEstado(RUC_A, "APROBADO")).thenReturn(true);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.registrar(10L, request(RUC_A, null, null)));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("El RUC ya está registrado", ex.getMessage());
+        verify(boticas, never()).save(any(Botica.class));
+    }
+
+    @Test
+    void corregirConSuMismoRucYaAcreditadoPorOtraCuentaDa409() {
+        Botica b = botica("RECHAZADO", RUC_A);
+        when(boticas.findByUsuarioId(10L)).thenReturn(Optional.of(b));
+        when(boticas.existsByRucAndEstado(RUC_A, "APROBADO")).thenReturn(true);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.corregir(10L, request(RUC_A, null, null)));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("RECHAZADO", b.getEstado());
+        verify(boticas, never()).save(any(Botica.class));
+    }
+
+    // ---------- A7: RUC de persona natural (10 y 15) a nombre de la cuenta ----------
+
+    private static final String RUC_PERSONA = "10461234564";
+    private static final String RUC_PERSONA_15 = "15123456782";
+
+    private void cuentaA(String nombre) {
+        Usuario u = new Usuario();
+        u.setId(10L);
+        u.setNombre(nombre);
+        when(usuarios.findById(10L)).thenReturn(Optional.of(u));
+    }
+
+    private void sunatConTitular(String ruc, String titular) {
+        // La cuenta de estas pruebas es la 10: el mismo id que cuenta en los límites de SUNAT
+        when(rucSunat.exigirValido(ruc, 10L)).thenReturn(
+                new RucResponse(ruc, true, "RUC válido", titular, "ACTIVO", "HABIDO", "SUNAT", null, null));
+    }
+
+    @Test
+    void registrarRucDePersonaANombreDeLaCuentaSeAcepta() {
+        cuentaA("Rosa Quispe");
+        sunatConTitular(RUC_PERSONA, "QUISPE MAMANI ROSA");
+        when(boticas.save(any(Botica.class))).thenAnswer(i -> i.getArgument(0));
+
+        BoticaCreadaResponse resp = service.registrar(10L, request(RUC_PERSONA, null, null));
+
+        assertEquals("PENDIENTE", resp.estado());
+        assertEquals("QUISPE MAMANI ROSA", resp.razonSocial());
+    }
+
+    @Test
+    void registrarRucDePersonaANombreDeOtraPersonaDa400() {
+        cuentaA("Jorge Mendoza");
+        sunatConTitular(RUC_PERSONA, "QUISPE MAMANI ROSA");
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.registrar(10L, request(RUC_PERSONA, null, null)));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular "
+                + "(según SUNAT: QUISPE MAMANI ROSA)", ex.getMessage());
+        verify(boticas, never()).save(any(Botica.class));
+    }
+
+    @Test
+    void registrarRuc15TambienSeRevisa() {
+        cuentaA("Rosa Quispe");
+        sunatConTitular(RUC_PERSONA_15, "TORRES DIAZ LUCIA");
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.registrar(10L, request(RUC_PERSONA_15, null, null)));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+    }
+
+    @Test
+    void registrarRucDePersonaSinRespuestaDeSunatNoSeBloquea() {
+        // Por defecto SUNAT no responde (fuente LOCAL, sin nombre del titular)
+        when(boticas.save(any(Botica.class))).thenAnswer(i -> i.getArgument(0));
+
+        BoticaCreadaResponse resp = service.registrar(10L, request(RUC_PERSONA, null, null));
+
+        assertEquals("PENDIENTE", resp.estado());
+        verify(usuarios, never()).findById(any());
+    }
+
+    @Test
+    void registrarRucDeEmpresaNoRevisaElTitular() {
+        sunatConTitular(RUC_A, "SALUD TOTAL FARMA S.A.C.");
+        when(boticas.save(any(Botica.class))).thenAnswer(i -> i.getArgument(0));
+
+        service.registrar(10L, request(RUC_A, null, null));
+
+        verify(usuarios, never()).findById(any());
+    }
+
+    @Test
+    void corregirTambienExigeQueElRucDePersonaSeaDeLaCuenta() {
+        Botica b = botica("RECHAZADO", RUC_A);
+        when(boticas.findByUsuarioId(10L)).thenReturn(Optional.of(b));
+        cuentaA("Jorge Mendoza");
+        sunatConTitular(RUC_PERSONA, "QUISPE MAMANI ROSA");
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.corregir(10L, request(RUC_PERSONA, null, null)));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("RECHAZADO", b.getEstado());
+        verify(boticas, never()).save(any(Botica.class));
+    }
+
+    @Test
+    void nombreCoincideSinTildesMayusculasNiOrden() {
+        assertTrue(BoticaService.nombreCoincide("Rosa Quispe", "QUISPE MAMANI ROSA"));
+        assertTrue(BoticaService.nombreCoincide("josé  peña", "PEÑA RAMIREZ JOSE"));
+        assertTrue(BoticaService.nombreCoincide("Lucía Torres", "TORRES, DIAZ LUCIA"));
+        // Una palabra de la cuenta que no está en SUNAT basta para que no coincida
+        assertFalse(BoticaService.nombreCoincide("Rosa Quispe Mendoza", "QUISPE MAMANI ROSA"));
+        // No basta con que sea el inicio de una palabra
+        assertFalse(BoticaService.nombreCoincide("Ros Quispe", "QUISPE MAMANI ROSA"));
+        assertFalse(BoticaService.nombreCoincide("   ", "QUISPE MAMANI ROSA"));
     }
 }

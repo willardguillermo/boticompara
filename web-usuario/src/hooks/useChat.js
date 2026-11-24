@@ -1,9 +1,10 @@
 // H69 - Estado del chat con el asistente (POST /chat).
-// La conversación vive solo en memoria: se pierde al recargar o cerrar sesión
-// (nada en localStorage, para no guardar lo que el usuario escribió).
+// La conversación se conserva en sessionStorage hasta 10 minutos después de cerrar
+// el panel (utils/chatGuardado.js); se borra al cerrar sesión. Nada en localStorage.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../services/index.js'
 import { armarHistorial, errorTiempoAgotado, mensajeDeError, TIEMPO_ESPERA_CHAT_MS } from '../utils/chat.js'
+import { borrarConversacion, conversacionVencida, guardarConversacion, leerConversacion } from '../utils/chatGuardado.js'
 
 let contador = 0
 const nuevoId = () => ++contador
@@ -14,12 +15,45 @@ const nuevoId = () => ++contador
  *   asistente: estado 'ok', con `productos`, `respaldo` y `ayuda`
  *
  * `ubicacion` ({ lat, lng }) es opcional: solo se envía si la web ya la tiene.
+ * `usuarioId`: dueño de la conversación guardada; otro usuario no la ve.
+ * `alAbrir` y `alCerrar` se llaman al abrir y cerrar el panel (para el vencimiento).
  */
-export function useChat({ ubicacion = null } = {}) {
-  const [mensajes, setMensajes] = useState([])
+export function useChat({ ubicacion = null, usuarioId = null } = {}) {
+  // Hora de cierre guardada; al recargar, el panel empieza cerrado: si estaba abierto,
+  // cuenta como cerrado ahora. Los ids se vuelven a numerar (el contador empieza de cero).
+  const [inicial] = useState(() => {
+    const guardada = leerConversacion(usuarioId, Date.now())
+    return {
+      mensajes: (guardada?.mensajes ?? []).map((m) => ({ ...m, id: nuevoId() })),
+      cerradaEn: guardada?.cerradaEn ?? Date.now(),
+    }
+  })
+  const [mensajes, setMensajes] = useState(inicial.mensajes)
   const [esperando, setEsperando] = useState(false)
   const [borrador, setBorrador] = useState('')
   const controlador = useRef(null)
+  // Hora en que se cerró el panel; null mientras está abierto (no vence)
+  const cerradaEn = useRef(inicial.cerradaEn)
+
+  useEffect(() => {
+    guardarConversacion({ usuarioId, mensajes, cerradaEn: cerradaEn.current })
+  }, [mensajes, usuarioId])
+
+  const alAbrir = useCallback(() => {
+    if (conversacionVencida(cerradaEn.current, Date.now()) && !controlador.current) {
+      borrarConversacion()
+      setMensajes([])
+      setBorrador('')
+    } else {
+      guardarConversacion({ usuarioId, mensajes, cerradaEn: null })
+    }
+    cerradaEn.current = null
+  }, [mensajes, usuarioId])
+
+  const alCerrar = useCallback(() => {
+    cerradaEn.current = Date.now()
+    guardarConversacion({ usuarioId, mensajes, cerradaEn: cerradaEn.current })
+  }, [mensajes, usuarioId])
 
   // Si el panel deja de existir (por ejemplo, al cerrar sesión) se cancela el pedido
   useEffect(() => () => controlador.current?.abort(), [])
@@ -91,5 +125,5 @@ export function useChat({ ubicacion = null } = {}) {
     [mensajes, enviar],
   )
 
-  return { mensajes, esperando, borrador, setBorrador, enviar, reintentar }
+  return { mensajes, esperando, borrador, setBorrador, enviar, reintentar, alAbrir, alCerrar }
 }
