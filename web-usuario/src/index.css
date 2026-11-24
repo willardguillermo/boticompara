@@ -2617,6 +2617,151 @@ a {
   }
 }
 
+/* ---------- Reseñas de la botica (H87, solo lectura) ---------- */
+.seccion-resenas {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.seccion-resenas h2 {
+  margin: 0;
+}
+
+.estrellas {
+  display: inline-flex;
+  gap: 0.1rem;
+  font-size: 1rem;
+  vertical-align: middle;
+}
+
+.estrellas-grandes {
+  font-size: 1.4rem;
+}
+
+/* Estrella vacía de fondo y, encima, la parte pintada recortada al ancho que toca */
+.estrella {
+  position: relative;
+  display: inline-flex;
+  color: var(--color-borde);
+}
+
+.estrella .icono {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+}
+
+.estrella-relleno {
+  position: absolute;
+  inset: 0 auto 0 0;
+  overflow: hidden;
+  display: inline-flex;
+  color: var(--franja-pendiente);
+}
+
+.resenas-resumen {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radio);
+  background: var(--color-hundido);
+  box-shadow: var(--sombra-hundida);
+  justify-self: start;
+}
+
+.resenas-resumen p {
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+}
+
+.resenas-promedio {
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-texto);
+}
+
+.resenas-lista {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resena {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--color-borde);
+}
+
+.resenas-lista .resena:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.resena p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.resena-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+}
+
+.resena-cabecera time {
+  margin-left: auto;
+  font-size: 0.85rem;
+}
+
+.resena-sin-comentario {
+  font-style: italic;
+}
+
+.resenas-cargando {
+  display: grid;
+  gap: 1rem;
+}
+
+.resenas-vacio .icono {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--color-texto-suave);
+}
+
+.resenas-vacio p {
+  margin: 0.5rem 0 0;
+}
+
+.resenas-mas {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+}
+
+.resenas-error {
+  margin: 0;
+  color: var(--error);
+}
+
+@media (max-width: 479px) {
+  .resenas-resumen {
+    justify-self: stretch;
+  }
+
+  /* En celular la fecha baja a su propia línea en lugar de quedar suelta a la derecha */
+  .resena-cabecera time {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
+
 /* ---------- Esqueletos de carga ---------- */
 .esqueleto {
   display: block;
