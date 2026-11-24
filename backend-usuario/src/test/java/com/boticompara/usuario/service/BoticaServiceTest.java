@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -77,7 +78,7 @@ class BoticaServiceTest {
     /** Por defecto SUNAT no responde: se acepta con la validación local y se usa la razón social enviada. */
     @BeforeEach
     void sunatNoDisponible() {
-        lenient().when(rucSunat.exigirValido(anyString())).thenAnswer(i -> new RucResponse(i.getArgument(0), true,
+        lenient().when(rucSunat.exigirValido(anyString(), anyLong())).thenAnswer(i -> new RucResponse(i.getArgument(0), true,
                 "RUC válido (no se pudo consultar SUNAT)", null, null, null, "LOCAL", null, null));
     }
 
@@ -218,7 +219,7 @@ class BoticaServiceTest {
 
     @Test
     void registrarGuardaLaRazonSocialDeSunat() {
-        when(rucSunat.exigirValido(RUC_A)).thenReturn(sunatActivo(RUC_A));
+        when(rucSunat.exigirValido(RUC_A, 10L)).thenReturn(sunatActivo(RUC_A));
         when(boticas.save(any(Botica.class))).thenAnswer(i -> i.getArgument(0));
 
         BoticaCreadaResponse resp = service.registrar(10L, request(RUC_A, null, null));
@@ -237,7 +238,7 @@ class BoticaServiceTest {
 
     @Test
     void registrarRechazadoPorSunatNoGuardaLaBotica() {
-        when(rucSunat.exigirValido(RUC_A)).thenThrow(ApiException.badRequest("El RUC no existe en SUNAT"));
+        when(rucSunat.exigirValido(RUC_A, 10L)).thenThrow(ApiException.badRequest("El RUC no existe en SUNAT"));
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.registrar(10L, request(RUC_A, null, null)));
@@ -255,14 +256,14 @@ class BoticaServiceTest {
                 () -> service.registrar(10L, request(RUC_A, null, null)));
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
-        verify(rucSunat, never()).exigirValido(anyString());
+        verify(rucSunat, never()).exigirValido(anyString(), anyLong());
     }
 
     @Test
     void corregirGuardaLaRazonSocialDeSunat() {
         Botica b = botica("RECHAZADO", RUC_A);
         when(boticas.findByUsuarioId(10L)).thenReturn(Optional.of(b));
-        when(rucSunat.exigirValido(RUC_A)).thenReturn(sunatActivo(RUC_A));
+        when(rucSunat.exigirValido(RUC_A, 10L)).thenReturn(sunatActivo(RUC_A));
         when(boticas.save(any(Botica.class))).thenAnswer(i -> i.getArgument(0));
 
         BoticaDetalleResponse resp = service.corregir(10L, request(RUC_A, null, null));
@@ -322,7 +323,8 @@ class BoticaServiceTest {
     }
 
     private void sunatConTitular(String ruc, String titular) {
-        when(rucSunat.exigirValido(ruc)).thenReturn(
+        // La cuenta de estas pruebas es la 10: el mismo id que cuenta en los límites de SUNAT
+        when(rucSunat.exigirValido(ruc, 10L)).thenReturn(
                 new RucResponse(ruc, true, "RUC válido", titular, "ACTIVO", "HABIDO", "SUNAT", null, null));
     }
 

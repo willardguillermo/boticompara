@@ -5,10 +5,12 @@ import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.EstadoReserva;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.entity.Reserva;
+import com.boticompara.usuario.entity.Usuario;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
 import com.boticompara.usuario.repository.ReservaRepository;
+import com.boticompara.usuario.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ public class ReservaService {
 
     static final int CANTIDAD_MAXIMA = 10;
     static final long HORAS_DE_PLAZO = 24;
+    static final String CORREO_SIN_VERIFICAR = "Verifica tu correo para poder reservar";
 
     /** Sin 0, O, 1 ni I, para que el código no se confunda al dictarlo. */
     private static final String ALFABETO = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -44,6 +47,8 @@ public class ReservaService {
 
     private final CondicionVentaService condiciones;
 
+    private final UsuarioRepository usuarios;
+
 
     /**
      * H72-H74: crea la reserva en PENDIENTE. El producto se bloquea dentro de la transacción,
@@ -53,6 +58,11 @@ public class ReservaService {
     public ReservaResponse crear(Long usuarioId, Long productoId, Integer cantidad) {
         if (cantidad == null || cantidad < 1 || cantidad > CANTIDAD_MAXIMA) {
             throw ApiException.badRequest("La cantidad debe estar entre 1 y " + CANTIDAD_MAXIMA);
+        }
+
+        // Cada reserva envía un correo al dueño: una cuenta con un correo ajeno no debe poder gastar el cupo
+        if (!usuarios.findById(usuarioId).map(Usuario::isCorreoVerificado).orElse(false)) {
+            throw ApiException.forbidden(CORREO_SIN_VERIFICAR);
         }
 
         // Misma visibilidad que GET /productos/{id}: si no se ve, no se puede reservar

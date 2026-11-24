@@ -13,14 +13,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ChatController {
 
+    private final AccesoChat acceso;
     private final ChatService chat;
 
     /**
      * H68: requiere sesión (cae en anyRequest().authenticated() de SecurityConfig). El id y el rol salen del
-     * token: el cuerpo no puede decir quién pregunta.
+     * token: el cuerpo no puede decir quién pregunta. Primero AccesoChat (403), antes de validar y de contar.
      */
     @PostMapping
     public ChatResponse preguntar(@RequestBody ChatRequest pedido, @AuthenticationPrincipal UsuarioAutenticado yo) {
+        acceso.exigir(yo);
         return chat.responder(yo, pedido);
     }
 }

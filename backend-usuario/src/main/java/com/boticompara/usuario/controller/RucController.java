@@ -18,14 +18,11 @@ public class RucController {
     private final RucSunatService rucSunat;
 
     /**
-     * H2: público. Solo con sesión de dueño de botica se consulta SUNAT; sin sesión (o con otro rol)
-     * se responde solo con la validación local, para que nadie pueda gastar la cuota del servicio.
+     * H2: solo DUENO_BOTICA (cae en /boticas/** de SecurityConfig). Las consultas a SUNAT cuentan en CuotaSunat:
+     * pasado el límite del usuario responde 429; pasado el tope global, solo la validación local.
      */
     @GetMapping("/validar-ruc/{ruc}")
     public RucResponse validar(@PathVariable String ruc, @AuthenticationPrincipal UsuarioAutenticado yo) {
-        if (yo == null || !"DUENO_BOTICA".equals(yo.rol())) {
-            return rucSunat.verificarLocal(ruc);
-        }
-        return rucSunat.verificar(ruc);
+        return rucSunat.consultarParaValidar(ruc, yo.id());
     }
 }

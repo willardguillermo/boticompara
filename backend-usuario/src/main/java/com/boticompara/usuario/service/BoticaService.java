@@ -41,7 +41,7 @@ public class BoticaService {
         }
         exigirRucLibre(ruc);
         // SUNAT al final: no se gasta cuota en registros que igual se rechazarían
-        RucResponse sunat = rucSunat.exigirValido(ruc);
+        RucResponse sunat = rucSunat.exigirValido(ruc, usuarioId);
         exigirTitular(usuarioId, ruc, sunat);
         String razonSocial = razonSocial(r, sunat);
         Botica b = new Botica();
@@ -70,7 +70,7 @@ public class BoticaService {
         // Su botica está RECHAZADO, así que nunca choca consigo misma: aunque conserve su RUC,
         // se revisa por si otra cuenta lo acreditó mientras tanto
         exigirRucLibre(ruc);
-        RucResponse sunat = rucSunat.exigirValido(ruc);
+        RucResponse sunat = rucSunat.exigirValido(ruc, usuarioId);
         exigirTitular(usuarioId, ruc, sunat);
         String razonSocial = razonSocial(r, sunat);
         aplicar(b, r, ruc, razonSocial);

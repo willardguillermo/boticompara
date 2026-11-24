@@ -6,6 +6,10 @@ import com.boticompara.usuario.chat.gemini.GeminiRespuesta;
 import com.boticompara.usuario.chat.herramienta.RegistroHerramientas;
 import com.boticompara.usuario.controller.BusquedaController;
 import com.boticompara.usuario.dto.BusquedaResponse;
+import com.boticompara.usuario.entity.Botica;
+import com.boticompara.usuario.entity.Usuario;
+import com.boticompara.usuario.repository.BoticaRepository;
+import com.boticompara.usuario.repository.UsuarioRepository;
 import com.boticompara.usuario.error.GlobalExceptionHandler;
 import com.boticompara.usuario.security.UsuarioAutenticado;
 import com.boticompara.usuario.service.BusquedaService;
@@ -24,6 +28,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,17 +54,22 @@ class ChatControllerTest {
 
     private final BusquedaService busqueda = mock(BusquedaService.class);
     private final RegistroBusquedaService registroBusquedas = mock(RegistroBusquedaService.class);
+    private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
+    private final BoticaRepository boticas = mock(BoticaRepository.class);
     private GeminiCliente gemini = (pedido, plazo) ->
             new GeminiRespuesta("Hola, ¿qué medicamento buscas?", List.of(), new ObjectMapper().createObjectNode());
     private MockMvc mvc;
 
     @BeforeEach
     void armar() {
+        // Por defecto todos pueden usar el asistente: comprador verificado y botica aprobada
+        when(usuarios.findById(any())).thenReturn(Optional.of(usuario(true)));
+        when(boticas.findByUsuarioId(any())).thenReturn(Optional.of(botica("APROBADO")));
         // El cliente de Gemini se consulta en cada pedido, así cada test puede cambiarlo
         ChatService service = new ChatService((pedido, plazo) -> gemini.generar(pedido, plazo),
                 new RegistroHerramientas(List.of()), new LimitadorChat(2, 30, 3), new InstruccionesSistema());
         // GlobalExceptionHandler va primero a propósito: ChatErrores debe ganar por su @Order
-        mvc = MockMvcBuilders.standaloneSetup(new ChatController(service),
+        mvc = MockMvcBuilders.standaloneSetup(new ChatController(new AccesoChat(usuarios, boticas), service),
                         new BusquedaController(busqueda, registroBusquedas))
                 .setControllerAdvice(new GlobalExceptionHandler(), new ChatErrores())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
@@ -71,6 +81,23 @@ class ChatControllerTest {
     @AfterEach
     void limpiar() {
         SecurityContextHolder.clearContext();
+    }
+
+    private static Usuario usuario(boolean verificado) {
+        Usuario u = new Usuario();
+        u.setCorreoVerificado(verificado);
+        return u;
+    }
+
+    private static Botica botica(String estado) {
+        Botica b = new Botica();
+        b.setEstado(estado);
+        return b;
+    }
+
+    private void comoDueno() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                new UsuarioAutenticado(1L, "DUENO_BOTICA"), null, List.of()));
     }
 
     private ResultActions preguntar(String cuerpo) throws Exception {
@@ -86,6 +113,84 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.productos").isEmpty())
                 .andExpect(jsonPath("$.respaldo").value(false))
                 .andExpect(jsonPath("$.ayuda").value(false));
+    }
+
+    // ---------- Quién puede usar el asistente (403) ----------
+
+    @Test
+    void compradorSinCorreoVerificado_403SinLlamarAGemini() throws Exception {
+        when(usuarios.findById(4L)).thenReturn(Optional.of(usuario(false)));
+        gemini = (pedido, plazo) -> {
+            throw new AssertionError("Con 403 no se llama a Gemini");
+        };
+
+        preguntar("{\"mensaje\":\"Hola\"}")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.error").value("Forbidden"))
+                .andExpect(jsonPath("$.mensaje").value("Verifica tu correo para usar el asistente"))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void compradorQueNoExiste_403() throws Exception {
+        when(usuarios.findById(4L)).thenReturn(Optional.empty());
+
+        preguntar("{\"mensaje\":\"Hola\"}")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.mensaje").value("Verifica tu correo para usar el asistente"));
+    }
+
+    @Test
+    void duenoConBoticaPendienteORechazada_403() throws Exception {
+        comoDueno();
+        for (String estado : List.of("PENDIENTE", "RECHAZADO")) {
+            when(boticas.findByUsuarioId(1L)).thenReturn(Optional.of(botica(estado)));
+
+            preguntar("{\"mensaje\":\"Hola\"}")
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.mensaje").value("El asistente se activa cuando tu botica sea aprobada"));
+        }
+    }
+
+    @Test
+    void duenoSinBotica_403() throws Exception {
+        comoDueno();
+        when(boticas.findByUsuarioId(1L)).thenReturn(Optional.empty());
+
+        preguntar("{\"mensaje\":\"Hola\"}")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.mensaje").value("El asistente se activa cuando tu botica sea aprobada"));
+    }
+
+    @Test
+    void duenoConBoticaAprobada_noNecesitaRevisarSuCorreo() throws Exception {
+        comoDueno();
+        when(usuarios.findById(1L)).thenReturn(Optional.of(usuario(false)));
+
+        preguntar("{\"mensaje\":\"Hola\"}").andExpect(status().isOk());
+    }
+
+    @Test
+    void el403VaAntesDeValidarElCuerpo() throws Exception {
+        when(usuarios.findById(4L)).thenReturn(Optional.of(usuario(false)));
+
+        preguntar("{\"mensaje\":\"  \"}")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.mensaje").value("Verifica tu correo para usar el asistente"));
+    }
+
+    @Test
+    void los403NoCuentanEnElLimite() throws Exception {
+        // El límite de este test es 2 por minuto: tres 403 seguidos no lo gastan
+        when(usuarios.findById(4L)).thenReturn(Optional.of(usuario(false)));
+        for (int i = 0; i < 3; i++) {
+            preguntar("{\"mensaje\":\"Hola\"}").andExpect(status().isForbidden());
+        }
+        when(usuarios.findById(4L)).thenReturn(Optional.of(usuario(true)));
+
+        preguntar("{\"mensaje\":\"uno\"}").andExpect(status().isOk());
+        preguntar("{\"mensaje\":\"dos\"}").andExpect(status().isOk());
     }
 
     @Test

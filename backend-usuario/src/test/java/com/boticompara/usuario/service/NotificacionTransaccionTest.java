@@ -5,10 +5,12 @@ import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.EstadoReserva;
 import com.boticompara.usuario.entity.Producto;
 import com.boticompara.usuario.entity.Reserva;
+import com.boticompara.usuario.entity.Usuario;
 import com.boticompara.usuario.error.GlobalExceptionHandler;
 import com.boticompara.usuario.repository.BoticaRepository;
 import com.boticompara.usuario.repository.ProductoRepository;
 import com.boticompara.usuario.repository.ReservaRepository;
+import com.boticompara.usuario.repository.UsuarioRepository;
 import com.boticompara.usuario.security.UsuarioAutenticado;
 import com.boticompara.usuario.service.NotificacionService.DatosReserva;
 import org.junit.jupiter.api.AfterEach;
@@ -163,6 +165,7 @@ class NotificacionTransaccionTest {
     @MockitoBean BusquedaService busqueda;
     @MockitoBean CondicionVentaService condiciones;
     @MockitoBean NamedParameterJdbcTemplate jdbc;
+    @MockitoBean UsuarioRepository usuarios;
 
     @Autowired ReservaService reservaService;
     @Autowired Transacciones transacciones;
@@ -196,6 +199,11 @@ class NotificacionTransaccionTest {
         pendiente.setEstado(EstadoReserva.PENDIENTE);
         pendiente.setVenceEn(Instant.now().plus(1, ChronoUnit.DAYS));
 
+        // El comprador ya verificó su correo: puede reservar
+        Usuario comprador = new Usuario();
+        comprador.setId(COMPRADOR);
+        comprador.setCorreoVerificado(true);
+        when(usuarios.findById(COMPRADOR)).thenReturn(Optional.of(comprador));
         when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(p));
         when(productos.findById(PRODUCTO)).thenReturn(Optional.of(p));
         when(boticas.findById(BOTICA)).thenReturn(Optional.of(b));
