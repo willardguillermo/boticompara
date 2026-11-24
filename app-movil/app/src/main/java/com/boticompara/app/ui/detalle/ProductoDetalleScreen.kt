@@ -40,6 +40,7 @@ import com.boticompara.app.data.remote.dto.AlternativaResponse
 import com.boticompara.app.ui.components.*
 import com.boticompara.app.ui.reservas.HojaReserva
 import com.boticompara.app.ui.reservas.ReservarViewModel
+import com.boticompara.app.ui.resenas.AccesoResenas
 import com.boticompara.app.ui.theme.Dimens
 import java.util.Locale
 
@@ -292,6 +293,9 @@ fun ProductoDetalleScreen(
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                 }
+
+                                Spacer(Modifier.height(Dimens.Space12))
+                                AccesoResenas(boticaId = producto.boticaId, navController = navController)
                             }
                         }
 

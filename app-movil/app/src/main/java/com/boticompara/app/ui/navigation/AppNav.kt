@@ -24,6 +24,8 @@ import com.boticompara.app.ui.favoritos.FavoritosScreen
 import com.boticompara.app.ui.reservas.MisReservasScreen
 import com.boticompara.app.ui.reservas.RUTA_RESERVA
 import com.boticompara.app.ui.reservas.ReservaDetalleScreen
+import com.boticompara.app.ui.resenas.RUTA_RESENAS
+import com.boticompara.app.ui.resenas.ResenasBoticaScreen
 import com.boticompara.app.ui.perfil.ProfileScreen
 import com.boticompara.app.ui.chat.ChatScreen
 
@@ -78,6 +80,16 @@ fun AppNav(
             ReservaDetalleScreen(
                 reservaId = backStackEntry.arguments?.getLong("reservaId") ?: 0L,
                 nueva = backStackEntry.arguments?.getBoolean("nueva") ?: false,
+                navController = navController
+            )
+        }
+
+        composable(
+            route = RUTA_RESENAS,
+            arguments = listOf(navArgument("boticaId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            ResenasBoticaScreen(
+                boticaId = backStackEntry.arguments?.getLong("boticaId") ?: 0L,
                 navController = navController
             )
         }
