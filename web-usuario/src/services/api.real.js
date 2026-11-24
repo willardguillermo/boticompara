@@ -53,6 +53,10 @@ export const apiReal = {
   // 1. Autenticación
   login: (credenciales) => solicitar('POST', '/auth/login', credenciales),
   registro: (datos) => solicitar('POST', '/auth/registro', datos),
+  // H17: el código y la contraseña van solo en el cuerpo, nunca en la URL
+  recuperarPassword: (correo) => solicitar('POST', '/auth/recuperar', { correo: correo.trim() }),
+  restablecerPassword: ({ correo, token, password }) =>
+    solicitar('POST', '/auth/restablecer', { correo: correo.trim(), token, password }),
 
   // 2. Perfil
   obtenerPerfil: () => solicitar('GET', '/usuarios/me'),

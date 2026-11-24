@@ -15,7 +15,8 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { state } = useLocation()
 
-  const [correo, setCorreo] = useState('')
+  // H17: al volver de restablecer la contraseña llega el aviso y el correo (sin la contraseña)
+  const [correo, setCorreo] = useState(state?.correo ?? '')
   const [password, setPassword] = useState('')
   const [errores, setErrores] = useState({})
   const [error, setError] = useState('')
@@ -60,6 +61,11 @@ export default function LoginPage() {
             <p className="texto-suave">Ingresa para gestionar tu botica y tu catálogo.</p>
 
             <form className="formulario" onSubmit={enviar} noValidate>
+              {state?.exito && !error && (
+                <Alerta tipo="exito">
+                  <p>{state.exito}</p>
+                </Alerta>
+              )}
               {aviso && (
                 <Alerta tipo="aviso">
                   <p>{aviso}</p>
@@ -86,6 +92,9 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </Campo>
+              <p className="enlace-olvido">
+                <Link to="/recuperar">¿Olvidaste tu contraseña?</Link>
+              </p>
 
               <button type="submit" className="btn btn-primario btn-bloque" disabled={enviando}>
                 {enviando ? 'Ingresando...' : 'Ingresar'}

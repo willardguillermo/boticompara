@@ -12,6 +12,7 @@ import EstadoPage from './pages/EstadoPage.jsx'
 import InicioPage from './pages/InicioPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import PedidosPage from './pages/PedidosPage.jsx'
+import RecuperarPasswordPage from './pages/RecuperarPasswordPage.jsx'
 import RegistroBoticaPage from './pages/RegistroBoticaPage.jsx'
 import RegistroPage from './pages/RegistroPage.jsx'
 
@@ -24,6 +25,7 @@ export default function App() {
             <Route element={<RutaPublica />}>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/registro" element={<RegistroPage />} />
+              <Route path="/recuperar" element={<RecuperarPasswordPage />} />
             </Route>
             <Route element={<RutaProtegida />}>
               <Route path="/panel" element={<PanelLayout />}>
