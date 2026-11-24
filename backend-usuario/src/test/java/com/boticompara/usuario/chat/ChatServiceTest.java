@@ -571,6 +571,34 @@ class ChatServiceTest {
     }
 
     @Test
+    void unHistorialDeMasDe20ElementosDa400SinLlamarAGemini() {
+        List<MensajeHistorial> historial = new ArrayList<>();
+        for (int i = 0; i < 21; i++) {
+            historial.add(new MensajeHistorial(i % 2 == 0 ? "usuario" : "asistente", "hola"));
+        }
+
+        ApiException e = error(CARLOS, new ChatRequest("hola", historial, null, null));
+
+        assertEquals(HttpStatus.BAD_REQUEST, e.getStatus());
+        assertEquals("El historial no puede pasar de 20 mensajes", e.getMessage());
+        assertTrue(gemini.pedidos.isEmpty());
+    }
+
+    @Test
+    void unHistorialDe20ElementosEsValidoYSeRecortaA10() {
+        List<MensajeHistorial> historial = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            historial.add(new MensajeHistorial(i % 2 == 0 ? "usuario" : "asistente", "texto " + i));
+        }
+        gemini.guion.add(texto("Hola"));
+
+        service.responder(CARLOS, new ChatRequest("nueva", historial, null, null));
+
+        // Quedan los 10 últimos (texto 10 a texto 19, empieza con el usuario) más la pregunta nueva
+        assertEquals(11, gemini.pedidos.get(0).turnos().size());
+    }
+
+    @Test
     void mensajeDe500CaracteresYCoordenadasEnElBorde_sonValidos() {
         gemini.guion.add(texto("Hola"));
 
