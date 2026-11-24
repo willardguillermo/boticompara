@@ -195,6 +195,11 @@ Elimina la cuenta del usuario logueado. Los datos se **anonimizan**, no se borra
 - `nombre` pasa a `"Usuario eliminado"` y `correo` a `eliminado-{id}@boticompara.local`.
 - `telefono` y `direccion` quedan en `null`, la contraseña deja de servir y `activo = false`.
 - Si es dueño de botica, todos sus productos pasan a `activo = false` (dejan de aparecer en las búsquedas).
+- Si es dueño de botica, su botica pasa a `RECHAZADO` con el motivo "Cuenta eliminada por el dueño" (si ya estaba
+  `RECHAZADO`, se deja como está). Así el RUC queda libre para otra cuenta (A5).
+- Si es dueño de botica, sus reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) pasan a `RECHAZADA` con el motivo
+  "La botica dejó de atender en BotiCompara", y cada comprador recibe el correo de rechazo de siempre (H83).
+- Todo lo anterior se guarda en la misma transacción; los correos salen después de confirmarla.
 - Se borran todos sus favoritos (D1).
 - Se borran todas sus alertas de precio (H59).
 
@@ -300,13 +305,15 @@ Sube la licencia de funcionamiento. Es `multipart/form-data` con un campo `archi
 - Formatos: PDF, JPG o PNG (se verifica el contenido, no solo la extensión).
 - Tamaño máximo: 5 MB.
 - Subir otro archivo reemplaza el anterior.
+- **Solo si la botica está `PENDIENTE` o `RECHAZADO`.** Una botica `APROBADO` ya no puede cambiar su licencia: el
+  administrador aprobó ese documento.
 
 El archivo se guarda en Supabase Storage (bucket privado) y la ruta queda en `licencia_url`.
 ```json
 // 200 OK
 { "tieneLicencia": true, "mensaje": "Licencia cargada correctamente" }
 ```
-Errores: 400 (falta el archivo, formato no permitido o más de 5 MB), 404 (no tiene botica).
+Errores: 400 (falta el archivo, formato no permitido o más de 5 MB), 404 (no tiene botica), 409 "La licencia de una botica aprobada no se puede cambiar" (la botica está `APROBADO`).
 
 ---
 
