@@ -50,7 +50,8 @@ Cada consulta viaja de Virginia a São Paulo y vuelve. Las pantallas que hacen v
 
 `render.yaml` (raíz del repo) ya trae todo lo de la tabla; el plan gratis lo admite. **New → Blueprint**, elegir el repo y llenar las
 variables que pide. Van con `sync: false`, o sea sin valores en el repo, y Render solo las pregunta **la primera vez**; después se
-cambian en **Environment**. No incluye `FIREBASE_PROJECT_ID`: se agrega a mano (sección 5).
+cambian en **Environment**. La única con valor fijo es `SERVER_TOMCAT_REMOTEIP_REMOTEIPHEADER` (no es secreta, sección 7).
+No incluye `FIREBASE_PROJECT_ID`: se agrega a mano (sección 5).
 
 ### El health check
 
@@ -69,6 +70,7 @@ Solo nombres: los valores están en tu `.env`. `PORT` **no se pone**, la da Rend
 | `DB_PORT`, `DB_NAME`, `DB_SSLMODE` | Puerto, base y SSL de la conexión | Usa 5432, `postgres` y `require` |
 | `JWT_SECRET` | Firma los JWT; mínimo 32 caracteres. Usa una **distinta** a la de local | **No arranca** |
 | `CORS_ORIGINS` | Orígenes de la web que pueden llamar a la API (sección 6) | Solo `http://localhost:5173` |
+| `SERVER_TOMCAT_REMOTEIP_REMOTEIPHEADER` | **`CF-Connecting-IP`**: la IP real del cliente para los límites por IP (SEC-05). No es secreta; ya viene en `render.yaml` | Se usa la IP de Cloudflare, que cambia en cada petición: los límites de login, registro y recuperar **no bloquean** (sección 7) |
 | `APP_BASE_URL` | URL pública de la API para los enlaces de los correos: la de Render terminada en `/api` | Los enlaces apuntan a `localhost` |
 | `SUPABASE_URL`, `SUPABASE_SECRET_KEY` | Licencias en Storage privado (H4) | Subir la licencia responde 503 |
 | `SUPABASE_BUCKET_LICENCIAS` | Nombre del bucket | `licencias` |
@@ -155,7 +157,11 @@ Debe mostrar tu URL; con otro `Origin`, nada.
 
 ---
 
-## 7. Lunes: ¿el límite de login ve la IP real?
+## 7. ¿El límite de login ve la IP real?
+
+> **Resultado en Render (23/11/2026):** sin ajuste, la API veía la IP de Cloudflare y el límite no bloqueaba. Se corrigió con
+> `SERVER_TOMCAT_REMOTEIP_REMOTEIPHEADER=CF-Connecting-IP`, sin cambiar código. Detalle en
+> [Lo que se probó en Render](#lo-que-se-probó-en-render-23112026).
 
 El límite (SEC-05) cuenta 5 fallos por **correo e IP**. Detrás de un proxy la IP sale de `X-Forwarded-For`, que cualquiera puede
 inventar. Con `server.forward-headers-strategy=native`, Tomcat lee esa lista **de derecha a izquierda** y usa la primera IP que no sea
@@ -199,6 +205,7 @@ curl -4 -s -o /dev/null -w '%{http_code}\n' $API/auth/login -H 'Content-Type: ap
 ### Mirar qué IP llega
 
 Agrega estas variables un momento, repite la prueba 1 y mira **Logs**. **Bórralas al terminar:** escriben las IP de los usuarios.
+El 23/11 se usaron solo para el diagnóstico y se quitaron después.
 
 ```
 SERVER_TOMCAT_ACCESSLOG_ENABLED=true
@@ -222,6 +229,24 @@ Compara `ip` con tu IP pública (`curl -4 ifconfig.me`).
 > **Nunca** pongas `.*` en `INTERNALPROXIES`: hace que se use la IP inventada y el límite deja de servir.
 
 Después de cualquier ajuste, repite las dos pruebas con otro correo. No hace falta cambiar código.
+
+### Lo que se probó en Render (23/11/2026)
+
+Con el servicio desplegado. Las IP de las personas no se anotan aquí.
+
+| Momento | Prueba 1 | IP que usó la API (access log) |
+|---|---|---|
+| Antes: sin ajuste | **`401 401 401 401 401 401`: no bloquea** | Una de Cloudflare (`104.22.x`), distinta en cada petición |
+| Después: `SERVER_TOMCAT_REMOTEIP_REMOTEIPHEADER=CF-Connecting-IP` | **`401 401 401 401 401 429`** | La real del cliente: `ip` = `cf` |
+
+- **Qué pasaba:** `X-Forwarded-For` llegaba como `cliente, Cloudflare (104.22.x), balanceador de Render (10.x)`. Tomcat descartaba
+  el `10.x` por ser red privada y se quedaba con la de Cloudflare, que no está entre los proxies internos. Era el **caso 2** de la tabla de arriba.
+- **El arreglo:** con `remote-ip-header=CF-Connecting-IP`, Tomcat toma la IP de la cabecera que pone Cloudflare con el cliente que se
+  conectó. El `X-Forwarded-For` inventado de la prueba ya no influye.
+- Registro y recuperar usan la misma IP, así que el arreglo también les sirve; solo se probó el login. La variable quedó en
+  `render.yaml` con valor fijo.
+- **Por comprobar:** la prueba 2 (otra red no queda bloqueada) y que un `CF-Connecting-IP` inventado no cambie `cf=`.
+- El access log de la sección anterior se activó solo para este diagnóstico y luego se quitó.
 
 ### Lo que se probó en local (22/11/2026)
 
