@@ -11,6 +11,7 @@ import CorregirBoticaPage from './pages/CorregirBoticaPage.jsx'
 import CuentaPage from './pages/CuentaPage.jsx'
 import EstadoPage from './pages/EstadoPage.jsx'
 import InicioPage from './pages/InicioPage.jsx'
+import LandingPage from './pages/LandingPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import PedidosPage from './pages/PedidosPage.jsx'
 import RecuperarPasswordPage from './pages/RecuperarPasswordPage.jsx'
@@ -23,6 +24,8 @@ export default function App() {
       <ToastProvider>
         <AuthProvider>
           <Routes>
+            {/* Página de presentación: pública también con sesión (entonces ofrece "Ir a mi panel") */}
+            <Route path="/" element={<LandingPage />} />
             <Route element={<RutaPublica />}>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/registro" element={<RegistroPage />} />

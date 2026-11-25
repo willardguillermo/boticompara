@@ -1,0 +1,1810 @@
+/* =====================================================================
+   Landing ("/"). Usa las variables del Soft UI de index.css; aquí solo se agregan las propias de
+   la página (vidrio de la barra, colores del mini mapa), con su versión para el modo oscuro.
+   Todo lo que se mueve se apaga con prefers-reduced-motion (al final del archivo).
+   Clases con prefijo lp- para no chocar con el panel.
+   ===================================================================== */
+.landing {
+  --lp-ancho: 1180px;
+  --lp-radio: 24px;
+  --lp-borde-tarjeta: transparent;
+  --lp-vidrio-fondo: rgb(247 250 249 / 72%);
+  --lp-vidrio-borde: rgb(255 255 255 / 75%);
+  --lp-vidrio-brillo: rgb(255 255 255 / 90%);
+  --lp-vidrio-sombra: 0 12px 32px rgb(16 48 44 / 14%), 0 2px 6px rgb(16 48 44 / 8%);
+  --lp-mapa-fondo: #dbe6e3;
+  --lp-calle: #f7faf9;
+  --lp-calle-borde: #c4d3cf;
+  --lp-parque: #c3e6d2;
+  --lp-rio: #b9dbe6;
+  --lp-tu: #1d4ed8;
+  --lp-pin-caro: #6c827c;
+  --lp-tinte: rgb(15 118 110 / 6%);
+  --lp-numero: rgb(15 118 110 / 16%);
+  --lp-resorte: cubic-bezier(0.34, 1.4, 0.5, 1);
+  --lp-salida: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  overflow-x: clip;
+  color: var(--color-texto);
+  background: var(--color-fondo);
+}
+
+:root[data-tema='oscuro'] .landing {
+  --lp-borde-tarjeta: var(--color-borde);
+  --lp-vidrio-fondo: rgb(26 38 34 / 74%);
+  --lp-vidrio-borde: rgb(255 255 255 / 10%);
+  --lp-vidrio-brillo: rgb(255 255 255 / 12%);
+  --lp-vidrio-sombra: 0 12px 32px rgb(0 0 0 / 45%);
+  --lp-mapa-fondo: #15211e;
+  --lp-calle: #26352f;
+  --lp-calle-borde: #1c2925;
+  --lp-parque: #183a2b;
+  --lp-rio: #163a47;
+  --lp-tu: #93c5fd;
+  --lp-pin-caro: #7f978f;
+  --lp-tinte: rgb(45 212 191 / 5%);
+  --lp-numero: rgb(45 212 191 / 14%);
+}
+
+html:has(.landing) {
+  scroll-behavior: smooth;
+}
+
+.landing main:focus {
+  outline: none;
+}
+
+.lp-contenedor {
+  width: 100%;
+  max-width: var(--lp-ancho);
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 4vw, 2rem);
+}
+
+.lp-saltar {
+  position: fixed;
+  top: -80px;
+  left: 1rem;
+  z-index: 60;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radio);
+  background: var(--color-primario);
+  color: var(--color-texto-sobre-color);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.lp-saltar:focus {
+  top: 1rem;
+}
+
+/* ---------- Barra flotante de vidrio ---------- */
+.lp-nav {
+  position: fixed;
+  top: 14px;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  padding-inline: 12px;
+  pointer-events: none;
+}
+
+.lp-vidrio {
+  position: relative;
+  isolation: isolate;
+}
+
+/* El vidrio va en un pseudo-elemento: un backdrop-filter en la píldora misma haría que la lista
+   fija del celular se ubique respecto a ella y no a la ventana */
+.lp-vidrio::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--lp-vidrio-fondo);
+  border: 1px solid var(--lp-vidrio-borde);
+  box-shadow: inset 0 1px 0 var(--lp-vidrio-brillo), var(--lp-vidrio-sombra);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+
+.lp-nav-pildora {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: min(1100px, 100%);
+  padding: 0.4rem 0.45rem 0.4rem 1rem;
+  border-radius: 999px;
+  pointer-events: auto;
+}
+
+.lp-nav .marca {
+  font-size: 1.08rem;
+}
+
+.lp-nav .marca-logo {
+  width: 32px;
+  height: 32px;
+}
+
+.lp-nav-lista {
+  position: relative;
+  display: flex;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+}
+
+/* Realce del ítem activo: se desliza con un resorte suave */
+.lp-nav-lista::before {
+  content: '';
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: 0;
+  width: var(--lp-ind-w, 0);
+  transform: translateX(var(--lp-ind-x, 0));
+  border-radius: 999px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primario) 88%, white), var(--color-primario));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), 0 4px 12px rgb(15 118 110 / 30%);
+  transition:
+    transform 0.5s var(--lp-resorte),
+    width 0.5s var(--lp-resorte),
+    opacity 0.25s;
+}
+
+.lp-nav-lista[data-indicador='oculto']::before {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.lp-nav-lista a {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  color: var(--color-texto-suave);
+  font-size: 0.92rem;
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.3s, background 0.2s;
+}
+
+.lp-nav-lista a:hover:not([aria-current]) {
+  color: var(--color-texto);
+  background: var(--capa-hover);
+}
+
+.lp-nav-lista a[aria-current] {
+  color: var(--color-texto-sobre-color);
+}
+
+.lp-nav-lista .icono,
+.lp-nav-corto {
+  display: none;
+}
+
+.lp-nav-acciones {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lp-nav-acciones .boton-redondo {
+  box-shadow: none;
+  background: transparent;
+}
+
+.lp-nav-cta {
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* ---------- Piezas comunes ---------- */
+.lp-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--color-primario-borde);
+  border-radius: 999px;
+  background: var(--color-primario-suave);
+  color: var(--color-primario-oscuro);
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.lp-btn-grande {
+  min-height: 52px;
+  padding: 0.8rem 1.4rem;
+  border-radius: 14px;
+  font-size: 1.02rem;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.2s, transform 0.25s var(--lp-resorte);
+}
+
+.lp-btn-grande:hover {
+  transform: translateY(-2px);
+}
+
+.lp-btn-grande:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.lp-flecha {
+  transition: transform 0.3s var(--lp-resorte);
+}
+
+.lp-btn-grande:hover .lp-flecha {
+  transform: translateX(4px);
+}
+
+.lp-encabezado {
+  max-width: 720px;
+  margin: 0 auto 3rem;
+  text-align: center;
+}
+
+.lp-encabezado h2 {
+  margin: 0;
+  font-size: clamp(1.9rem, 3vw + 0.9rem, 3.1rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.lp-encabezado p {
+  margin: 1rem auto 0;
+  max-width: 560px;
+  color: var(--color-texto-suave);
+  font-size: 1.1rem;
+}
+
+.lp-seccion {
+  position: relative;
+  padding-block: clamp(4.5rem, 9vw, 7.5rem);
+  scroll-margin-top: 70px;
+}
+
+.lp-seccion-tinte {
+  background: linear-gradient(180deg, transparent, var(--lp-tinte) 18%, var(--lp-tinte) 82%, transparent);
+}
+
+.lp-centro {
+  display: flex;
+  justify-content: center;
+  margin-top: 2.5rem;
+}
+
+.lp-tarjeta-icono {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--color-primario-suave);
+  color: var(--color-primario-oscuro);
+  font-size: 1.15rem;
+  transition: transform 0.4s var(--lp-resorte);
+}
+
+/* ---------- 1. Hero ---------- */
+.lp-hero {
+  position: relative;
+  padding: clamp(7rem, 12vw, 9.5rem) 0 clamp(3.5rem, 7vw, 6rem);
+}
+
+.lp-hero-fondo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* Se desvanece abajo para que no se note dónde termina el hero */
+  mask-image: linear-gradient(180deg, #000 65%, transparent);
+}
+
+/* Trama de puntos que se desvanece hacia los bordes */
+.lp-hero-fondo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(var(--color-borde) 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 75%);
+}
+
+/* Aurora: dos brillos que se mueven muy despacio */
+.lp-hero-fondo::after {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background:
+    radial-gradient(circle at 20% 25%, var(--brillo-acceso-1), transparent 35%),
+    radial-gradient(circle at 80% 60%, var(--brillo-acceso-2), transparent 38%);
+  animation: lp-aurora 22s ease-in-out infinite alternate;
+}
+
+.lp-hero-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 4.5rem);
+}
+
+.lp-hero h1 {
+  margin: 0 0 1.25rem;
+  font-size: clamp(2.5rem, 4.6vw + 0.8rem, 4.6rem);
+  font-weight: 850;
+  line-height: 1.04;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+
+.lp-titulo-degradado {
+  font-weight: inherit;
+}
+
+.lp-hero-bajada {
+  max-width: 34rem;
+  color: var(--color-texto-suave);
+  font-size: clamp(1.05rem, 0.5vw + 0.95rem, 1.22rem);
+}
+
+.lp-hero-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1.75rem 0 1.5rem;
+}
+
+.lp-hero-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--color-texto-suave);
+  font-size: 0.92rem;
+}
+
+.lp-hero-pie strong {
+  color: var(--color-texto);
+}
+
+/* Entrada del hero al cargar */
+.lp-entrada {
+  animation: lp-subir 0.8s var(--lp-salida) both;
+}
+
+.lp-entrada-2 { animation-delay: 0.08s; }
+.lp-entrada-3 { animation-delay: 0.18s; }
+.lp-entrada-4 { animation-delay: 0.28s; }
+.lp-entrada-5 { animation-delay: 0.38s; }
+
+/* ---------- Comparador del hero ---------- */
+.lp-comparador {
+  padding: 1.1rem;
+  border: 1px solid var(--lp-borde-tarjeta);
+  border-radius: 28px;
+  background: var(--color-superficie);
+  box-shadow: var(--sombra);
+  animation: lp-flotar 7s ease-in-out infinite;
+}
+
+.lp-comparador-barra {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.lp-busqueda {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  background: var(--color-superficie);
+  box-shadow: var(--sombra-hundida);
+  color: var(--color-texto-suave);
+}
+
+:root[data-tema='oscuro'] .lp-busqueda {
+  background: var(--color-hundido);
+}
+
+.lp-busqueda-texto {
+  display: inline-block;
+  overflow: hidden;
+  max-width: 14ch;
+  color: var(--color-texto);
+  font-weight: 600;
+  white-space: nowrap;
+  animation: lp-escribir 0.9s steps(11, end) both;
+}
+
+.lp-busqueda::after {
+  content: '';
+  width: 2px;
+  height: 1.1em;
+  margin-left: -0.35rem;
+  background: var(--color-primario);
+  animation: lp-parpadeo 1s steps(1) infinite;
+}
+
+.lp-boton-pausa {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-borde-control);
+  border-radius: 50%;
+  background: var(--color-superficie);
+  color: var(--color-texto);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.lp-boton-pausa:hover {
+  border-color: var(--color-primario);
+  color: var(--color-primario);
+}
+
+.lp-ejemplos {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.8rem;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--color-hundido);
+}
+
+.lp-ejemplos button {
+  flex: 1;
+  min-height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-texto-suave);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s, box-shadow 0.25s;
+}
+
+.lp-ejemplos button:hover {
+  color: var(--color-texto);
+}
+
+.lp-ejemplos button[aria-pressed='true'] {
+  background: var(--color-superficie-plana);
+  color: var(--color-primario-oscuro);
+  box-shadow: 0 1px 2px rgb(16 48 44 / 12%), 0 2px 8px rgb(16 48 44 / 8%);
+}
+
+/* Mini mapa SVG */
+.lp-mapa {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0.8rem 0;
+  border-radius: 16px;
+}
+
+.lp-mapa-fondo { fill: var(--lp-mapa-fondo); }
+.lp-mapa-parque { fill: var(--lp-parque); }
+
+.lp-mapa-rio {
+  fill: none;
+  stroke: var(--lp-rio);
+  stroke-width: 12;
+  stroke-linecap: round;
+}
+
+.lp-mapa-calles path,
+.lp-mapa-cuadras path {
+  fill: none;
+  stroke-linecap: square;
+}
+
+.lp-mapa-calles path { stroke: var(--lp-calle-borde); stroke-width: 17; }
+.lp-mapa-cuadras path { stroke: var(--lp-calle); stroke-width: 14; }
+
+.lp-mapa-ruta {
+  fill: none;
+  stroke: var(--color-primario);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: lp-trazar 1.1s 0.35s var(--lp-salida) both;
+}
+
+.lp-mapa-tu-punto {
+  fill: var(--lp-tu);
+  stroke: var(--color-superficie-plana);
+  stroke-width: 3;
+}
+
+.lp-mapa-tu-onda {
+  fill: var(--lp-tu);
+  opacity: 0.22;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lp-onda 2.4s ease-out infinite;
+}
+
+.lp-mapa-etiqueta {
+  fill: var(--color-texto);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lp-pin-cuerpo,
+.lp-pin-precio {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: lp-caer 0.7s var(--lp-resorte) both;
+}
+
+.lp-pin-precio { animation-delay: 0.12s; }
+.lp-pin-barato .lp-pin-cuerpo { animation-delay: 0.2s; }
+.lp-pin-barato .lp-pin-precio { animation-delay: 0.32s; }
+
+.lp-pin-caro .lp-pin-cuerpo path { fill: var(--lp-pin-caro); }
+.lp-pin-barato .lp-pin-cuerpo path { fill: var(--color-primario); }
+.lp-pin-cuerpo circle { fill: var(--color-superficie-plana); }
+
+.lp-pin-precio text {
+  font-size: 12.5px;
+  font-weight: 800;
+  text-anchor: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-pin-caro .lp-pin-precio rect {
+  fill: var(--color-superficie-plana);
+  stroke: var(--color-borde);
+}
+
+.lp-pin-caro .lp-pin-precio text { fill: var(--color-texto); }
+.lp-pin-barato .lp-pin-precio rect { fill: var(--color-primario); }
+.lp-pin-barato .lp-pin-precio text { fill: var(--color-texto-sobre-color); }
+
+/* Filas de precios */
+.lp-filas {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 16px;
+  background: var(--color-superficie-plana);
+  animation: lp-subir 0.55s var(--lp-salida) both;
+}
+
+.lp-fila-barata {
+  border-color: var(--color-primario-borde);
+  background: var(--color-primario-suave);
+  animation-delay: 0.12s;
+}
+
+.lp-fila-datos {
+  display: grid;
+  flex: 1;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.lp-fila-botica {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.lp-fila-botica .icono {
+  color: var(--lp-pin-caro);
+}
+
+.lp-fila-barata .lp-fila-botica .icono {
+  color: var(--color-primario);
+}
+
+.lp-fila-producto {
+  color: var(--color-texto-suave);
+  font-size: 0.82rem;
+}
+
+.lp-barra {
+  display: block;
+  height: 6px;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-hundido);
+}
+
+.lp-barra span {
+  display: block;
+  width: var(--lp-proporcion, 0);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lp-pin-caro);
+  transform-origin: left;
+  animation: lp-crecer 0.9s 0.25s var(--lp-salida) both;
+}
+
+.lp-fila-barata .lp-barra span {
+  background: var(--color-primario);
+}
+
+.lp-fila-precio {
+  display: grid;
+  justify-items: end;
+  gap: 0.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-fila-precio strong {
+  font-size: 1.2rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.lp-chip-barato {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--color-primario);
+  color: var(--color-texto-sobre-color);
+  font-size: 0.7rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.lp-ahorro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.8rem;
+  margin-top: 0.7rem;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  background: linear-gradient(120deg, var(--color-primario-suave), var(--exito-fondo));
+}
+
+.lp-ahorro-etiqueta {
+  font-weight: 700;
+}
+
+.lp-ahorro-monto {
+  color: var(--color-primario-oscuro);
+  font-size: clamp(1.6rem, 2vw + 1rem, 2.1rem);
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.lp-ahorro-porcentaje {
+  margin-left: auto;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid var(--exito-borde);
+  border-radius: 999px;
+  background: var(--color-superficie-plana);
+  color: var(--exito);
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+
+.lp-comparador-nota {
+  margin: 0.75rem 0.2rem 0;
+  color: var(--color-texto-suave);
+  font-size: 0.8rem;
+}
+
+.lp-comparador-nota strong {
+  color: var(--color-texto);
+}
+
+/* ---------- 2. Cómo funciona ---------- */
+.lp-pasos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-paso {
+  position: relative;
+  padding: 1.5rem;
+  border: 1px solid var(--lp-borde-tarjeta);
+  border-radius: var(--lp-radio);
+  background: var(--color-superficie);
+  box-shadow: var(--sombra);
+}
+
+/* Conector punteado entre pasos */
+.lp-paso:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -1.5rem;
+  width: 1.5rem;
+  border-top: 2px dashed var(--color-primario-borde);
+}
+
+.lp-paso h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.lp-paso p {
+  margin: 0;
+  color: var(--color-texto-suave);
+}
+
+.lp-paso-numero {
+  position: absolute;
+  top: 0.4rem;
+  right: 1.1rem;
+  color: var(--lp-numero);
+  font-size: 4.2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.lp-paso-visual {
+  display: grid;
+  place-items: center;
+  gap: 0.6rem;
+  height: 120px;
+  margin-bottom: 1.2rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: var(--color-hundido);
+  box-shadow: var(--sombra-hundida);
+}
+
+.lp-mini-busqueda {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: min(220px, 100%);
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: var(--color-superficie-plana);
+  color: var(--color-texto-suave);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.lp-mini-busqueda span {
+  color: var(--color-texto);
+}
+
+.lp-mini-resultados {
+  display: grid;
+  gap: 0.35rem;
+  width: min(220px, 100%);
+}
+
+.lp-mini-resultados span {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--color-borde);
+}
+
+.lp-mini-resultados span:first-child {
+  width: 85%;
+  background: var(--color-primario-borde);
+}
+
+.lp-mini-resultados span:last-child {
+  width: 60%;
+}
+
+.lp-ticket {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.6rem 1.1rem;
+  border: 2px dashed var(--color-primario);
+  border-radius: 14px;
+  background: var(--color-superficie-plana);
+  text-align: center;
+}
+
+.lp-ticket-titulo {
+  color: var(--color-texto-suave);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lp-ticket-codigo {
+  color: var(--color-primario-oscuro);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.lp-recoger {
+  position: relative;
+  color: var(--color-primario);
+  font-size: 3rem;
+}
+
+.lp-recoger-check {
+  position: absolute;
+  right: -0.5rem;
+  bottom: -0.2rem;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 3px solid var(--color-hundido);
+  border-radius: 50%;
+  background: var(--exito);
+  color: var(--color-texto-sobre-color);
+  font-size: 0.85rem;
+}
+
+:root[data-tema='oscuro'] .lp-recoger-check {
+  color: #06211e;
+}
+
+.lp-paso.revelado .lp-recoger-check {
+  animation: lp-pop 0.6s 0.6s var(--lp-resorte) both;
+}
+
+/* ---------- 3. Compradores ---------- */
+.lp-dos-columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(2.5rem, 6vw, 5.5rem);
+}
+
+.lp-dos-columnas .lp-encabezado {
+  margin: 0 0 2rem;
+  text-align: left;
+}
+
+.lp-celular-figura {
+  display: grid;
+  justify-items: center;
+  margin: 0;
+}
+
+.lp-celular-figura figcaption {
+  margin-top: 1.4rem;
+  color: var(--color-texto-suave);
+  font-size: 0.82rem;
+}
+
+.lp-celular {
+  width: min(280px, 82vw);
+  padding: 10px;
+  border-radius: 44px;
+  background: linear-gradient(145deg, #1d2f2b, #0b1513);
+  box-shadow: var(--sombra-flotante), inset 0 0 0 1.5px rgb(255 255 255 / 12%);
+  transform: rotate(-3deg);
+  animation: lp-flotar-girado 8s ease-in-out infinite;
+}
+
+.lp-celular-pantalla {
+  display: grid;
+  gap: 0.55rem;
+  padding: 1.1rem 0.8rem 0.9rem;
+  border-radius: 34px;
+  background: var(--color-fondo);
+  font-size: 0.78rem;
+}
+
+.lp-app-barra {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-primario);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.lp-app-logo {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--color-primario);
+  color: var(--color-texto-sobre-color);
+  font-size: 0.75rem;
+}
+
+.lp-app-busqueda {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 999px;
+  background: var(--color-superficie);
+  box-shadow: var(--sombra-hundida);
+  color: var(--color-texto);
+  font-weight: 600;
+}
+
+.lp-app-mapa {
+  position: relative;
+  height: 118px;
+  overflow: hidden;
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, transparent 31%, var(--lp-calle) 31% 38%, transparent 38% 69%, var(--lp-calle) 69% 75%, transparent 75%),
+    linear-gradient(0deg, transparent 40%, var(--lp-calle) 40% 50%, transparent 50%),
+    var(--lp-mapa-fondo);
+}
+
+.lp-app-pin {
+  position: absolute;
+  font-size: 1.5rem;
+  animation: lp-caer 0.7s var(--lp-resorte) both;
+}
+
+.lp-app-pin-1 {
+  top: 12%;
+  left: 62%;
+  color: var(--color-primario);
+}
+
+.lp-app-pin-2 {
+  top: 50%;
+  left: 18%;
+  color: var(--lp-pin-caro);
+  animation-delay: 0.15s;
+}
+
+.lp-app-tu {
+  position: absolute;
+  top: 58%;
+  left: 52%;
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--color-superficie-plana);
+  border-radius: 50%;
+  background: var(--lp-tu);
+  box-shadow: 0 0 0 0 var(--lp-tu);
+  animation: lp-onda-caja 2.4s ease-out infinite;
+}
+
+.lp-app-resultado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 14px;
+  background: var(--color-superficie-plana);
+}
+
+.lp-app-resultado div {
+  display: grid;
+  min-width: 0;
+}
+
+.lp-app-resultado span {
+  color: var(--color-texto-suave);
+  font-size: 0.7rem;
+}
+
+.lp-app-resultado b {
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.lp-app-resultado-mejor {
+  border-color: var(--color-primario-borde);
+  background: var(--color-primario-suave);
+}
+
+.lp-app-resultado-mejor b {
+  color: var(--color-primario-oscuro);
+}
+
+.lp-app-boton {
+  padding: 0.55rem;
+  border-radius: 12px;
+  background: var(--color-primario);
+  color: var(--color-texto-sobre-color);
+  font-weight: 750;
+  text-align: center;
+}
+
+.lp-app-alerta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  border-radius: 999px;
+  background: var(--info-fondo);
+  color: var(--info);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.lp-lista-funciones {
+  display: grid;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-lista-funciones li {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.lp-lista-funciones li:hover .lp-tarjeta-icono {
+  transform: translateY(-3px) rotate(-6deg);
+}
+
+.lp-lista-funciones h3 {
+  margin: 0.1rem 0 0.15rem;
+  font-size: 1.08rem;
+}
+
+.lp-lista-funciones p {
+  margin: 0;
+  color: var(--color-texto-suave);
+}
+
+.lp-proximamente {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 2rem 0 0;
+  padding: 0.8rem 1.2rem;
+  border: 1.5px dashed var(--color-borde-control);
+  border-radius: 18px;
+  font-size: 1.4rem;
+  color: var(--color-primario);
+}
+
+.lp-proximamente > span {
+  display: grid;
+  font-size: 1rem;
+  color: var(--color-texto);
+}
+
+.lp-proximamente-sub {
+  color: var(--color-texto-suave);
+  font-size: 0.85rem;
+}
+
+/* ---------- 4. Boticas (bento) y 5. Confianza ---------- */
+.lp-bento {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.lp-confianza {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.landing .lp-tarjeta {
+  --spotlight-card-border: var(--lp-borde-tarjeta) !important;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 1.5rem;
+  border-radius: var(--lp-radio);
+}
+
+.lp-tarjeta-grande {
+  grid-column: span 2;
+}
+
+.lp-tarjeta .lp-tarjeta-icono {
+  margin-bottom: 0.9rem;
+}
+
+.lp-tarjeta:hover .lp-tarjeta-icono {
+  transform: translateY(-3px) rotate(-6deg);
+}
+
+.lp-tarjeta h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1.12rem;
+}
+
+.lp-tarjeta p {
+  margin: 0;
+  color: var(--color-texto-suave);
+}
+
+.lp-mini-panel {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: auto;
+  padding-top: 1.2rem;
+}
+
+.lp-mini-saludo {
+  font-weight: 800;
+}
+
+.lp-mini-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.lp-mini-kpis span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border-radius: 14px;
+  background: var(--color-hundido);
+  color: var(--color-primario);
+}
+
+.lp-mini-kpis span::after {
+  content: '';
+  width: 70%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-borde);
+}
+
+.lp-mini-estados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: auto 0 0;
+  padding: 1.2rem 0 0;
+  list-style: none;
+}
+
+/* El estado resaltado avanza por el ciclo de vida del pedido */
+.lp-mini-estados li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  background: var(--color-superficie-plana);
+  color: var(--color-texto-suave);
+  font-size: 0.82rem;
+  font-weight: 650;
+  animation: lp-estado 8s infinite;
+}
+
+.lp-mini-estados li:nth-child(2) { animation-delay: 2s; }
+.lp-mini-estados li:nth-child(3) { animation-delay: 4s; }
+.lp-mini-estados li:nth-child(4) { animation-delay: 6s; }
+
+.lp-mini-aviso {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 14px;
+  background: var(--color-superficie-plana);
+  box-shadow: 0 6px 18px rgb(16 48 44 / 10%);
+  font-size: 0.85rem;
+  font-weight: 650;
+  animation: lp-aviso 5s var(--lp-salida) infinite;
+}
+
+.lp-tarjeta:has(.lp-mini-aviso) .lp-mini-aviso {
+  margin-top: 1.1rem;
+}
+
+.lp-mini-aviso .icono {
+  color: var(--color-primario);
+}
+
+/* ---------- 6. Equipo ---------- */
+.lp-equipo {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-persona {
+  padding: 2rem 1.5rem;
+  border: 1px solid var(--lp-borde-tarjeta);
+  border-radius: var(--lp-radio);
+  background: var(--color-superficie);
+  box-shadow: var(--sombra);
+  text-align: center;
+}
+
+.lp-persona h3 {
+  margin: 1rem 0 0.3rem;
+  font-size: 1.15rem;
+}
+
+.lp-persona p {
+  margin: 0;
+  color: var(--color-texto-suave);
+}
+
+.lp-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primario-oscuro), var(--rb-gradiente-2));
+  color: var(--color-texto-sobre-color);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 0 0 6px var(--color-primario-suave);
+  transition: transform 0.4s var(--lp-resorte);
+}
+
+.lp-persona:hover .lp-avatar {
+  transform: scale(1.06) rotate(-4deg);
+}
+
+.lp-stack {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-stack li {
+  padding: 0.45rem 1rem;
+  border: 1px solid var(--lp-borde-tarjeta);
+  border-radius: 999px;
+  background: var(--color-superficie);
+  box-shadow: var(--sombra-elevada-suave);
+  font-size: 0.92rem;
+  font-weight: 650;
+  transition: transform 0.3s var(--lp-resorte), color 0.2s;
+}
+
+.lp-stack li:hover {
+  color: var(--color-primario);
+  transform: translateY(-2px);
+}
+
+/* ---------- 7. Cierre y pie ---------- */
+.lp-cierre-seccion {
+  padding-top: 1rem;
+}
+
+.lp-cierre {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(2.75rem, 6vw, 4.75rem) clamp(1.25rem, 5vw, 4rem);
+  border-radius: 32px;
+  background: linear-gradient(135deg, var(--color-primario-oscuro), var(--color-primario) 55%, var(--rb-gradiente-2));
+  color: var(--color-texto-sobre-color);
+  text-align: center;
+}
+
+.lp-cierre-brillo {
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 30% 30%, rgb(255 255 255 / 18%), transparent 30%),
+    radial-gradient(circle at 75% 70%, rgb(255 255 255 / 12%), transparent 28%);
+  animation: lp-aurora 18s ease-in-out infinite alternate;
+}
+
+.lp-cierre h2 {
+  margin: 0 auto 0.8rem;
+  max-width: 16ch;
+  font-size: clamp(2rem, 3.6vw + 0.8rem, 3.4rem);
+  font-weight: 850;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.lp-cierre p {
+  max-width: 36rem;
+  margin: 0 auto;
+  font-size: 1.1rem;
+  opacity: 0.92;
+}
+
+.lp-centro-flex {
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+/* Dentro del bloque de color los botones se invierten para no perderse en el fondo */
+.lp-cierre .btn-primario {
+  background: var(--color-texto-sobre-color);
+  color: var(--color-primario-oscuro);
+}
+
+.lp-cierre .btn-primario:hover {
+  background: var(--color-primario-suave);
+}
+
+:root[data-tema='oscuro'] .lp-cierre .btn-primario:hover {
+  background: #0b2b27;
+}
+
+.lp-cierre .btn-secundario {
+  border-color: var(--color-texto-sobre-color);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-texto-sobre-color);
+}
+
+.lp-cierre .btn-secundario:hover {
+  border-color: var(--color-texto-sobre-color);
+  background: rgb(255 255 255 / 12%);
+  color: var(--color-texto-sobre-color);
+}
+
+.lp-cierre :focus-visible {
+  outline-color: var(--color-texto-sobre-color);
+}
+
+.lp-pie {
+  border-top: 1px solid var(--color-borde);
+}
+
+.lp-pie-contenido {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  padding-block: 2rem;
+}
+
+.lp-pie p {
+  margin: 0;
+  color: var(--color-texto-suave);
+}
+
+.lp-pie nav {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.lp-pie nav a {
+  font-weight: 650;
+}
+
+/* ---------- Entrada al hacer scroll ---------- */
+/* translate (y no transform) para no pisar el transform del hover de las tarjetas */
+.landing.lp-animar .revelar {
+  opacity: 0;
+  translate: 0 28px;
+  transition:
+    opacity 0.7s var(--curva) var(--lp-retraso, 0ms),
+    translate 0.85s var(--lp-salida) var(--lp-retraso, 0ms),
+    transform 0.35s var(--lp-salida),
+    box-shadow 0.35s;
+}
+
+.landing.lp-animar .revelar.revelado {
+  opacity: 1;
+  translate: none;
+}
+
+/* Microinteracción: las tarjetas se levantan */
+.lp-paso,
+.lp-persona,
+.landing .lp-tarjeta {
+  transition: transform 0.35s var(--lp-salida), box-shadow 0.35s;
+}
+
+.lp-paso:hover,
+.lp-persona:hover,
+.landing .lp-tarjeta:hover {
+  transform: translateY(-5px);
+}
+
+/* ---------- Animaciones ---------- */
+@keyframes lp-subir {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+@keyframes lp-escribir {
+  from {
+    max-width: 0;
+  }
+}
+
+@keyframes lp-parpadeo {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes lp-trazar {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes lp-caer {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.85);
+  }
+}
+
+@keyframes lp-onda {
+  from {
+    opacity: 0.35;
+    transform: scale(0.5);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+@keyframes lp-onda-caja {
+  70% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes lp-crecer {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes lp-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+
+@keyframes lp-flotar {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes lp-flotar-girado {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateY(0);
+  }
+
+  50% {
+    transform: rotate(-2deg) translateY(-10px);
+  }
+}
+
+@keyframes lp-aurora {
+  to {
+    transform: translate(4%, 3%) rotate(6deg) scale(1.05);
+  }
+}
+
+@keyframes lp-estado {
+  0%,
+  22% {
+    border-color: var(--color-primario);
+    background: var(--color-primario);
+    color: var(--color-texto-sobre-color);
+  }
+
+  28%,
+  100% {
+    border-color: var(--color-borde);
+    background: var(--color-superficie-plana);
+    color: var(--color-texto-suave);
+  }
+}
+
+@keyframes lp-aviso {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+
+  12%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1080px) {
+  .lp-bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lp-confianza {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Tableta y celular: las secciones bajan a una píldora fija abajo, como la barra de una app */
+@media (max-width: 1020px) {
+  .lp-nav-pildora {
+    width: min(720px, 100%);
+  }
+
+  .lp-nav-lista {
+    position: fixed;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    left: 50%;
+    z-index: 50;
+    justify-content: space-between;
+    width: min(460px, calc(100% - 20px));
+    padding: 0.3rem;
+    transform: translateX(-50%);
+    border: 1px solid var(--lp-vidrio-borde);
+    border-radius: 26px;
+    background: var(--lp-vidrio-fondo);
+    box-shadow: inset 0 1px 0 var(--lp-vidrio-brillo), var(--lp-vidrio-sombra);
+    backdrop-filter: blur(18px) saturate(170%);
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+  }
+
+  .lp-nav-lista::before {
+    top: 0.3rem;
+    bottom: 0.3rem;
+    border-radius: 20px;
+  }
+
+  .lp-nav-lista li {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .lp-nav-lista a {
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.15rem;
+    min-height: 50px;
+    padding: 0.35rem 0.15rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+  }
+
+  .lp-nav-lista .icono {
+    display: block;
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+
+  .lp-nav-corto {
+    display: block;
+  }
+
+  /* El nombre completo queda para los lectores de pantalla */
+  .lp-nav-texto {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .landing {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
+  .lp-hero-grid,
+  .lp-dos-columnas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lp-hero-texto {
+    text-align: center;
+  }
+
+  .lp-hero-bajada {
+    margin-inline: auto;
+  }
+
+  .lp-hero-acciones,
+  .lp-hero-pie {
+    justify-content: center;
+  }
+
+  .lp-hero-visual {
+    width: min(520px, 100%);
+    margin-inline: auto;
+  }
+
+  .lp-dos-columnas > div {
+    order: -1;
+  }
+
+  .lp-dos-columnas .lp-encabezado {
+    text-align: center;
+  }
+
+  .lp-pasos {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 520px;
+    margin-inline: auto;
+  }
+
+  .lp-paso:not(:last-child)::after {
+    top: auto;
+    right: auto;
+    bottom: -1.5rem;
+    left: 50%;
+    width: 0;
+    height: 1.5rem;
+    border-top: 0;
+    border-left: 2px dashed var(--color-primario-borde);
+  }
+
+  .lp-lista-funciones {
+    max-width: 560px;
+    margin-inline: auto;
+  }
+
+  .lp-dos-columnas .lp-proximamente {
+    display: flex;
+    width: fit-content;
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .lp-equipo {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 460px;
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .lp-bento,
+  .lp-confianza {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lp-tarjeta-grande {
+    grid-column: auto;
+  }
+
+  .lp-hero-acciones .btn {
+    flex: 1 1 100%;
+  }
+
+  .lp-etiqueta {
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+  }
+
+  .lp-nav-cta {
+    min-height: 40px;
+    padding-inline: 0.9rem;
+  }
+
+  .lp-comparador {
+    padding: 0.85rem;
+    border-radius: 22px;
+  }
+
+  .lp-fila {
+    padding: 0.6rem 0.7rem;
+  }
+
+  .lp-fila-precio strong {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .lp-nav .marca-nombre {
+    display: none;
+  }
+
+  .lp-nav-pildora {
+    padding-left: 0.5rem;
+  }
+
+  .lp-ahorro-porcentaje {
+    margin-left: 0;
+  }
+}
+
+/* ---------- Movimiento reducido: todo quieto ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html:has(.landing) {
+    scroll-behavior: auto;
+  }
+
+  .landing *,
+  .landing *::before,
+  .landing *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .lp-paso:hover,
+  .lp-persona:hover,
+  .landing .lp-tarjeta:hover,
+  .lp-btn-grande:hover,
+  .lp-stack li:hover {
+    transform: none;
+  }
+
+  .lp-celular {
+    transform: rotate(-3deg);
+  }
+}
