@@ -26,7 +26,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,25 +33,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.boticompara.app.data.local.Distrito
 import com.boticompara.app.data.local.Distritos
 import com.boticompara.app.data.local.UbicacionManual
-import org.osmdroid.config.Configuration
-import org.osmdroid.events.MapEventsReceiver
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.MapEventsOverlay
-import org.osmdroid.views.overlay.Marker
-import java.io.File
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 
-private val CENTRO_LIMA = GeoPoint(-12.0464, -77.0300)
+private val CENTRO_LIMA = LatLng(-12.0464, -77.0300)
 private const val ETIQUETA_PUNTO = "Punto en el mapa"
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -175,62 +169,31 @@ private fun SelectorMapa(
     inicial: UbicacionManual?,
     onConfirmar: (lat: Double, lng: Double) -> Unit
 ) {
-    val context = LocalContext.current
-    var punto by remember { mutableStateOf(inicial?.let { GeoPoint(it.lat, it.lng) }) }
+    var punto by remember { mutableStateOf(inicial?.let { LatLng(it.lat, it.lng) }) }
 
-    val mapView = remember {
-        Configuration.getInstance().apply {
-            userAgentValue = context.packageName
-            osmdroidBasePath = File(context.cacheDir, "osmdroid")
-            osmdroidTileCache = File(context.cacheDir, "osmdroid/tiles")
-        }
-        MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            controller.setZoom(if (inicial != null) 14.0 else 13.0)
-            controller.setCenter(inicial?.let { GeoPoint(it.lat, it.lng) } ?: CENTRO_LIMA)
-            overlays.add(
-                MapEventsOverlay(object : MapEventsReceiver {
-                    override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                        punto = GeoPoint(p.latitude, p.longitude)
-                        return true
-                    }
-
-                    override fun longPressHelper(p: GeoPoint): Boolean = false
-                })
-            )
-        }
-    }
-
-    DisposableEffect(mapView) {
-        mapView.onResume()
-        onDispose {
-            mapView.onPause()
-            mapView.onDetach()
-        }
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(
+            inicial?.let { LatLng(it.lat, it.lng) } ?: CENTRO_LIMA,
+            if (inicial != null) 14f else 13f
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        AndroidView(
-            factory = { mapView },
-            update = { vista ->
-                vista.overlays.removeAll { it is Marker }
-                punto?.let { p ->
-                    vista.overlays.add(
-                        Marker(vista).apply {
-                            position = p
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            setOnMarkerClickListener { _, _ -> true }
-                        }
-                    )
-                }
-                vista.invalidate()
-            },
+        GoogleMap(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth()
-                .clipToBounds()
-        )
+                .fillMaxWidth(),
+            cameraPositionState = cameraPositionState,
+            onMapClick = { coordenadas -> punto = coordenadas }
+        ) {
+            punto?.let { ubicacion ->
+                Marker(
+                    state = MarkerState(position = ubicacion),
+                    title = "Punto seleccionado",
+                    onClick = { true }
+                )
+            }
+        }
         BotiButton(
             text = if (punto == null) "Toca el mapa para marcar tu ubicación" else "Usar este punto",
             onClick = { punto?.let { onConfirmar(it.latitude, it.longitude) } },

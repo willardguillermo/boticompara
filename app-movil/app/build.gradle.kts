@@ -68,7 +68,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.maps.compose)
     implementation(libs.play.services.maps)
-    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     // H67: iniciar sesión con Google (Firebase Authentication + Credential Manager)
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
