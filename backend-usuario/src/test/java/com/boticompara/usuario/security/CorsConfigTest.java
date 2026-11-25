@@ -16,7 +16,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Levanta la aplicación completa, que necesita la base. Sin base configurada, la clase se omite. */
 @SpringBootTest
 @AutoConfigureMockMvc
-@TestPropertySource(properties = "CORS_ORIGINS=https://boticompara.vercel.app,http://localhost:5173")
+// H84: sin la tarea de vencer reservas, que al arrancar escribiría en la base compartida
+@TestPropertySource(properties = {"CORS_ORIGINS=https://boticompara.vercel.app,http://localhost:5173",
+        "app.reservas.vencer.habilitada=false"})
 class CorsConfigTest {
 
     @Autowired

@@ -85,7 +85,8 @@ class NotificacionTransaccionTest {
     @Configuration
     @EnableTransactionManagement
     @EnableAsync
-    @Import({ReservaService.class, NotificacionService.class, NotificacionListener.class})
+    @Import({ReservaService.class, NotificacionService.class, NotificacionListener.class,
+            VencimientoReservasService.class})
     static class Config {
         @Bean
         Transacciones transacciones() {
@@ -168,6 +169,7 @@ class NotificacionTransaccionTest {
     @MockitoBean UsuarioRepository usuarios;
 
     @Autowired ReservaService reservaService;
+    @Autowired VencimientoReservasService vencimiento;
     @Autowired Transacciones transacciones;
 
     private final List<SqlParameterSource> guardadas = new ArrayList<>();
@@ -203,7 +205,7 @@ class NotificacionTransaccionTest {
         Usuario comprador = new Usuario();
         comprador.setId(COMPRADOR);
         comprador.setCorreoVerificado(true);
-        when(usuarios.findById(COMPRADOR)).thenReturn(Optional.of(comprador));
+        when(usuarios.bloquearPorId(COMPRADOR)).thenReturn(Optional.of(comprador));
         when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(p));
         when(productos.findById(PRODUCTO)).thenReturn(Optional.of(p));
         when(boticas.findById(BOTICA)).thenReturn(Optional.of(b));
@@ -361,5 +363,57 @@ class NotificacionTransaccionTest {
 
         assertTrue(log.getOut().contains("La notificación NUEVA_RESERVA de la reserva 15 ya existía"));
         assertFalse(log.getOut().contains("No se pudo guardar"));
+    }
+
+    // ---------- H84 (S4-01): reserva vencida ----------
+
+    private Reserva vencidaSinMarcar() {
+        Reserva r = new Reserva();
+        r.setId(RESERVA);
+        r.setCodigo("BC-7K2QXM");
+        r.setUsuarioId(COMPRADOR);
+        r.setProductoId(PRODUCTO);
+        r.setCantidad(3);
+        r.setPrecioUnitario(new BigDecimal("24.00"));
+        r.setEstado(EstadoReserva.CONFIRMADA);
+        r.setVenceEn(Instant.now().minus(1, ChronoUnit.HOURS));
+        return r;
+    }
+
+    @Test
+    void unaReservaVencidaCreaSuReservaVencidaDespuesDelCommitEnOtraTransaccion() {
+        Reserva r = vencidaSinMarcar();
+        when(reservas.bloquearVencidas(any(), any(), any())).thenReturn(List.of(r));
+
+        assertEquals(1, vencimiento.vencer(Instant.now()));
+
+        assertEquals(EstadoReserva.VENCIDA, r.getEstado());
+        assertGuardada("RESERVA_VENCIDA", "Reserva vencida BC-7K2QXM", "Amoxil x 3 · S/ 72.00");
+        assertEquals(List.of("abre 1", "commit 1", "abre 2", "insert", "commit 2"), transacciones.pasos);
+        assertSame(Thread.currentThread(), hiloDelInsert);
+    }
+
+    @Test
+    void siFallaElAvisoLaReservaQuedaVencidaYElLogNoTraeDatos(CapturedOutput log) {
+        Reserva r = vencidaSinMarcar();
+        when(reservas.bloquearVencidas(any(), any(), any())).thenReturn(List.of(r));
+        errorAlGuardar = new DataAccessResourceFailureException("sin base " + DATO_DEL_COMPRADOR);
+
+        assertEquals(1, vencimiento.vencer(Instant.now()));
+
+        assertEquals(EstadoReserva.VENCIDA, r.getEstado());
+        assertTrue(guardadas.isEmpty());
+        assertTrue(log.getOut().contains("No se pudo guardar la notificación RESERVA_VENCIDA de la reserva 15"));
+        assertFalse(log.getOut().contains(DATO_DEL_COMPRADOR));
+    }
+
+    @Test
+    void siNoHayVencidasNoAbreNingunaTransaccionMas() {
+        when(reservas.bloquearVencidas(any(), any(), any())).thenReturn(List.of());
+
+        assertEquals(0, vencimiento.vencer(Instant.now()));
+
+        assertEquals(List.of("abre 1", "commit 1"), transacciones.pasos);
+        assertTrue(guardadas.isEmpty());
     }
 }

@@ -7,6 +7,7 @@ import {
   MOTIVO_PEDIDOS_BOTICA_ELIMINADA,
   soloRecientes,
   titularCoincide,
+  vencerActivas,
 } from './api.mock.js'
 
 const DIA = 24 * 60 * 60 * 1000
@@ -88,4 +89,27 @@ test('eliminarCuentaEnDatos: el comprador cancela sus reservas activas y avisa a
   // La reserva de otro comprador y la botica no cambian
   assert.equal(estadoDe(datos, 60), 'PENDIENTE')
   assert.equal(datos.boticas[0].estado, 'APROBADO')
+})
+
+const reserva = (id, estado, venceEnMs) => ({ id, estado, venceEn: new Date(venceEnMs).toISOString() })
+
+test('vencerActivas: solo las activas con venceEn pasado pasan a VENCIDA (H84, S4-01)', () => {
+  const pendiente = reserva(1, 'PENDIENTE', AHORA - 1)
+  const confirmada = reserva(2, 'CONFIRMADA', AHORA - DIA)
+  const lista = reserva(3, 'LISTA', AHORA)
+  const vigente = reserva(4, 'PENDIENTE', AHORA + 1)
+  const entregada = reserva(5, 'ENTREGADA', AHORA - DIA)
+
+  const vencidas = vencerActivas([pendiente, confirmada, lista, vigente, entregada], AHORA)
+
+  assert.deepEqual(vencidas.map((r) => r.id), [1, 2, 3])
+  assert.equal(pendiente.estado, 'VENCIDA')
+  assert.equal(lista.actualizadoEn, new Date(AHORA).toISOString())
+  assert.equal(vigente.estado, 'PENDIENTE')
+  assert.equal(entregada.estado, 'ENTREGADA')
+})
+
+test('vencerActivas: una reserva ya VENCIDA no se vuelve a contar (H84)', () => {
+  const ya = reserva(1, 'VENCIDA', AHORA - DIA)
+  assert.deepEqual(vencerActivas([ya], AHORA), [])
 })

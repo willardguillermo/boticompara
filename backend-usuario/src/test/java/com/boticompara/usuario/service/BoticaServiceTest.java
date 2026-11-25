@@ -349,8 +349,9 @@ class BoticaServiceTest {
                 () -> service.registrar(10L, request(RUC_PERSONA, null, null)));
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertEquals("Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular "
-                + "(según SUNAT: QUISPE MAMANI ROSA)", ex.getMessage());
+        assertEquals("Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular del RUC", ex.getMessage());
+        // S4-06: el mensaje no dice el nombre del titular
+        assertFalse(ex.getMessage().contains("QUISPE"));
         verify(boticas, never()).save(any(Botica.class));
     }
 

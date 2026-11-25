@@ -117,6 +117,7 @@ Errores: 400, 409 (correo ya registrado), 429 (límite por IP).
 ```
 El token dura 24 h. Errores:
 
+- **400:** falta `correo` o `password`, o vienen vacíos (S4-13). Mensaje "El correo es obligatorio" o "La contraseña es obligatoria" (los dos, separados por "; ", si faltan ambos). No cuenta como intento fallido.
 - **401:** correo o contraseña incorrectos, o cuenta sin contraseña (creada con Google). Es el mismo mensaje en todos los casos, para no revelar qué correos existen.
 - **403:** cuenta dada de baja o suspendida, **solo si la contraseña es correcta**. Responde "Tu cuenta fue dada de baja" o "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima). Sin contraseña correcta no se revela el estado de la cuenta.
 - **429:** demasiados intentos fallidos. Se cuenta por correo e IP: 5 contraseñas incorrectas en 15 minutos bloquean nuevos intentos de ese correo desde esa IP durante 15 minutos. Responde con el header `Retry-After` (segundos restantes) y el mensaje "Demasiados intentos fallidos. Espera 15 minutos". Un login correcto limpia el contador de ese correo e IP.
@@ -273,7 +274,7 @@ El RUC se verifica igual que en `validar-ruc` y la consulta a SUNAT cuenta en lo
 
 **El RUC solo se reserva al aprobar la botica (A5).** Varias cuentas pueden tener solicitudes `PENDIENTE` (o `RECHAZADO`) con el mismo RUC; el 409 "El RUC ya está registrado" sale solo si ya hay una botica `APROBADO` con ese RUC. Así, quien registre el RUC de una botica real no la deja sin poder registrarse. Cuando el administrador aprueba una de esas solicitudes, las demás `PENDIENTE` con el mismo RUC pasan a `RECHAZADO` con el motivo "Otra cuenta acreditó la licencia de este RUC" (y su dueño recibe el correo de rechazo). En la BD lo asegura un índice único parcial (`uq_botica_ruc_aprobado`: `ruc` único donde `estado = 'APROBADO'`).
 
-**RUC de persona natural (A7).** Si el RUC empieza con `10` o `15` y SUNAT devolvió el nombre del titular (`razonSocial`), cada palabra del nombre de la cuenta (`nombre` del usuario) debe aparecer en ese nombre, sin importar tildes, mayúsculas ni orden. Si no → 400 "Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular (según SUNAT: {razonSocial})". Ejemplo: cuenta "Rosa Quispe" y SUNAT "QUISPE MAMANI ROSA" → pasa; cuenta "Jorge Mendoza" con ese RUC → 400. Si SUNAT no respondió o se llegó a un límite de consultas (`fuente: LOCAL`), no se bloquea. Los RUC `20` y `17` (empresas y otros) no se revisan. Para corregirlo, el dueño cambia su nombre en el perfil (`PUT /usuarios/me`) o usa el RUC de su empresa.
+**RUC de persona natural (A7).** Si el RUC empieza con `10` o `15` y SUNAT devolvió el nombre del titular (`razonSocial`), cada palabra del nombre de la cuenta (`nombre` del usuario) debe aparecer en ese nombre, sin importar tildes, mayúsculas ni orden. Si no → 400 "Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular del RUC". El mensaje no repite el nombre que da SUNAT (S4-06). Ejemplo: cuenta "Rosa Quispe" y SUNAT "QUISPE MAMANI ROSA" → pasa; cuenta "Jorge Mendoza" con ese RUC → 400. Si SUNAT no respondió o se llegó a un límite de consultas (`fuente: LOCAL`), no se bloquea. Los RUC `20` y `17` (empresas y otros) no se revisan. Para corregirlo, el dueño cambia su nombre en el perfil (`PUT /usuarios/me`) o usa el RUC de su empresa.
 
 Errores: 400 (RUC inválido, inexistente en SUNAT, que no está `ACTIVO` o no está `HABIDO`; RUC de persona que no está a nombre de la cuenta; coordenadas inválidas o incompletas), 409 (el RUC ya pertenece a una botica aprobada, o el dueño ya tiene botica).
 
@@ -723,7 +724,7 @@ Roles: `COMPRADOR` y `DUENO_BOTICA`. El rol del token decide qué herramientas t
 | Campo | Obligatorio | Validación |
 |---|---|---|
 | `mensaje` | sí | Texto de 1 a 500 caracteres, sin contar espacios al inicio ni al final |
-| `historial` | no | Lista de mensajes anteriores, del más antiguo al más reciente. Cada uno con `rol` (`usuario` o `asistente`) y `texto` (1 a 1000 caracteres). Si llegan más de 10, el servidor usa solo los 10 últimos. Sin historial: se omite, `null` o `[]` |
+| `historial` | no | Lista de mensajes anteriores, del más antiguo al más reciente. Cada uno con `rol` (`usuario` o `asistente`) y `texto` (1 a 1000 caracteres). Como máximo 20 elementos (S4-16): con más, 400. De los que llegan, el servidor usa solo los 10 últimos. Sin historial: se omite, `null` o `[]` |
 | `lat`, `lng` | no | Ubicación del usuario; se envían juntas, con los mismos rangos que en `GET /productos/buscar`. Solo sirven para calcular distancias en el servidor: **no se envían a Gemini ni se guardan** |
 
 El cliente arma el historial con lo que ya mostró en pantalla: los `mensaje` enviados (`usuario`) y las `respuesta` recibidas (`asistente`). Los `productos` de respuestas anteriores no se reenvían.
@@ -881,11 +882,11 @@ Con 900 caracteres, la respuesta del dueño cabe en un `texto` del `historial` (
 
    | Grupo | Frases que lo activan | Texto de la respuesta |
    |---|---|---|
-   | Autolesión | "hacerme daño", "matarme", "quiero matarme", "suicid…" (suicidio, suicidarme), "quitarme la vida", "no quiero vivir", "no quiero seguir viviendo", "quiero morir", "me quiero morir", "acabar con mi vida", "cortarme las venas", "hacerme cortes" | "Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento." |
-   | Emergencia física | "no puedo respirar", "no puedo respirar bien", "me falta el aire", "dolor de pecho", "dolor en el pecho", "me duele el pecho", "intoxicación", "envenenamiento", "convulsión", "desmayo" | "Llama al SAMU al 106 de inmediato. BotiCompara solo compara precios de medicamentos y no puede atender una emergencia: ahora lo más importante es tu salud." |
+   | Autolesión | "hacerme daño", "matarme", "quiero matarme", "suicid…" (suicidio, suicidarme), "quitarme la vida", "no quiero vivir", "no quiero seguir viviendo", "quiero morir", "me quiero morir", "acabar con mi vida", "cortarme las venas", "hacerme cortes", "dosis letal", "dosis mortal", "todas las pastillas juntas", "todas las pastillas de golpe", "todas las pastillas a la vez" (S4-15) | "Lamento mucho que te sientas así y quiero que sepas que no estás solo. Llama al SAMU al 106 o a la Línea 113, opción 5, que es la de salud mental del Ministerio de Salud. Hay personas capacitadas dispuestas a escucharte y ayudarte en este momento." |
+   | Emergencia física | "no puedo respirar", "no puedo respirar bien", "me falta el aire", "dolor de pecho", "dolor en el pecho", "me duele el pecho", "intoxicación", "envenenamiento", "convulsión", "desmayo", "sobredosis" (S4-15) | "Llama al SAMU al 106 de inmediato. BotiCompara solo compara precios de medicamentos y no puede atender una emergencia: ahora lo más importante es tu salud." |
 
    - Si el mensaje tiene frases de los dos grupos, responde el de autolesión.
-   - La lista es corta a propósito. Un falso positivo solo muestra números de ayuda, pero no debe activarse con frases comunes: "me duele la cabeza", "dolor de cabeza" o "cortarme el pelo" siguen su camino normal.
+   - La lista es corta a propósito. Un falso positivo solo muestra números de ayuda, pero no debe activarse con frases comunes: "me duele la cabeza", "dolor de cabeza", "cortarme el pelo" o "¿tengo que tomarme todas las pastillas del antibiótico?" siguen su camino normal.
    - Si el filtro no detecta nada, todo sigue igual: responde Gemini con sus instrucciones, que también indican el SAMU 106 y la Línea 113.
 2. **Red de seguridad en los errores.** Todos los mensajes de error propios del chat (429, 503 y 504) terminan con: "Si es una emergencia, llama al SAMU 106. Si piensas en hacerte daño, llama a la Línea 113, opción 5." Así, aunque el asistente no pueda responder, nadie se queda sin esos números. Los 400 y el 401 no lo llevan.
 
@@ -916,6 +917,7 @@ Errores:
 | 400 | `mensaje` vacío o solo espacios | "Escribe tu pregunta" |
 | 400 | `mensaje` de más de 500 caracteres | "La pregunta no puede pasar de 500 caracteres" |
 | 400 | `historial` con un `rol` distinto de `usuario` o `asistente`, o un `texto` vacío o de más de 1000 caracteres | "El historial no es válido" |
+| 400 | `historial` con más de 20 elementos (S4-16) | "El historial no puede pasar de 20 mensajes" |
 | 400 | Solo una de `lat` y `lng`, o coordenadas fuera de rango | Los mismos mensajes que `GET /productos/buscar` |
 | 401 | El token no es válido o la cuenta no está habilitada (dada de baja o suspendida) | El mismo que el resto de la API |
 | 403 | Dueño cuya botica no está `APROBADO` (o sin botica) | "El asistente se activa cuando tu botica sea aprobada" |
@@ -943,7 +945,7 @@ Errores:
 
 El comprador aparta un producto para recogerlo en la botica. La reserva **aparta unidades pero no descuenta el stock**: mientras está activa resta de la cantidad disponible, y el stock se descuenta recién cuando el dueño la entrega (sección 10).
 
-**Cantidad disponible** de un producto = `producto.stock` − la suma de `cantidad` de sus reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`). Ejemplo: stock 5 y una reserva `CONFIRMADA` de 2 → disponible 3. Al entregarse esa reserva, el stock baja a 3 y la reserva deja de estar activa: el disponible sigue en 3. Nunca es negativo: si la resta da menos de 0, se toma 0. Se calcula con `select coalesce(sum(cantidad), 0) from reserva where producto_id = :id and estado in ('PENDIENTE', 'CONFIRMADA', 'LISTA')` (índice `idx_reserva_producto`). Todos los endpoints piden token de `COMPRADOR`; con otro rol responden 403. El usuario sale siempre del token (`UsuarioAutenticado.id`), nunca del cuerpo.
+**Cantidad disponible** de un producto = `producto.stock` − la suma de `cantidad` de sus reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) **que todavía no vencieron** (`vence_en > now()`). Ejemplo: stock 5 y una reserva `CONFIRMADA` de 2 → disponible 3. Al entregarse esa reserva, el stock baja a 3 y la reserva deja de estar activa: el disponible sigue en 3. Nunca es negativo: si la resta da menos de 0, se toma 0. Se calcula con `select coalesce(sum(cantidad), 0) from reserva where producto_id = :id and estado in ('PENDIENTE', 'CONFIRMADA', 'LISTA') and vence_en > now()` (índice `idx_reserva_producto`). Una reserva activa con `venceEn` pasado ya no aparta unidades, aunque el proceso de H84 (sección 10) todavía no la haya pasado a `VENCIDA`. Todos los endpoints piden token de `COMPRADOR`; con otro rol responden 403. El usuario sale siempre del token (`UsuarioAutenticado.id`), nunca del cuerpo.
 
 **Estados de una reserva** (`chk_reserva_estado` en `reserva`):
 
@@ -1004,13 +1006,14 @@ Validaciones y reglas:
 - **Condición de venta (H72):** si el medicamento enlazado al producto es `RECETA_RETENIDA` → 409 "Este medicamento se vende con receta retenida: acércate a la botica con tu receta médica" y no se crea nada. Se revisa después del 404 y antes de calcular lo disponible. `CON_RECETA` sí se reserva (la app muestra el aviso de la receta antes de confirmar y en la reserva); `SIN_RECETA` y `null` (producto sin enlazar o sin dato) se reservan como siempre. El límite de 10 unidades y la regla de una reserva activa por producto no cambian.
 - `cantidad` no puede pasar de la cantidad disponible (stock menos reservas activas) → 409 "Solo hay {disponible} unidades disponibles de este producto". Si el disponible es 0 → 409 "Todas las unidades de este producto ya están reservadas".
 - **Sin carreras:** dentro de la misma transacción, primero se bloquea la fila del producto (`select ... from producto where id = :id for update`), luego se calcula el disponible y se inserta la reserva. Si dos compradores reservan las últimas unidades a la vez, el segundo espera al primero y ve su reserva en la suma, así que recibe el 409.
-- Un comprador no puede tener dos reservas activas (`PENDIENTE`, `CONFIRMADA` o `LISTA`) del mismo producto → 409 "Ya tienes una reserva activa de este producto" (propuesta, ver decisiones).
+- Un comprador no puede tener dos reservas activas (`PENDIENTE`, `CONFIRMADA` o `LISTA`, sin vencer) del mismo producto → 409 "Ya tienes una reserva activa de este producto" (propuesta, ver decisiones). Una reserva con `venceEn` pasado no cuenta.
+- **Máximo de reservas activas (S4-03):** un comprador puede tener como máximo **5** reservas activas sin vencer entre todos los productos (`reservas.limite.activas-por-comprador`). Con 5 → 409 "Tienes demasiadas reservas activas: el máximo es 5. Recoge o cancela alguna antes de hacer otra". Se revisa después de la regla anterior y antes de calcular lo disponible. Para que dos pedidos a la vez no pasen el máximo, la fila del comprador se bloquea (`select ... from usuario where id = :id for update`) al revisar el correo verificado. Cada reserva envía un correo al dueño, y el plan de correo es de 100 al día para todo el backend.
 - `precio_unitario` se copia de `producto.precio` en ese momento.
 - `estado = PENDIENTE` y `vence_en = ahora + 24 h`. Confirmar la reserva **no** amplía ese plazo; solo pasar a `LISTA` lo cambia (sección 10).
 - **Código de confirmación:** `BC-` seguido de 6 caracteres tomados de `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (sin `0`, `O`, `1` ni `I`, para que no se confundan al dictarlo). Se genera con `SecureRandom`; si choca con `uq_reserva_codigo` se genera otro (hasta 3 intentos). Hay 32⁶ ≈ 1 070 millones de combinaciones. El comprador lo muestra al recoger.
 - Al crearse, se avisa por correo al dueño de la botica (ver "Correos" en la sección 10).
 
-Errores: 400 (falta `productoId` o `cantidad`, o `cantidad` fuera de 1 a 10), 401 (sin token), 403 (el rol no es `COMPRADOR`, o el correo no está verificado), 404 (el producto no existe o no se ve), 409 (medicamento con receta retenida, cantidad mayor que la disponible, o ya tiene una reserva activa de ese producto).
+Errores: 400 (falta `productoId` o `cantidad`, o `cantidad` fuera de 1 a 10), 401 (sin token), 403 (el rol no es `COMPRADOR`, o el correo no está verificado), 404 (el producto no existe o no se ve), 409 (medicamento con receta retenida, cantidad mayor que la disponible, ya tiene una reserva activa de ese producto, o ya tiene 5 reservas activas).
 
 ### `GET /reservas/mias?estado=PENDIENTE` 🔒 — H76
 Historial de reservas del comprador, de la más reciente a la más antigua (por `creadoEn`), máximo 100. `estado` es opcional: sin él devuelve todas.
@@ -1036,6 +1039,7 @@ Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `COMPRADOR`
 
 ### `PATCH /reservas/{id}/cancelar` 🔒 — H75
 Sin cuerpo. Pasa la reserva a `CANCELADA`. Respuesta: 200 con la reserva actualizada.
+- Desde `VENCIDA` → 409 "La reserva ya venció".
 - Solo desde `PENDIENTE`, `CONFIRMADA` o `LISTA`. Desde cualquier otro estado → 409 "No se puede cancelar una reserva {estado}".
 - Si `venceEn` ya pasó (aunque el proceso de H84 todavía no la haya marcado) → 409 "La reserva ya venció".
 - No se descuenta ni se devuelve stock (nunca se descontó). Como la reserva deja de estar activa, sus unidades vuelven a la cantidad disponible.
@@ -1049,7 +1053,8 @@ Errores: 400 (`id` no numérico), 401 (sin token), 403 (el rol no es `COMPRADOR`
 3. **Cantidad máxima de 10** unidades por reserva.
 4. **Una sola reserva activa por producto** y comprador (409 si intenta otra).
 5. **La reserva aparta unidades:** disponible = stock − reservas activas (`PENDIENTE`, `CONFIRMADA`, `LISTA`). Se valida al crear (con la fila del producto bloqueada con `for update`) y al confirmar (sección 10); el stock se descuenta recién al entregar.
-6. **Reserva con `venceEn` pasado y aún sin marcar** → se trata como vencida (409 al cancelar o cambiar de estado).
+6. **Reserva con `venceEn` pasado y aún sin marcar** → se trata como vencida: 409 al cancelar o cambiar de estado, y ya no aparta unidades ni cuenta en "una reserva activa por producto" ni en el máximo de 5.
+9. **Máximo de 5 reservas activas por comprador (24/11/2026, S4-03)**, configurable con `reservas.limite.activas-por-comprador`.
 7. **Máximo 100** en el historial, sin paginación (como `GET /alertas`).
 8. **Condición de venta (20/11/2026, H72), según DIGEMID:** columna `medicamento.condicion_venta` (`SIN_RECETA`, `CON_RECETA`, `RECETA_RETENIDA` o `null` = sin información) y campo `condicionVenta` en búsqueda, detalle, alternativas, reserva y pedido. `RECETA_RETENIDA` (psicofármacos y estupefacientes: la botica se queda con la receta) **no se reserva**: 409 "Este medicamento se vende con receta retenida: acércate a la botica con tu receta médica". `CON_RECETA` sí se reserva y la app avisa "Presenta tu receta médica al recoger; sin ella la botica no puede entregarlo". **No se suben fotos de recetas:** la receta la valida el químico farmacéutico en la botica. El límite de 10 y una reserva activa por producto no cambian. `condicionVenta` de la reserva y del pedido es la actual del medicamento (no se guarda en `reserva`); si un medicamento pasa a `RECETA_RETENIDA` con reservas ya creadas, esas reservas siguen su curso y el químico farmacéutico decide al entregar.
    **Limitación:** los productos sin enlazar al catálogo maestro (`medicamento_id` null) no tienen condición (`condicionVenta: null`): se muestran sin etiqueta y se reservan igual que hoy, aunque en la realidad necesiten receta. La regla solo protege a los productos enlazados.
@@ -1092,7 +1097,7 @@ Se calcula con `select coalesce(sum(cantidad), 0) from reserva where producto_id
 - `condicionVenta` (H72): igual que en la reserva (sección 9), la condición actual del medicamento enlazado o `null`. Con `"CON_RECETA"` o `"RECETA_RETENIDA"` la web le recuerda al dueño: "Pide la receta médica antes de entregar". Un pedido `RECETA_RETENIDA` solo puede existir si la reserva se creó antes de que su medicamento tuviera esa condición (desde el 20/11/2026 `POST /reservas` no lo permite).
 - Del comprador **solo** se muestra `compradorNombre`, con la misma regla que `autor` en las reseñas (sección 11): **nombre de pila más la inicial del apellido** (`"Carlos Ramírez"` → `"Carlos R."`). Nunca su correo, teléfono ni dirección. Si el comprador eliminó su cuenta, sale `"Usuario eliminado"` (el nombre anonimizado de H19).
 - `stockActual`: el stock de hoy del producto, para que el dueño sepa si puede atender antes de confirmar.
-- `disponible`: **solo en `PENDIENTE`**; en los demás estados es `null`. Es `producto.stock` − la suma de `cantidad` de las **otras** reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) del producto, **sin contar este pedido**. Es el mismo número que se valida al confirmar: si `disponible < cantidad`, confirmar dará 409, y la web lo usa para avisar al dueño antes de que lo intente (y sugerirle rechazarlo con un motivo). En el ejemplo: stock 90 y otras reservas activas por 5 → `disponible` 85. **Nunca es negativo:** si la resta da menos de 0 (por ejemplo, el dueño bajó el stock por debajo de reservas aún `PENDIENTE`), se devuelve 0. Ejemplo: stock 2 y otras reservas `PENDIENTE` por 5 → 2 − 5 = −3 → `disponible` 0.
+- `disponible`: **solo en `PENDIENTE`**; en los demás estados es `null`. Es `producto.stock` − la suma de `cantidad` de las **otras** reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) sin vencer del producto, **sin contar este pedido**. Es el mismo número que se valida al confirmar: si `disponible < cantidad`, confirmar dará 409, y la web lo usa para avisar al dueño antes de que lo intente (y sugerirle rechazarlo con un motivo). En el ejemplo: stock 90 y otras reservas activas por 5 → `disponible` 85. **Nunca es negativo:** si la resta da menos de 0 (por ejemplo, el dueño bajó el stock por debajo de reservas aún `PENDIENTE`), se devuelve 0. Ejemplo: stock 2 y otras reservas `PENDIENTE` por 5 → 2 − 5 = −3 → `disponible` 0.
 - `precioUnitario`, `total` y `motivoRechazo`: igual que en la sección 9.
 
 ### `GET /pedidos?estado=PENDIENTE` 🔒 — H77, H81
@@ -1130,8 +1135,9 @@ Respuesta: 200 con el pedido actualizado.
 | `CONFIRMADA` | `LISTA` | `vence_en = ahora + 48 h` (plazo para recoger) y `recordatorio_enviado = false`. No se valida stock: ya está garantizado |
 | `LISTA` | `ENTREGADA` | Se descuenta `cantidad` del stock del producto, en la misma transacción |
 
+- Desde `VENCIDA`, o con `venceEn` pasado aunque H84 todavía no la haya marcado → 409 "La reserva ya venció".
 - Cualquier otro cambio (saltarse un paso, volver atrás, salir de un estado final, o enviar `RECHAZADA`, `CANCELADA`, `VENCIDA` o `PENDIENTE`) → 409 "No se puede pasar de {actual} a {nuevo}". Para rechazar se usa `PATCH /pedidos/{id}/rechazar`.
-- **Validación al confirmar (`PENDIENTE` → `CONFIRMADA`):** **el dueño no puede aceptar un pedido que no puede cumplir.** Con la fila del producto bloqueada (`select ... from producto where id = :id for update`), se calcula lo disponible igual que el campo `disponible`: `producto.stock` − (suma de `cantidad` de las **otras** reservas `PENDIENTE`, `CONFIRMADA` y `LISTA` del producto), y si da menos de 0 se toma 0. Debe ser ≥ `cantidad`. Si no → 409 "No hay stock suficiente para aceptar este pedido: disponible {n}, pedido {m}. Recházalo con un motivo." y el pedido sigue en `PENDIENTE`; el dueño debe rechazarlo con `PATCH /pedidos/{id}/rechazar`. Puede pasar si el dueño bajó el stock en su catálogo después de que se creó la reserva. Ejemplo: stock 3, otra reserva `CONFIRMADA` de 2 y este pedido de 2 → disponible 3 − 2 = 1, menor que 2 → 409 "No hay stock suficiente para aceptar este pedido: disponible 1, pedido 2. Recházalo con un motivo."
+- **Validación al confirmar (`PENDIENTE` → `CONFIRMADA`):** **el dueño no puede aceptar un pedido que no puede cumplir.** Con la fila del producto bloqueada (`select ... from producto where id = :id for update`), se calcula lo disponible igual que el campo `disponible`: `producto.stock` − (suma de `cantidad` de las **otras** reservas `PENDIENTE`, `CONFIRMADA` y `LISTA` sin vencer del producto), y si da menos de 0 se toma 0. Debe ser ≥ `cantidad`. Si no → 409 "No hay stock suficiente para aceptar este pedido: disponible {n}, pedido {m}. Recházalo con un motivo." y el pedido sigue en `PENDIENTE`; el dueño debe rechazarlo con `PATCH /pedidos/{id}/rechazar`. Puede pasar si el dueño bajó el stock en su catálogo después de que se creó la reserva. Ejemplo: stock 3, otra reserva `CONFIRMADA` de 2 y este pedido de 2 → disponible 3 − 2 = 1, menor que 2 → 409 "No hay stock suficiente para aceptar este pedido: disponible 1, pedido 2. Recházalo con un motivo."
 - **Producto dado de baja (H79):** al confirmar, con la misma fila del producto bloqueada y **antes** de calcular lo disponible, si el producto tiene `activo = false` → 409 "Este producto ya no está disponible en tu catálogo. Rechaza el pedido con un motivo." y el pedido sigue en `PENDIENTE`; el dueño lo rechaza con `PATCH /pedidos/{id}/rechazar`. Pasa cuando el dueño dio de baja el producto con reservas `PENDIENTE` (`DELETE /productos/{id}`, sección 4). Solo afecta al paso a `CONFIRMADA`: `CONFIRMADA` y `LISTA` no pueden existir en un producto dado de baja, porque la baja se bloquea si las tiene.
 - **`LISTA` y `ENTREGADA` ya tienen el stock garantizado:** al confirmar, el pedido quedó cubierto, y desde entonces el stock no puede bajar de las unidades comprometidas (sección 4). Por eso al pasar a `LISTA` no se valida stock.
 - **Descuento de stock al entregar (respaldo):** `update producto set stock = stock - :cantidad where id = :id and stock >= :cantidad`. Con la regla anterior siempre debería actualizar la fila; la condición `stock >= :cantidad` queda **solo como respaldo** por si algo inconsistente pasara (por ejemplo, un cambio hecho directo en la base). Si no actualiza ninguna fila → 409 "Stock insuficiente: quedan {stock} unidades" y el pedido sigue en `LISTA`. El producto se descuenta aunque esté dado de baja (la venta ocurrió). Si queda en 0, deja de verse en la búsqueda.
@@ -1159,6 +1165,7 @@ Errores:
 ```
 Respuesta: 200 con el pedido en `RECHAZADA` y `motivoRechazo` guardado (`reserva.motivo_rechazo`; `chk_reserva_motivo_rechazo` lo exige).
 - `motivo` obligatorio, de 10 a 300 caracteres sin contar espacios al inicio ni al final → si no, 400.
+- Desde `VENCIDA`, o con `venceEn` pasado → 409 "La reserva ya venció".
 - Solo desde `PENDIENTE` o `CONFIRMADA`. Desde `LISTA` o un estado final → 409 "No se puede rechazar un pedido {estado}". (Desde `LISTA` el comprador ya puede estar en camino.)
 - No toca el stock. Sus unidades vuelven a la cantidad disponible.
 - Envía un correo al comprador con el motivo (ver "Correos").
@@ -1166,11 +1173,13 @@ Respuesta: 200 con el pedido en `RECHAZADA` y `motivoRechazo` guardado (`reserva
 Errores: 400 (`motivo` ausente, muy corto o muy largo), 401, 403, 404, 409 (estado que no se puede rechazar o reserva vencida).
 
 ### Reservas vencidas y recordatorio — H84
-No es un endpoint. Un proceso programado (`@Scheduled`, zona `America/Lima`, como `AlertaStockJob`) corre **cada 5 minutos** y hace dos cosas:
-1. **Vencer:** pasa a `VENCIDA` las reservas en `PENDIENTE`, `CONFIRMADA` o `LISTA` con `vence_en <= now()`. Usa el índice `idx_reserva_vence_en`. No toca el stock (sus unidades vuelven a la cantidad disponible). No envía correo: el estado se ve en la app.
-2. **Recordar:** a las reservas `LISTA` con `recordatorio_enviado = false` y `vence_en` entre ahora y ahora + 6 h, les envía el recordatorio y pone `recordatorio_enviado = true`. Se marca aunque el correo falle, para no reintentar cada 5 minutos (solo queda el aviso en el log).
+No es un endpoint. Un proceso programado (`VencerReservasJob`, `@Scheduled` con zona `America/Lima`, como `AlertaStockJob`) corre **cada 15 minutos** (`app.reservas.vencer.cron`, por defecto `0 */15 * * * *`) y **una vez al arrancar** la API, porque el plan gratis de Render se duerme y reinicia. Se apaga con `app.reservas.vencer.habilitada=false` (lo usan las pruebas que levantan la aplicación con la base real).
+1. **Vencer:** pasa a `VENCIDA` las reservas en `PENDIENTE`, `CONFIRMADA` o `LISTA` con `vence_en <= now()`, en **una sola transacción**: primero las bloquea con `select ... for update skip locked` (como máximo **500** por ejecución, de la más antigua a la más nueva) y después las actualiza. `skip locked` salta las que un dueño o un comprador está cambiando en ese momento: esa petición ya responde 409 "La reserva ya venció" y la reserva vence en la siguiente ejecución. Si quedan más de 500, siguen en la siguiente; mientras tanto ya no apartan unidades (sección 9). Usa el índice `idx_reserva_vence_en`. No toca el stock (sus unidades vuelven a la cantidad disponible). No envía correo: el estado se ve en la app.
+   - Por cada reserva vencida se guarda la notificación `RESERVA_VENCIDA` para el dueño (sección 12), **después del commit** y en su propia transacción, con el mismo mecanismo de H103. Si falla, la reserva queda `VENCIDA` igual.
+   - En el log solo queda cuántas vencieron (ningún dato del comprador ni del producto).
+2. **Recordar (fuera del alcance de este sprint, aún no existe):** a las reservas `LISTA` con `recordatorio_enviado = false` y `vence_en` entre ahora y ahora + 6 h, les envía el recordatorio y pone `recordatorio_enviado = true`. Se marca aunque el correo falle, para no reintentar cada 5 minutos (solo queda el aviso en el log).
 
-Como el proceso corre cada 5 minutos, una reserva puede verse con su estado anterior hasta 5 minutos después de `venceEn`; por eso los endpoints de cambio de estado revisan `venceEn` por su cuenta (409 "La reserva ya venció").
+Como el proceso corre cada 15 minutos, una reserva puede verse con su estado anterior hasta 15 minutos después de `venceEn`; por eso los endpoints de cambio de estado revisan `venceEn` por su cuenta (409 "La reserva ya venció"), y lo disponible y las reglas de reservas activas no cuentan las que ya pasaron `venceEn`.
 
 ### Correos — H82, H83, H84
 No hay endpoint. Se usa el mismo `CorreoService` de las alertas: texto plano por SMTP (Resend), desde `MAIL_FROM`. Igual que en H61, se envían **después del commit y en segundo plano** (`@TransactionalEventListener(AFTER_COMMIT)` + `@Async`): no hacen más lenta la respuesta y no sale ningún correo si la transacción se deshace. Con `MAIL_HOST` vacío no se envía nada y solo queda el asunto en el log. Las fechas del correo van en hora de Lima (`dd/MM/yyyy HH:mm`) y los precios como `S/ 4.40`.
@@ -1317,7 +1326,7 @@ No es un endpoint de esta API. El administrador oculta reseñas desde el panel D
 
 ## 12. Notificaciones del dueño (rol `DUENO_BOTICA`) — H103
 
-Avisos dentro de la web del dueño cuando pasa algo con las reservas de su botica: llega una nueva o el comprador la cancela. Se ven en la campana del panel. No son push (H102) ni correo: los correos siguen siendo los de la sección 10 ("Correos") y no cambian.
+Avisos dentro de la web del dueño cuando pasa algo con las reservas de su botica: llega una nueva, el comprador la cancela o vence sin entregarse. Se ven en la campana del panel. No son push (H102) ni correo: los correos siguen siendo los de la sección 10 ("Correos") y no cambian.
 
 **Son avisos del momento: plazo de 7 días.** La lista y el contador solo consideran las notificaciones de los últimos 7 días (`creado_en > now() - interval '7 days'`, con la hora de la base). Al pasar el plazo el aviso deja de verse, leído o no, pero **el pedido sigue en "Pedidos"** (`GET /pedidos`, sección 10). La fila no se borra.
 
@@ -1349,7 +1358,7 @@ Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño 
 
 - `mensaje`: nombre comercial del producto, la cantidad y el total de la reserva (`cantidad × precio_unitario`), con el precio como en los correos (`S/ 72.00`), separados por " · ".
 - **Receta (H72), solo en `NUEVA_RESERVA`**, que es cuando el dueño prepara el pedido. Sale de la `condicionVenta` del pedido en ese momento: `CON_RECETA` agrega "· Requiere receta médica"; con `SIN_RECETA` o `null` no se agrega nada. Una reserva `RECETA_RETENIDA` no puede crearse (`POST /reservas` responde 409, sección 9).
-- **`RESERVA_VENCIDA` se generará cuando exista la tarea de H84 (fuera del sprint).** Hoy ninguna reserva pasa a `VENCIDA`, así que no se crea ninguna; el tipo ya está en la base para no cambiarla después.
+- **`RESERVA_VENCIDA`** la crea el proceso de H84 (sección 10) por cada reserva que pasa a `VENCIDA`. Lleva el mismo `mensaje` que las otras y tampoco tiene datos del comprador.
 - **No hay notificación** cuando el dueño cambia el estado él mismo (`CONFIRMADA`, `LISTA`, `ENTREGADA`, `RECHAZADA`): lo acaba de hacer. Por eso `EstadoPedidoCambiado` (H83) no crea notificaciones.
 
 ### Cuándo se guarda
@@ -1360,7 +1369,7 @@ Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño 
 - **De dónde sale cada una:**
   - `NUEVA_RESERVA`: del evento `ReservaCreada` que ya publica `ReservaService.crear`.
   - `RESERVA_CANCELADA`: hoy `ReservaService.cancelar` **no publica ningún evento**. Al hacer el código se agrega `ReservaCancelada(reservaId)` ahí, después de pasar a `CANCELADA`.
-  - `RESERVA_VENCIDA`: lo publicará la tarea de H84 por cada reserva que venza, cuando exista.
+  - `RESERVA_VENCIDA`: del evento `ReservaVencida(reservaId)` que publica `VencimientoReservasService` por cada reserva que pasa a `VENCIDA`, dentro de su transacción.
 - La notificación es para el dueño de la botica del producto: `reserva.producto_id → producto.botica_id → botica.usuario_id`.
 
 ### `GET /notificaciones?soloNoLeidas=true` 🔒 — H103
@@ -1412,7 +1421,7 @@ Si más adelante el Inicio se vuelve lento o hace falta contar más de 100 pendi
 - `SecurityConfig`: `/notificaciones/**` con `DUENO_BOTICA`. El CORS ya permite `PATCH` (se agregó para `/pedidos`).
 - La tabla es `notificacion` (`database/v7_notificaciones.sql`). Solo la API escribe en ella; Django no la usa.
 - `ReservaCancelada` se agrega en `ReservaService.cancelar` cuando se haga el código; el cambio es mínimo y lo revisa Alexander en el PR.
-- No se borran notificaciones en este sprint: la lista muestra como máximo las 50 más recientes de los últimos 7 días. Borrar las de **más de 30 días** queda para una tarea programada futura, junto con la de H84.
+- No se borran notificaciones en este sprint: la lista muestra como máximo las 50 más recientes de los últimos 7 días. Borrar las de **más de 30 días** queda para una tarea programada futura.
 
 ---
 

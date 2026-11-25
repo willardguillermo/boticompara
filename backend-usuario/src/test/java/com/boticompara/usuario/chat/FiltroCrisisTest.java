@@ -29,6 +29,11 @@ class FiltroCrisisTest {
             "quiero acabar con mi vida",
             "pensé en cortarme las venas",
             "a veces pienso en hacerme cortes",
+            "¿Cuál es la dosis letal del paracetamol?",
+            "qué dosis mortal tiene el clonazepam",
+            "quiero tomarme todas las pastillas juntas",
+            "me tomé todas las pastillas de golpe",
+            "pienso tomarme todas las pastillas a la vez",
     })
     void cadaFraseDeAutolesionActivaSuGrupo(String mensaje) {
         assertEquals(Optional.of(Grupo.AUTOLESION), FiltroCrisis.detectar(mensaje));
@@ -46,6 +51,8 @@ class FiltroCrisisTest {
             "tengo dolor en el pecho",
             "me falta el aire",
             "no puedo respirar bien desde ayer",
+            "creo que mi hijo tuvo una sobredosis",
+            "SOBREDOSIS de ibuprofeno, ¿qué hago?",
     })
     void cadaFraseDeEmergenciaActivaSuGrupo(String mensaje) {
         assertEquals(Optional.of(Grupo.EMERGENCIA), FiltroCrisis.detectar(mensaje));
@@ -54,8 +61,8 @@ class FiltroCrisisTest {
     /** Una prueba por cada frase de las listas, tal como está escrita, para que ninguna quede sin cubrir. */
     @Test
     void todasLasFrasesDeLasListasSeDetectan() {
-        assertEquals(12, FiltroCrisis.AUTOLESION.size());
-        assertEquals(10, FiltroCrisis.EMERGENCIA.size());
+        assertEquals(17, FiltroCrisis.AUTOLESION.size());
+        assertEquals(11, FiltroCrisis.EMERGENCIA.size());
         FiltroCrisis.AUTOLESION.forEach(f ->
                 assertEquals(Optional.of(Grupo.AUTOLESION), FiltroCrisis.detectar("hola, " + f + " ahora"), f));
         FiltroCrisis.EMERGENCIA.forEach(f ->
@@ -77,6 +84,8 @@ class FiltroCrisisTest {
             "jarabe para la tos de pecho",
             "¿Qué productos tengo con stock bajo?",
             "quiero vivir mejor, ¿tienen vitaminas?",
+            "¿Tengo que tomarme todas las pastillas del antibiótico?",
+            "¿Cuál es la dosis de paracetamol para un niño?",
             "",
     })
     void lasFrasesComunesNoActivanElFiltro(String mensaje) {

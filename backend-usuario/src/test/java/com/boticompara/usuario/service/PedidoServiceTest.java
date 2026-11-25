@@ -148,7 +148,7 @@ class PedidoServiceTest {
         Reserva r = reserva(EstadoReserva.PENDIENTE, dentroDeUnDia());
         pedidoDeMiBotica(r);
         when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(10, true)));
-        when(reservas.unidadesApartadasSinEsta(anyLong(), any(), anyLong())).thenReturn(0L);
+        when(reservas.unidadesApartadasSinEsta(anyLong(), any(), anyLong(), any())).thenReturn(0L);
         guardaLoQueRecibe();
 
         PedidoResponse resp = service.cambiarEstado(DUENO, ID, "CONFIRMADA");
@@ -161,7 +161,7 @@ class PedidoServiceTest {
         // stock 3, otra reserva activa de 2: disponible 1, el pedido es de 2
         pedidoDeMiBotica(reserva(EstadoReserva.PENDIENTE, dentroDeUnDia()));
         when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(3, true)));
-        when(reservas.unidadesApartadasSinEsta(anyLong(), any(), anyLong())).thenReturn(2L);
+        when(reservas.unidadesApartadasSinEsta(anyLong(), any(), anyLong(), any())).thenReturn(2L);
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.cambiarEstado(DUENO, ID, "CONFIRMADA"));
@@ -374,5 +374,50 @@ class PedidoServiceTest {
                 java.util.EnumSet.of(EstadoReserva.PENDIENTE, EstadoReserva.CONFIRMADA, EstadoReserva.LISTA));
         verify(reservas, never()).save(any(Reserva.class));
         verifyNoInteractions(eventos);
+    }
+
+    // ---------- S4-01: reserva que H84 ya pasó a VENCIDA ----------
+
+    @Test
+    void cambiarEstadoDeUnaVencidaDa409ConElMensajeDeVencida() {
+        pedidoDeMiBotica(reserva(EstadoReserva.VENCIDA, Instant.now().minus(1, ChronoUnit.HOURS)));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.cambiarEstado(DUENO, ID, "CONFIRMADA"));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("La reserva ya venció", ex.getMessage());
+        verify(reservas, org.mockito.Mockito.never()).save(any(Reserva.class));
+        verifyNoInteractions(eventos);
+    }
+
+    @Test
+    void rechazarUnaVencidaDa409ConElMensajeDeVencida() {
+        pedidoDeMiBotica(reserva(EstadoReserva.VENCIDA, Instant.now().minus(1, ChronoUnit.HOURS)));
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.rechazar(DUENO, ID, "No nos queda stock de esa presentación"));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("La reserva ya venció", ex.getMessage());
+        verify(reservas, org.mockito.Mockito.never()).save(any(Reserva.class));
+        verifyNoInteractions(eventos);
+    }
+
+    @Test
+    void lasOtrasReservasSeCuentanConLaHoraActual() {
+        Reserva r = reserva(EstadoReserva.PENDIENTE, dentroDeUnDia());
+        pedidoDeMiBotica(r);
+        guardaLoQueRecibe();
+        when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(5, true)));
+        when(productos.findAllById(any())).thenReturn(List.of(producto(5, true)));
+        when(reservas.unidadesApartadasSinEsta(anyLong(), any(), anyLong(), any())).thenReturn(0L);
+        Instant antes = Instant.now();
+
+        service.cambiarEstado(DUENO, ID, "CONFIRMADA");
+
+        org.mockito.ArgumentCaptor<Instant> ahora = org.mockito.ArgumentCaptor.forClass(Instant.class);
+        verify(reservas, org.mockito.Mockito.atLeastOnce())
+                .unidadesApartadasSinEsta(eq(PRODUCTO), eq(EstadoReserva.ACTIVAS), eq(ID), ahora.capture());
+        assertTrue(ahora.getAllValues().stream().allMatch(i -> !i.isBefore(antes) && !i.isAfter(Instant.now())));
     }
 }

@@ -4,10 +4,13 @@ import com.boticompara.usuario.entity.EstadoReserva;
 import com.boticompara.usuario.entity.Reserva;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Pageable;
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.Lock;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -24,15 +27,40 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     /** H75, H76: solo las del propio comprador. Si es de otro, no existe. */
     Optional<Reserva> findByIdAndUsuarioId(Long id, Long usuarioId);
 
-    /** Unidades que aparta un producto: cantidad disponible = stock - esto (API.md, sección 9). */
+    /**
+     * Unidades que aparta un producto: cantidad disponible = stock - esto (API.md, sección 9).
+     * S4-01: una reserva con venceEn pasado ya no aparta, aunque H84 todavía no la haya marcado VENCIDA.
+     */
     @Query("select coalesce(sum(r.cantidad), 0) from Reserva r "
-            + "where r.productoId = :productoId and r.estado in :estados")
+            + "where r.productoId = :productoId and r.estado in :estados and r.venceEn > :ahora")
     long unidadesApartadas(@Param("productoId") Long productoId,
-                           @Param("estados") Collection<EstadoReserva> estados);
+                           @Param("estados") Collection<EstadoReserva> estados,
+                           @Param("ahora") Instant ahora);
 
-    /** Regla: un comprador no puede tener dos reservas activas del mismo producto (409). */
-    boolean existsByUsuarioIdAndProductoIdAndEstadoIn(Long usuarioId, Long productoId,
-                                                      Collection<EstadoReserva> estados);
+    /** Regla: un comprador no puede tener dos reservas activas del mismo producto (409). Las vencidas no cuentan. */
+    @Query("select count(r) > 0 from Reserva r where r.usuarioId = :usuarioId and r.productoId = :productoId "
+            + "and r.estado in :estados and r.venceEn > :ahora")
+    boolean existeActivaDelProducto(@Param("usuarioId") Long usuarioId, @Param("productoId") Long productoId,
+                                    @Param("estados") Collection<EstadoReserva> estados,
+                                    @Param("ahora") Instant ahora);
+
+    /** S4-03: reservas activas sin vencer del comprador, entre todos los productos. */
+    @Query("select count(r) from Reserva r where r.usuarioId = :usuarioId "
+            + "and r.estado in :estados and r.venceEn > :ahora")
+    long contarActivasDe(@Param("usuarioId") Long usuarioId,
+                         @Param("estados") Collection<EstadoReserva> estados,
+                         @Param("ahora") Instant ahora);
+
+    /**
+     * H84 (S4-01): reservas activas con venceEn pasado, de la más antigua a la más nueva, bloqueadas hasta el commit.
+     * El timeout -2 es SKIP LOCKED en Hibernate: salta las que otra transacción está cambiando (un dueño confirmando,
+     * un comprador cancelando); esas ya responden 409 "La reserva ya venció" y vencen en la siguiente ejecución.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
+    @Query("select r from Reserva r where r.estado in :estados and r.venceEn <= :ahora order by r.venceEn asc, r.id asc")
+    List<Reserva> bloquearVencidas(@Param("estados") Collection<EstadoReserva> estados,
+                                   @Param("ahora") Instant ahora, Pageable pagina);
 
     /** H77, H81: pedidos de una botica, de la más reciente a la más antigua. */
     @Query("select r from Reserva r, Producto p "
@@ -53,12 +81,13 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             + "where r.id = :id and r.productoId = p.id and p.boticaId = :boticaId")
     Optional<Reserva> pedidoDeBotica(@Param("id") Long id, @Param("boticaId") Long boticaId);
 
-    /** H79: unidades apartadas por las OTRAS reservas activas del producto (validación al confirmar). */
+    /** H79: unidades apartadas por las OTRAS reservas activas sin vencer del producto (validación al confirmar). */
     @Query("select coalesce(sum(r.cantidad), 0) from Reserva r "
-            + "where r.productoId = :productoId and r.estado in :estados and r.id <> :id")
+            + "where r.productoId = :productoId and r.estado in :estados and r.id <> :id and r.venceEn > :ahora")
     long unidadesApartadasSinEsta(@Param("productoId") Long productoId,
                                   @Param("estados") Collection<EstadoReserva> estados,
-                                  @Param("id") Long id);
+                                  @Param("id") Long id,
+                                  @Param("ahora") Instant ahora);
 
 
     /** H78-H80 (cambios): bloquea la fila de la reserva hasta el commit, solo si es de esa botica. */

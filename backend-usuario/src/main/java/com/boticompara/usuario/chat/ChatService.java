@@ -45,6 +45,8 @@ public class ChatService {
     static final int MAX_MENSAJE = 500;
     static final int MAX_TEXTO_HISTORIAL = 1000;
     static final int MAX_HISTORIAL = 10;
+    /** S4-16: tope de elementos que se aceptan antes de validarlos; la web y el móvil envían 10 como máximo. */
+    static final int MAX_HISTORIAL_RECIBIDO = 20;
     static final int MAX_RONDAS = 2;
     static final int MAX_HERRAMIENTAS_POR_RONDA = 3;
     static final int MAX_PRODUCTOS = 10;
@@ -213,6 +215,9 @@ public class ChatService {
         List<Turno> turnos = new ArrayList<>();
         if (historial == null) {
             return turnos;
+        }
+        if (historial.size() > MAX_HISTORIAL_RECIBIDO) {
+            throw ApiException.badRequest("El historial no puede pasar de 20 mensajes");
         }
         for (MensajeHistorial m : historial) {
             if (m == null || m.texto() == null || m.texto().isBlank() || m.texto().length() > MAX_TEXTO_HISTORIAL) {
