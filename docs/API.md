@@ -196,6 +196,14 @@ Elimina la cuenta del usuario logueado. Los datos se **anonimizan**, no se borra
 - `nombre` pasa a `"Usuario eliminado"` y `correo` a `eliminado-{id}@boticompara.local`.
 - `telefono` y `direccion` quedan en `null`, la contraseña deja de servir y `activo = false`.
 - Si es dueño de botica, todos sus productos pasan a `activo = false` (dejan de aparecer en las búsquedas).
+- Si es dueño de botica, su botica pasa a `RECHAZADO` con el motivo "Cuenta eliminada por el dueño" (si ya estaba
+  `RECHAZADO`, se deja como está). Así el RUC queda libre para otra cuenta (A5).
+- Si es dueño de botica, sus reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) pasan a `RECHAZADA` con el motivo
+  "La botica dejó de atender en BotiCompara", y cada comprador recibe el correo de rechazo de siempre (H83).
+- Si es comprador, sus reservas activas (`PENDIENTE`, `CONFIRMADA` y `LISTA`) pasan a `CANCELADA` (liberan las
+  unidades), igual que con `PATCH /reservas/{id}/cancelar`: el dueño de cada botica recibe la notificación
+  `RESERVA_CANCELADA` (H103), sin datos del comprador.
+- Todo lo anterior se guarda en la misma transacción; los correos y las notificaciones salen después de confirmarla.
 - Se borran todos sus favoritos (D1).
 - Se borran todas sus alertas de precio (H59).
 
@@ -301,13 +309,15 @@ Sube la licencia de funcionamiento. Es `multipart/form-data` con un campo `archi
 - Formatos: PDF, JPG o PNG (se verifica el contenido, no solo la extensión).
 - Tamaño máximo: 5 MB.
 - Subir otro archivo reemplaza el anterior.
+- **Solo si la botica está `PENDIENTE` o `RECHAZADO`.** Una botica `APROBADO` ya no puede cambiar su licencia: el
+  administrador aprobó ese documento.
 
 El archivo se guarda en Supabase Storage (bucket privado) y la ruta queda en `licencia_url`.
 ```json
 // 200 OK
 { "tieneLicencia": true, "mensaje": "Licencia cargada correctamente" }
 ```
-Errores: 400 (falta el archivo, formato no permitido o más de 5 MB), 404 (no tiene botica).
+Errores: 400 (falta el archivo, formato no permitido o más de 5 MB), 404 (no tiene botica), 409 "La licencia de una botica aprobada no se puede cambiar" (la botica está `APROBADO`).
 
 ---
 
@@ -1343,7 +1353,7 @@ Todos los endpoints piden token de `DUENO_BOTICA` (otro rol → 403). El dueño 
 | `tipo` | Cuándo se crea | `titulo` | `mensaje` | Lleva a |
 |---|---|---|---|---|
 | `NUEVA_RESERVA` | `POST /reservas` (H72) | "Nueva reserva BC-7K2QXM" | "Amoxil x 3 · S/ 72.00", y si el producto pide receta, "· Requiere receta médica" | El pedido, en `PENDIENTE` |
-| `RESERVA_CANCELADA` | El comprador cancela: `PATCH /reservas/{id}/cancelar` (H75) | "Reserva cancelada BC-7K2QXM" | "Amoxil x 3 · S/ 72.00" | El pedido, en `CANCELADA` |
+| `RESERVA_CANCELADA` | El comprador cancela: `PATCH /reservas/{id}/cancelar` (H75), o elimina su cuenta con reservas activas (`DELETE /usuarios/me`, H19) | "Reserva cancelada BC-7K2QXM" | "Amoxil x 3 · S/ 72.00" | El pedido, en `CANCELADA` |
 | `RESERVA_VENCIDA` | El proceso de H84 la pasa a `VENCIDA` | "Reserva vencida BC-7K2QXM" | "Amoxil x 3 · S/ 72.00" | El pedido, en `VENCIDA` |
 
 - `mensaje`: nombre comercial del producto, la cantidad y el total de la reserva (`cantidad × precio_unitario`), con el precio como en los correos (`S/ 72.00`), separados por " · ".

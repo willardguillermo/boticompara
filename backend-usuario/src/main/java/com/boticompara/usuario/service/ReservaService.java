@@ -79,7 +79,10 @@ public class ReservaService {
             throw ApiException.notFound("El producto no está disponible");
         }
 
+        // H19: si el dueño eliminó su cuenta mientras tanto, el producto ya está desactivado al obtener el bloqueo
+        // (sus pedidos se rechazaron antes de que esta reserva existiera): se vuelve a revisar con la fila bloqueada
         Producto p = productos.bloquearPorId(productoId)
+                .filter(Producto::isActivo)
                 .orElseThrow(() -> ApiException.notFound("El producto no está disponible"));
 
         // H72: después del 404 y antes de calcular lo disponible. CON_RECETA y null sí se reservan
@@ -167,6 +170,22 @@ public class ReservaService {
         // H103: el aviso al dueño se guarda después del commit
         eventos.publishEvent(new ReservaCancelada(cancelada.getId()));
         return respuesta(cancelada);
+    }
+
+    /**
+     * H19: el comprador eliminó su cuenta. Sus reservas PENDIENTE, CONFIRMADA y LISTA pasan a CANCELADA (liberan las
+     * unidades), aunque ya hayan pasado su venceEn: nadie las va a recoger. Igual que en cancelar, cada dueño recibe
+     * RESERVA_CANCELADA (H103) después del commit. Corre en la transacción de quien la llama. Devuelve cuántas.
+     */
+    @Transactional
+    public int cancelarActivasDe(Long usuarioId) {
+        List<Reserva> activas = reservas.bloquearPropiasConEstados(usuarioId, EstadoReserva.ACTIVAS);
+        for (Reserva r : activas) {
+            r.setEstado(EstadoReserva.CANCELADA);
+            Reserva cancelada = reservas.save(r);
+            eventos.publishEvent(new ReservaCancelada(cancelada.getId()));
+        }
+        return activas.size();
     }
 
     /** H76: detalle de una reserva propia. */

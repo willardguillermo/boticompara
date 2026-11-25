@@ -310,6 +310,42 @@ function pedidoDto(reserva) {
 }
 
 const ahoraIso = () => new Date().toISOString()
+
+/** H19 y S4-02: los mismos motivos de la API (UsuarioService). */
+export const MOTIVO_BOTICA_ELIMINADA = 'Cuenta eliminada por el dueño'
+export const MOTIVO_PEDIDOS_BOTICA_ELIMINADA = 'La botica dejó de atender en BotiCompara'
+
+/**
+ * H19 (DELETE /usuarios/me), como en docs/API.md, sección 2. Se exporta para probarla con datos propios:
+ * - Dueño: sus productos se dan de baja, su botica pasa a RECHAZADO (si no lo estaba) y sus pedidos activos a
+ *   RECHAZADA con motivo. El correo a cada comprador no se simula.
+ * - Comprador: sus reservas activas pasan a CANCELADA y cada dueño recibe RESERVA_CANCELADA (`avisar`).
+ */
+export function eliminarCuentaEnDatos(datos, usuario, { avisar = () => {}, ahora = new Date().toISOString() } = {}) {
+  Object.assign(usuario, {
+    nombre: 'Usuario eliminado', correo: `eliminado-${usuario.id}@boticompara.local`,
+    telefono: null, direccion: null, password: null, eliminado: true,
+  })
+  const activa = (r) => ['PENDIENTE', 'CONFIRMADA', 'LISTA'].includes(r.estado)
+  const botica = datos.boticas.find((b) => b.usuarioId === usuario.id)
+  if (botica) {
+    const productos = datos.productos.filter((p) => p.boticaId === botica.id)
+    for (const p of productos) p.activo = false
+    if (botica.estado !== 'RECHAZADO') {
+      Object.assign(botica, { estado: 'RECHAZADO', motivoRechazo: MOTIVO_BOTICA_ELIMINADA })
+    }
+    const ids = new Set(productos.map((p) => p.id))
+    for (const r of datos.reservas.filter((r) => ids.has(r.productoId) && activa(r))) {
+      Object.assign(r, { estado: 'RECHAZADA', motivoRechazo: MOTIVO_PEDIDOS_BOTICA_ELIMINADA, actualizadoEn: ahora })
+    }
+  }
+  if (usuario.rol === 'COMPRADOR') {
+    for (const r of datos.reservas.filter((r) => r.usuarioId === usuario.id && activa(r))) {
+      Object.assign(r, { estado: 'CANCELADA', actualizadoEn: ahora })
+      avisar('RESERVA_CANCELADA', r)
+    }
+  }
+}
 const yaVencio = (reserva) => new Date(reserva.venceEn).getTime() <= Date.now()
 
 /** H84 (S4-01): pasa a VENCIDA las activas con venceEn pasado y devuelve las que cambiaron. */
@@ -1013,13 +1049,7 @@ export const apiMock = {
   // H19: anonimiza la cuenta (no borra la fila) y da de baja los productos de su botica
   async eliminarCuenta() {
     await esperar()
-    const usuario = usuarioActual()
-    Object.assign(usuario, {
-      nombre: 'Usuario eliminado', correo: `eliminado-${usuario.id}@boticompara.local`,
-      telefono: null, direccion: null, password: null, eliminado: true,
-    })
-    const botica = db.boticas.find((b) => b.usuarioId === usuario.id)
-    for (const p of db.productos.filter((p) => p.boticaId === botica?.id)) p.activo = false
+    eliminarCuentaEnDatos(db, usuarioActual(), { avisar: crearNotificacion, ahora: ahoraIso() })
     return null
   },
 
@@ -1075,6 +1105,8 @@ export const apiMock = {
   async subirLicencia(archivo) {
     await esperar()
     const botica = boticaActual()
+    // S4-07: igual que la API, una botica aprobada no cambia su licencia
+    if (botica.estado === 'APROBADO') throw crearError(409, 'La licencia de una botica aprobada no se puede cambiar')
     const error = validarArchivoLicencia(archivo)
     if (error) throw crearError(400, error)
     if (!(await contenidoPermitido(archivo))) {

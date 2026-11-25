@@ -2,6 +2,7 @@ package com.boticompara.usuario.service;
 
 import com.boticompara.usuario.dto.PerfilRequest;
 import com.boticompara.usuario.dto.PerfilResponse;
+import com.boticompara.usuario.entity.Botica;
 import com.boticompara.usuario.entity.Usuario;
 import com.boticompara.usuario.error.ApiException;
 import com.boticompara.usuario.repository.BoticaRepository;
@@ -20,12 +21,18 @@ import java.util.HexFormat;
 @RequiredArgsConstructor
 public class UsuarioService {
 
+    /** S4-02: con estos motivos queda la botica y se rechazan sus reservas cuando el dueño elimina su cuenta. */
+    static final String MOTIVO_BOTICA = "Cuenta eliminada por el dueño";
+    static final String MOTIVO_RESERVAS = "La botica dejó de atender en BotiCompara";
+
     private final UsuarioRepository usuarios;
     private final BoticaRepository boticas;
     private final ProductoRepository productos;
     private final TokenUsuarioRepository tokens;
     private final FavoritoService favoritos;
     private final AlertaService alertas;
+    private final PedidoService pedidos;
+    private final ReservaService reservas;
     private final PasswordEncoder encoder;
 
     private final SecureRandom azar = new SecureRandom();
@@ -57,6 +64,9 @@ public class UsuarioService {
      * H19: elimina la cuenta anonimizando los datos (la fila se conserva) y da de baja los productos de su
      * botica. Los códigos y tokens pendientes también quedan sin efecto.
      * D1: también borra sus favoritos (como la fila del usuario no se borra, el on delete cascade no actúa).
+     * S4-02: si es dueño, su botica pasa a RECHAZADO (libera el RUC de uq_botica_ruc_aprobado) y sus reservas
+     * activas se rechazan. Si es comprador, sus reservas activas se cancelan (H103: aviso a cada dueño).
+     * Todo en esta transacción; los correos y las notificaciones salen después del commit.
      */
     @Transactional
     public void eliminar(Long id) {
@@ -75,10 +85,25 @@ public class UsuarioService {
         u.setGoogleUid(null);
         usuarios.save(u);
 
-        boticas.findByUsuarioId(id).ifPresent(b -> productos.desactivarPorBotica(b.getId()));
+        boticas.bloquearPorUsuarioId(id).ifPresent(this::cerrarBotica);
+        if ("COMPRADOR".equals(u.getRol())) {
+            reservas.cancelarActivasDe(id);
+        }
         tokens.invalidarPendientes(id);
         favoritos.quitarTodos(id);
         alertas.borrarTodas(id);   // H59: también sus alertas de precio
+    }
+
+    private void cerrarBotica(Botica b) {
+        // H19: sus productos dejan de aparecer en las búsquedas
+        productos.desactivarPorBotica(b.getId());
+        // Si ya estaba RECHAZADO el RUC ya está libre: se conserva el motivo que le dio el administrador
+        if (!"RECHAZADO".equals(b.getEstado())) {
+            b.setEstado("RECHAZADO");
+            b.setMotivoRechazo(MOTIVO_BOTICA);
+            boticas.save(b);
+        }
+        pedidos.rechazarActivasDeBotica(b.getId(), MOTIVO_RESERVAS);
     }
 
     private Usuario buscar(Long id) {

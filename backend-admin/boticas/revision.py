@@ -10,6 +10,7 @@ La usan la acción masiva "Aprobar boticas seleccionadas", el guardado del formu
 - El correo al dueño sale después del commit y, si falla, la revisión igual queda guardada.
 - A5: el RUC solo se reserva al aprobar. No se aprueba una botica si otra APROBADO ya tiene su RUC, y al
   aprobarla, las demás PENDIENTE con el mismo RUC pasan a RECHAZADO (con historial y correo, como un rechazo).
+- S4-08: no se aprueba una botica sin licencia de funcionamiento cargada (es la evidencia de la revisión, A6).
 """
 from django.db import transaction
 
@@ -26,8 +27,16 @@ MENSAJE_SIN_MOTIVO = 'Indica el motivo del rechazo.'
 MOTIVO_RUC_ACREDITADO = 'Otra cuenta acreditó la licencia de este RUC'
 
 
-class RucYaAprobado(ValueError):
+class NoSePuedeAprobar(ValueError):
+    """Una regla impide aprobar. El mensaje explica cuál y qué hacer; no se aprueba ninguna."""
+
+
+class RucYaAprobado(NoSePuedeAprobar):
     """A5: no se puede aprobar: otra botica APROBADO ya tiene ese RUC (o se eligieron dos con el mismo)."""
+
+
+class SinLicencia(NoSePuedeAprobar):
+    """S4-08: no se puede aprobar: la botica no tiene la licencia de funcionamiento cargada."""
 
 
 class Revisadas(list):
@@ -43,18 +52,33 @@ def mensaje_ruc_aprobado(ruc, aprobada):
             'Si la licencia es de esta cuenta, primero rechaza esa.')
 
 
+def tiene_licencia(botica):
+    return bool((botica.licencia_url or '').strip())
+
+
+def mensaje_sin_licencia(boticas):
+    """S4-08: el porqué, como en A5. `boticas`: una o varias sin licencia."""
+    nombres = ', '.join(b.nombre_comercial for b in boticas)
+    sujeto = f'la botica {nombres} no tiene' if len(boticas) == 1 else f'las boticas {nombres} no tienen'
+    return (f'No se puede aprobar: {sujeto} la licencia de funcionamiento cargada. '
+            'El dueño debe subirla desde la web, en «Mi botica».')
+
+
 def aprobada_con_ruc(botica):
     """A5: la otra botica APROBADO con el mismo RUC, o None."""
     return Botica.objects.filter(ruc=botica.ruc, estado=Botica.Estado.APROBADO).exclude(pk=botica.pk).first()
 
 
-def revisar(pks, estado, revisado_por, motivo=None, desde=None, si_falla_correo=None):
+def revisar(pks, estado, revisado_por, motivo=None, desde=None, si_falla_correo=None, avisar_dueno=True):
     """
     Pasa a `estado` (APROBADO o RECHAZADO) las boticas de `pks` que aún no lo tienen y, si se da
     `desde`, solo las que están en uno de esos estados. Devuelve la lista de boticas que cambiaron.
 
     `pks` puede ser una lista o un queryset de pk (subconsulta). `si_falla_correo(botica)` se llama
-    si no se pudo enviar el correo de esa botica.
+    si no se pudo enviar el correo de esa botica. Con `avisar_dueno=False` no se envía el correo de revisión
+    (la baja de la cuenta, S4-02: el dueño ya no puede corregir ni reenviar nada).
+
+    Al aprobar lanza NoSePuedeAprobar (RucYaAprobado o SinLicencia) sin cambiar ninguna.
     """
     if estado not in ESTADOS_REVISADOS:
         raise ValueError(f'Estado de revisión no válido: {estado}')
@@ -84,11 +108,15 @@ def revisar(pks, estado, revisado_por, motivo=None, desde=None, si_falla_correo=
             return Revisadas()
         rechazadas_por_ruc = []
         if estado == Botica.Estado.APROBADO:
+            # S4-08: se revisa con las filas ya bloqueadas, así cuenta la licencia que hay en este momento
+            sin_licencia = [b for b in por_revisar if not tiene_licencia(b)]
+            if sin_licencia:
+                raise SinLicencia(mensaje_sin_licencia(sin_licencia))
             rechazadas_por_ruc = _pendientes_del_mismo_ruc(por_revisar, mismo_ruc)
-        _guardar(por_revisar, estado, motivo, revisado_por, si_falla_correo)
+        _guardar(por_revisar, estado, motivo, revisado_por, si_falla_correo, avisar_dueno)
         if rechazadas_por_ruc:
             _guardar(rechazadas_por_ruc, Botica.Estado.RECHAZADO, MOTIVO_RUC_ACREDITADO, revisado_por,
-                     si_falla_correo)
+                     si_falla_correo, avisar_dueno)
     return Revisadas(por_revisar, rechazadas_por_ruc)
 
 
@@ -112,7 +140,7 @@ def _pendientes_del_mismo_ruc(por_aprobar, mismo_ruc):
     return [b for b in otras if b.estado == Botica.Estado.PENDIENTE]
 
 
-def _guardar(boticas, estado, motivo, revisado_por, si_falla_correo):
+def _guardar(boticas, estado, motivo, revisado_por, si_falla_correo, avisar_dueno=True):
     # Solo se escriben estado y motivo, para no pisar datos que el dueño
     # haya cambiado desde la web mientras el admin tenía la ficha abierta
     Botica.objects.filter(pk__in=[b.pk for b in boticas]).update(estado=estado, motivo_rechazo=motivo)
@@ -122,6 +150,8 @@ def _guardar(boticas, estado, motivo, revisado_por, si_falla_correo):
     ])
     for botica in boticas:
         botica.estado, botica.motivo_rechazo = estado, motivo
+        if not avisar_dueno:
+            continue
         # Después del commit: si algo falla al guardar, no se avisa de un cambio que no ocurrió
         transaction.on_commit(lambda b=botica: _avisar(b, si_falla_correo))
 

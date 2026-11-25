@@ -56,6 +56,12 @@ class UsuarioServiceTest {
     @Mock
     PasswordEncoder encoder;
 
+    @Mock
+    PedidoService pedidos;
+
+    @Mock
+    ReservaService reservas;
+
     @InjectMocks
     UsuarioService service;
 
@@ -73,9 +79,14 @@ class UsuarioServiceTest {
     }
 
     private Botica botica(Long id) {
+        return botica(id, "APROBADO");
+    }
+
+    private Botica botica(Long id, String estado) {
         Botica b = new Botica();
         b.setId(id);
         b.setUsuarioId(10L);
+        b.setEstado(estado);
         return b;
     }
 
@@ -115,21 +126,109 @@ class UsuarioServiceTest {
     @Test
     void eliminarDaDeBajaLosProductosDeSuBotica() {
         when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
-        when(boticas.findByUsuarioId(10L)).thenReturn(Optional.of(botica(5L)));
+        when(boticas.bloquearPorUsuarioId(10L)).thenReturn(Optional.of(botica(5L)));
 
         service.eliminar(10L);
 
         verify(productos).desactivarPorBotica(5L);
     }
 
+    // ---------- S4-02: la botica y las reservas del dueño que elimina su cuenta ----------
+
     @Test
-    void sinBoticaNoTocaProductos() {
+    void eliminarPasaLaBoticaAprobadaARechazadoConMotivoYLiberaElRuc() {
+        Botica b = botica(5L, "APROBADO");
         when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
-        when(boticas.findByUsuarioId(10L)).thenReturn(Optional.empty());
+        when(boticas.bloquearPorUsuarioId(10L)).thenReturn(Optional.of(b));
 
         service.eliminar(10L);
 
-        verifyNoInteractions(productos);
+        assertEquals("RECHAZADO", b.getEstado());
+        assertEquals("Cuenta eliminada por el dueño", b.getMotivoRechazo());
+        verify(boticas).save(b);
+    }
+
+    @Test
+    void eliminarPasaLaBoticaPendienteARechazado() {
+        Botica b = botica(5L, "PENDIENTE");
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+        when(boticas.bloquearPorUsuarioId(10L)).thenReturn(Optional.of(b));
+
+        service.eliminar(10L);
+
+        assertEquals("RECHAZADO", b.getEstado());
+        assertEquals("Cuenta eliminada por el dueño", b.getMotivoRechazo());
+    }
+
+    @Test
+    void unaBoticaYaRechazadaConservaElMotivoDelAdministrador() {
+        Botica b = botica(5L, "RECHAZADO");
+        b.setMotivoRechazo("La licencia está vencida");
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+        when(boticas.bloquearPorUsuarioId(10L)).thenReturn(Optional.of(b));
+
+        service.eliminar(10L);
+
+        assertEquals("La licencia está vencida", b.getMotivoRechazo());
+        verify(boticas, never()).save(any(Botica.class));
+        // Sus reservas activas igual se rechazan
+        verify(pedidos).rechazarActivasDeBotica(5L, "La botica dejó de atender en BotiCompara");
+    }
+
+    @Test
+    void eliminarRechazaLasReservasActivasDeSuBoticaConElMotivo() {
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+        when(boticas.bloquearPorUsuarioId(10L)).thenReturn(Optional.of(botica(5L)));
+
+        service.eliminar(10L);
+
+        verify(pedidos).rechazarActivasDeBotica(5L, "La botica dejó de atender en BotiCompara");
+    }
+
+    @Test
+    void unCompradorNoTocaBoticasNiPedidos() {
+        Usuario u = usuario(true);
+        u.setRol("COMPRADOR");
+        when(usuarios.findById(10L)).thenReturn(Optional.of(u));
+        when(boticas.bloquearPorUsuarioId(10L)).thenReturn(Optional.empty());
+
+        service.eliminar(10L);
+
+        verify(boticas, never()).save(any(Botica.class));
+        verifyNoInteractions(pedidos);
+    }
+
+    // ---------- H19: el comprador que elimina su cuenta ----------
+
+    @Test
+    void unCompradorCancelaSusReservasActivas() {
+        Usuario u = usuario(true);
+        u.setRol("COMPRADOR");
+        when(usuarios.findById(10L)).thenReturn(Optional.of(u));
+
+        service.eliminar(10L);
+
+        verify(reservas).cancelarActivasDe(10L);
+    }
+
+    @Test
+    void unDuenoNoCancelaReservasComoComprador() {
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+        when(boticas.bloquearPorUsuarioId(10L)).thenReturn(Optional.of(botica(5L)));
+
+        service.eliminar(10L);
+
+        verifyNoInteractions(reservas);
+    }
+
+    @Test
+    void sinBoticaNoTocaProductos() {
+        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true)));
+        when(boticas.bloquearPorUsuarioId(10L)).thenReturn(Optional.empty());
+
+        service.eliminar(10L);
+
+        verifyNoInteractions(productos, pedidos);
     }
 
     @Test
@@ -217,7 +316,7 @@ class UsuarioServiceTest {
 
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
         verify(usuarios, never()).save(any(Usuario.class));
-        verifyNoInteractions(boticas, productos, tokens, favoritos, alertas, encoder);
+        verifyNoInteractions(boticas, productos, tokens, favoritos, alertas, encoder, pedidos, reservas);
     }
 
     @Test
@@ -230,6 +329,6 @@ class UsuarioServiceTest {
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
         assertEquals("Ana Torres", u.getNombre());
         verify(usuarios, never()).save(any(Usuario.class));
-        verifyNoInteractions(boticas, productos, tokens, favoritos, alertas, encoder);
+        verifyNoInteractions(boticas, productos, tokens, favoritos, alertas, encoder, pedidos, reservas);
     }
 }

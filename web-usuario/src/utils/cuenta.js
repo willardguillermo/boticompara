@@ -53,6 +53,20 @@ export function confirmacionValida(texto) {
   return String(texto ?? '').trim() === PALABRA_ELIMINAR
 }
 
+/**
+ * H19 (S4-02): qué le pasa a la botica del dueño al eliminar la cuenta (docs/API.md, sección 2). Pasa a RECHAZADO y
+ * su RUC queda libre; si ya estaba RECHAZADO no cambia, así que no hay nada que avisar (null).
+ */
+export function avisoBoticaAlEliminar(botica) {
+  if (botica?.estado === 'APROBADO') {
+    return 'deja de estar aprobada (pasa a «Rechazado») y su RUC queda libre para otra cuenta.'
+  }
+  if (botica?.estado === 'PENDIENTE') {
+    return 'se retira de la revisión (pasa a «Rechazado») y su RUC queda libre para otra cuenta.'
+  }
+  return null
+}
+
 /** A7: RUC de persona natural (empieza con 10 o 15); su titular debe ser el nombre de la cuenta. */
 export function esRucDePersona(ruc) {
   return /^(10|15)\d{9}$/.test(String(ruc ?? ''))

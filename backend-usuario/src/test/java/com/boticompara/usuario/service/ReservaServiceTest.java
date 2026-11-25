@@ -158,6 +158,20 @@ class ReservaServiceTest {
     }
 
     @Test
+    void productoDesactivadoMientrasSeEsperabaElBloqueoEs404() {
+        // H19: la búsqueda todavía lo veía, pero el dueño eliminó su cuenta antes de que se obtuviera el bloqueo
+        Producto desactivado = producto(5);
+        desactivado.setActivo(false);
+        when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(desactivado));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+        assertEquals("El producto no está disponible", ex.getMessage());
+        verifyNoInteractions(reservas, condiciones, eventos);
+    }
+
+    @Test
     void yaTieneUnaReservaActivaDelMismoProductoEs409() {
         when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(5)));
         when(reservas.existeActivaDelProducto(eq(USUARIO), eq(PRODUCTO), eq(EstadoReserva.ACTIVAS), any()))
@@ -407,6 +421,37 @@ class ReservaServiceTest {
 
         assertEquals("BC-7K2QXM", resp.codigo());
         assertEquals("FarmaVida", resp.boticaNombre());
+    }
+
+    // ---------- H19: el comprador elimina su cuenta ----------
+
+    @Test
+    void cancelarActivasDeLasCancelaYAvisaACadaDueno() {
+        Reserva pendiente = reservaDe(EstadoReserva.PENDIENTE, Instant.now().plus(1, ChronoUnit.DAYS));
+        // Aunque ya haya pasado su venceEn: nadie la va a recoger
+        Reserva lista = reservaDe(EstadoReserva.LISTA, Instant.now().minus(1, ChronoUnit.HOURS));
+        lista.setId(16L);
+        when(reservas.bloquearPropiasConEstados(USUARIO, EstadoReserva.ACTIVAS)).thenReturn(List.of(pendiente, lista));
+        when(reservas.save(any(Reserva.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertEquals(2, service.cancelarActivasDe(USUARIO));
+
+        assertEquals(EstadoReserva.CANCELADA, pendiente.getEstado());
+        assertEquals(EstadoReserva.CANCELADA, lista.getEstado());
+        assertNull(pendiente.getMotivoRechazo());
+        verify(eventos).publishEvent(new ReservaCancelada(15L));
+        verify(eventos).publishEvent(new ReservaCancelada(16L));
+    }
+
+    @Test
+    void cancelarActivasDeSinReservasActivasNoAvisaANadie() {
+        when(reservas.bloquearPropiasConEstados(USUARIO, java.util.EnumSet.of(EstadoReserva.PENDIENTE,
+                EstadoReserva.CONFIRMADA, EstadoReserva.LISTA))).thenReturn(List.of());
+
+        assertEquals(0, service.cancelarActivasDe(USUARIO));
+
+        verify(reservas, times(0)).save(any(Reserva.class));
+        verifyNoInteractions(eventos);
     }
 
     // ---------- S4-01: las reservas con venceEn pasado no cuentan ----------

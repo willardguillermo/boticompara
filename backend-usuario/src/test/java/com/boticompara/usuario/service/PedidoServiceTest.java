@@ -342,6 +342,40 @@ class PedidoServiceTest {
         assertNull(service.detalle(DUENO, ID).condicionVenta());
     }
 
+    // ---------- S4-02: la botica dejó de atender ----------
+
+    @Test
+    void rechazarActivasDeBoticaLasRechazaConMotivoYAvisaACadaComprador() {
+        Reserva pendiente = reserva(EstadoReserva.PENDIENTE, dentroDeUnDia());
+        Reserva lista = reserva(EstadoReserva.LISTA, dentroDeUnDia());
+        lista.setId(16L);
+        when(reservas.bloquearDeBoticaConEstados(BOTICA, EstadoReserva.ACTIVAS)).thenReturn(List.of(pendiente, lista));
+        when(reservas.save(any(Reserva.class))).thenAnswer(i -> i.getArgument(0));
+
+        int rechazadas = service.rechazarActivasDeBotica(BOTICA, "La botica dejó de atender en BotiCompara");
+
+        assertEquals(2, rechazadas);
+        for (Reserva r : List.of(pendiente, lista)) {
+            assertEquals(EstadoReserva.RECHAZADA, r.getEstado());
+            assertEquals("La botica dejó de atender en BotiCompara", r.getMotivoRechazo());
+            verify(reservas).save(r);
+        }
+        verify(eventos).publishEvent(new EstadoPedidoCambiado(ID, EstadoReserva.RECHAZADA));
+        verify(eventos).publishEvent(new EstadoPedidoCambiado(16L, EstadoReserva.RECHAZADA));
+    }
+
+    @Test
+    void rechazarActivasDeBoticaSoloPideLasPendientesConfirmadasYListas() {
+        when(reservas.bloquearDeBoticaConEstados(eq(BOTICA), any())).thenReturn(List.of());
+
+        assertEquals(0, service.rechazarActivasDeBotica(BOTICA, "La botica dejó de atender en BotiCompara"));
+
+        verify(reservas).bloquearDeBoticaConEstados(BOTICA,
+                java.util.EnumSet.of(EstadoReserva.PENDIENTE, EstadoReserva.CONFIRMADA, EstadoReserva.LISTA));
+        verify(reservas, never()).save(any(Reserva.class));
+        verifyNoInteractions(eventos);
+    }
+
     // ---------- S4-01: reserva que H84 ya pasó a VENCIDA ----------
 
     @Test

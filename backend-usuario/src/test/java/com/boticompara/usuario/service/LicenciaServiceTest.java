@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -129,6 +130,48 @@ class LicenciaServiceTest {
 
         assertEquals(HttpStatus.BAD_GATEWAY, ex.getStatus());
         verify(boticas, never()).save(any(Botica.class));
+    }
+
+    // ---------- S4-07: la licencia solo se cambia antes de aprobar ----------
+
+    @Test
+    void conLaBoticaAprobadaDa409SinTocarStorageNiLaBase() {
+        Botica b = botica("botica-1/licencia.pdf");
+        b.setEstado("APROBADO");
+        when(boticaService.obtenerMia(10L)).thenReturn(b);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.subir(10L, PNG));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("La licencia de una botica aprobada no se puede cambiar", ex.getMessage());
+        verifyNoInteractions(storage);
+        verify(boticas, never()).save(any(Botica.class));
+        assertEquals("botica-1/licencia.pdf", b.getLicenciaUrl());
+    }
+
+    @Test
+    void conLaBoticaRechazadaSiPuedeSubirla() {
+        Botica b = botica("botica-1/licencia.pdf");
+        b.setEstado("RECHAZADO");
+        when(boticaService.obtenerMia(10L)).thenReturn(b);
+
+        LicenciaResponse resp = service.subir(10L, PDF);
+
+        verify(storage).subir("botica-1/licencia.pdf", PDF, "application/pdf");
+        verify(boticas).save(b);
+        assertTrue(resp.tieneLicencia());
+    }
+
+    @Test
+    void conLaBoticaPendienteSiPuedeSubirla() {
+        Botica b = botica(null);
+        assertEquals("PENDIENTE", b.getEstado());
+        when(boticaService.obtenerMia(10L)).thenReturn(b);
+
+        service.subir(10L, PDF);
+
+        verify(boticas).save(b);
+        assertEquals("botica-1/licencia.pdf", b.getLicenciaUrl());
     }
 
     @Test

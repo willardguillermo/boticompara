@@ -96,6 +96,19 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
             + "where r.id = :id and r.productoId = p.id and p.boticaId = :boticaId")
     Optional<Reserva> bloquearPedidoDeBotica(@Param("id") Long id, @Param("boticaId") Long boticaId);
 
+    /** S4-02: bloquea las reservas de una botica con esos estados, en orden de id (como lo haría otro cambio). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Reserva r, Producto p "
+            + "where r.productoId = p.id and p.boticaId = :boticaId and r.estado in :estados order by r.id")
+    List<Reserva> bloquearDeBoticaConEstados(@Param("boticaId") Long boticaId,
+                                            @Param("estados") Collection<EstadoReserva> estados);
+
+    /** H19 (comprador que elimina su cuenta): bloquea sus reservas con esos estados, en orden de id. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Reserva r where r.usuarioId = :usuarioId and r.estado in :estados order by r.id")
+    List<Reserva> bloquearPropiasConEstados(@Param("usuarioId") Long usuarioId,
+                                           @Param("estados") Collection<EstadoReserva> estados);
+
     /** H75 (cancelar): bloquea la reserva del comprador hasta el commit. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Reserva r where r.id = :id and r.usuarioId = :usuarioId")

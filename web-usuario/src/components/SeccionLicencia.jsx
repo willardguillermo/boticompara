@@ -1,5 +1,6 @@
 // H4 - Carga de la licencia de funcionamiento (PDF, JPG o PNG, máximo 5 MB).
 // Se usa en "Mi botica" y en la corrección de una botica rechazada (H7).
+// S4-07: con la botica aprobada ya no se puede cambiar (la API responde 409), así que no se ofrece.
 import { useState } from 'react'
 import { useBotica } from '../context/BoticaContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
@@ -8,7 +9,7 @@ import { ACCEPT_LICENCIA, propsError, validarArchivoLicencia } from '../utils/va
 import Alerta from './Alerta.jsx'
 import Campo from './Campo.jsx'
 
-export default function SeccionLicencia({ tieneLicencia }) {
+export default function SeccionLicencia({ tieneLicencia, aprobada = false }) {
   const { recargar } = useBotica()
   const toast = useToast()
   const [reemplazando, setReemplazando] = useState(false)
@@ -19,7 +20,7 @@ export default function SeccionLicencia({ tieneLicencia }) {
   // Cambiar la key vacía el <input type="file">, que no se puede controlar con value
   const [claveInput, setClaveInput] = useState(0)
 
-  const mostrarSelector = !tieneLicencia || reemplazando
+  const mostrarSelector = !aprobada && (!tieneLicencia || reemplazando)
 
   function limpiar() {
     setArchivo(null)
@@ -67,7 +68,14 @@ export default function SeccionLicencia({ tieneLicencia }) {
     <section className="tarjeta seccion-licencia" aria-labelledby="titulo-licencia">
       <h2 id="titulo-licencia">Licencia de funcionamiento</h2>
 
-      {tieneLicencia ? (
+      {aprobada ? (
+        <Alerta tipo="info">
+          <p>
+            {tieneLicencia && <strong>Licencia cargada. </strong>}
+            Tu botica ya fue aprobada, así que la licencia no se puede cambiar.
+          </p>
+        </Alerta>
+      ) : tieneLicencia ? (
         <div className="licencia-cargada">
           <Alerta tipo="exito">
             <p>

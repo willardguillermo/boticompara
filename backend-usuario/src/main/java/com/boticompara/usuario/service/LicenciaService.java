@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 public class LicenciaService {
 
     static final int MAX_BYTES = 5 * 1024 * 1024;
+    static final String YA_APROBADA = "La licencia de una botica aprobada no se puede cambiar";
 
     private final BoticaService boticaService;
     private final BoticaRepository boticas;
@@ -21,9 +22,13 @@ public class LicenciaService {
     /**
      * H4: sube la licencia a Storage y guarda la ruta en licencia_url.
      * Si falla la subida, no se toca la base de datos.
+     * S4-07: solo en PENDIENTE o RECHAZADO. Lo que se aprobó es el documento que vio el revisor.
      */
     public LicenciaResponse subir(Long usuarioId, byte[] contenido) {
         Botica botica = boticaService.obtenerMia(usuarioId);
+        if ("APROBADO".equals(botica.getEstado())) {
+            throw ApiException.conflict(YA_APROBADA);
+        }
 
         if (contenido == null || contenido.length == 0) {
             throw ApiException.badRequest("Debes adjuntar el archivo de la licencia");
