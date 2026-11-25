@@ -30,6 +30,10 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      # IP real del cliente para los límites por IP (SEC-05). No es secreto. Sin esto Tomcat usa la IP de
+      # Cloudflare, que cambia en cada petición, y el límite no bloquea (probado el 23/11/2026, render.md sección 7)
+      - key: SERVER_TOMCAT_REMOTEIP_REMOTEIPHEADER
+        value: CF-Connecting-IP
       # Licencias en Supabase Storage (H4)
       - key: SUPABASE_URL
         sync: false
