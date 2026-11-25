@@ -5,6 +5,7 @@ val localProps = Properties().apply {
     if (archivo.exists()) archivo.inputStream().use { load(it) }
 }
 val baseUrl: String = localProps.getProperty("BASE_URL") ?: "http://10.0.2.2:8080/api/"
+val mapsApiKey: String = localProps.getProperty("MAPS_API_KEY") ?: ""
 
 plugins {
     alias(libs.plugins.android.application)
@@ -27,6 +28,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {
@@ -64,7 +66,8 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("org.osmdroid:osmdroid-android:6.1.20")
+    implementation(libs.maps.compose)
+    implementation(libs.play.services.maps)
 
     // H67: iniciar sesión con Google (Firebase Authentication + Credential Manager)
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))

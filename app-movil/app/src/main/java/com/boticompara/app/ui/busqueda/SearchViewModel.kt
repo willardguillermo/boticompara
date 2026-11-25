@@ -50,7 +50,10 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var mensajeUbicacion by mutableStateOf<String?>(null)
         private set
-    private var ubicacion: UbicacionProvider.Coordenadas? = null
+    private var ubicacion by mutableStateOf<UbicacionProvider.Coordenadas?>(null)
+
+    val coordenadasUsuario: Pair<Double, Double>?
+        get() = ubicacion?.let { it.lat to it.lng }
 
     var radioKm by mutableStateOf<Double?>(null)
         private set
