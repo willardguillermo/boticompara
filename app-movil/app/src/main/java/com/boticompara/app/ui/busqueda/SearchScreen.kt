@@ -368,7 +368,8 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                             MapaResultados(
                                 productos = vm.productos,
                                 onProductoClick = { productoId -> navController.navigate("detalle/$productoId") },
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                ubicacionUsuario = vm.coordenadasUsuario
                             )
                         } else {
                             val precioMinimo = vm.productos.minOf { it.precio }

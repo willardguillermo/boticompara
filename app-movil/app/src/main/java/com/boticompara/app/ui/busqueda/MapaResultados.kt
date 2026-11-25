@@ -1,13 +1,6 @@
 package com.boticompara.app.ui.busqueda
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
-import android.graphics.Typeface
-import android.graphics.drawable.BitmapDrawable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +18,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,25 +26,28 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.boticompara.app.data.remote.dto.ProductoResponse
 import com.boticompara.app.ui.components.BotiButton
 import com.boticompara.app.ui.components.ProductoCard
 import com.boticompara.app.ui.theme.Dimens
-import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.BoundingBox
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
-import java.io.File
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberUpdatedMarkerState
 import java.util.Locale
 
-private val CENTRO_LIMA = GeoPoint(-12.0464, -77.0300)
+private val CENTRO_LIMA = LatLng(-12.0464, -77.0300)
+private const val ZOOM_LIMA = 12f
+private const val ZOOM_BOTICA = 15f
+private const val MARGEN_MAPA = 96
 
 internal data class MarcadorBotica(
     val producto: ProductoResponse,
@@ -73,11 +68,9 @@ internal fun agruparPorBotica(productos: List<ProductoResponse>): List<MarcadorB
 fun MapaResultados(
     productos: List<ProductoResponse>,
     onProductoClick: (productoId: Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    ubicacionUsuario: Pair<Double, Double>? = null
 ) {
-    val context = LocalContext.current
-    val colorFondo = MaterialTheme.colorScheme.primary.toArgb()
-    val colorTexto = MaterialTheme.colorScheme.onPrimary.toArgb()
     val alTocar by rememberUpdatedState(onProductoClick)
 
     val marcadores = remember(productos) { agruparPorBotica(productos) }
@@ -86,65 +79,66 @@ fun MapaResultados(
     }
 
     var boticaSeleccionada by remember { mutableStateOf<MarcadorBotica?>(null) }
+    var tamanoMapa by remember { mutableStateOf(IntSize.Zero) }
 
-    val mapView = remember {
-        Configuration.getInstance().apply {
-            userAgentValue = context.packageName
-            osmdroidBasePath = File(context.cacheDir, "osmdroid")
-            osmdroidTileCache = File(context.cacheDir, "osmdroid/tiles")
-        }
-        MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            controller.setZoom(12.0)
-            controller.setCenter(CENTRO_LIMA)
-        }
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(CENTRO_LIMA, ZOOM_LIMA)
     }
+    val estadoUbicacion = rememberUpdatedMarkerState(
+        position = ubicacionUsuario?.let { LatLng(it.first, it.second) } ?: CENTRO_LIMA
+    )
 
-    DisposableEffect(mapView) {
-        mapView.onResume()
-        onDispose {
-            mapView.onPause()
-            mapView.onDetach()
+    LaunchedEffect(marcadores, ubicacionUsuario, tamanoMapa) {
+        if (tamanoMapa.width == 0 || tamanoMapa.height == 0) return@LaunchedEffect
+        val puntos = marcadores.map { LatLng(it.lat, it.lng) } +
+            (ubicacionUsuario?.let { listOf(LatLng(it.first, it.second)) } ?: emptyList())
+        when {
+            puntos.isEmpty() ->
+                cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(CENTRO_LIMA, ZOOM_LIMA))
+
+            puntos.size == 1 ->
+                cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(puntos.first(), ZOOM_BOTICA))
+
+            else -> {
+                val limites = LatLngBounds.builder()
+                puntos.forEach { limites.include(it) }
+                cameraPositionState.move(
+                    CameraUpdateFactory.newLatLngBounds(limites.build(), MARGEN_MAPA)
+                )
+            }
         }
-    }
-
-    LaunchedEffect(marcadores) {
-        mapView.post { ajustarVista(mapView, marcadores) }
     }
 
     Box(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
-            AndroidView(
-                factory = { mapView },
-                update = { vista ->
-                    vista.overlays.removeAll { it is Marker }
-                    marcadores.forEach { marcador ->
-                        vista.overlays.add(
-                            Marker(vista).apply {
-                                position = GeoPoint(marcador.lat, marcador.lng)
-                                icon = crearIconoBotica(
-                                    context = context,
-                                    nombre = marcador.producto.boticaNombre,
-                                    precio = "S/ ${String.format(Locale.US, "%.2f", marcador.producto.precio)}",
-                                    colorFondo = colorFondo,
-                                    colorTexto = colorTexto
-                                )
-                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                setOnMarkerClickListener { _, _ ->
-                                    boticaSeleccionada = marcador
-                                    true
-                                }
-                            }
-                        )
-                    }
-                    vista.invalidate()
-                },
+            GoogleMap(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .clipToBounds()
-            )
+                    .onGloballyPositioned { coordenadas ->
+                        if (coordenadas.size != tamanoMapa) tamanoMapa = coordenadas.size
+                    },
+                cameraPositionState = cameraPositionState,
+                onMapClick = { boticaSeleccionada = null }
+            ) {
+                marcadores.forEach { marcador ->
+                    Marker(
+                        state = MarkerState(position = LatLng(marcador.lat, marcador.lng)),
+                        title = marcador.producto.boticaNombre,
+                        snippet = "S/ ${String.format(Locale.US, "%.2f", marcador.producto.precio)}",
+                        onClick = {
+                            boticaSeleccionada = marcador
+                            true
+                        }
+                    )
+                }
+                if (ubicacionUsuario != null) {
+                    Marker(
+                        state = estadoUbicacion,
+                        title = "Tu ubicación"
+                    )
+                }
+            }
             if (sinUbicacion > 0) {
                 Text(
                     if (sinUbicacion == 1) {
@@ -189,7 +183,7 @@ fun MapaResultados(
                         Spacer(Modifier.height(Dimens.Space12))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.Space8),
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.Space8),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             BotiButton(
@@ -206,63 +200,4 @@ fun MapaResultados(
             }
         }
     }
-}
-
-private fun ajustarVista(mapView: MapView, marcadores: List<MarcadorBotica>) {
-    val densidad = mapView.context.resources.displayMetrics.density
-    when {
-        marcadores.isEmpty() -> {
-            mapView.controller.setZoom(12.0)
-            mapView.controller.setCenter(CENTRO_LIMA)
-        }
-        else -> {
-            val puntos = marcadores.map { GeoPoint(it.lat, it.lng) }
-            if (puntos.distinct().size == 1) {
-                mapView.controller.setZoom(15.0)
-                mapView.controller.setCenter(puntos.first())
-            } else {
-                mapView.zoomToBoundingBox(BoundingBox.fromGeoPoints(puntos), false, (56 * densidad).toInt())
-            }
-        }
-    }
-}
-
-private fun crearIconoBotica(
-    context: Context,
-    nombre: String,
-    precio: String,
-    colorFondo: Int,
-    colorTexto: Int
-): BitmapDrawable {
-    val d = context.resources.displayMetrics.density
-    val pNombre = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = colorTexto
-        textSize = 12f * d
-        typeface = Typeface.DEFAULT_BOLD
-    }
-    val pPrecio = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = colorTexto
-        textSize = 13f * d
-        typeface = Typeface.DEFAULT_BOLD
-    }
-    val nombreCorto = if (nombre.length > 22) nombre.take(21) + "…" else nombre
-    val ancho = (maxOf(pNombre.measureText(nombreCorto), pPrecio.measureText(precio)) + 20f * d).toInt()
-    val altoCaja = (46f * d).toInt()
-    val altoPunta = (8f * d).toInt()
-
-    val bitmap = Bitmap.createBitmap(ancho, altoCaja + altoPunta, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    val pFondo = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colorFondo }
-
-    canvas.drawRoundRect(RectF(0f, 0f, ancho.toFloat(), altoCaja.toFloat()), 10f * d, 10f * d, pFondo)
-    val punta = Path().apply {
-        moveTo(ancho / 2f - 8f * d, altoCaja.toFloat())
-        lineTo(ancho / 2f + 8f * d, altoCaja.toFloat())
-        lineTo(ancho / 2f, (altoCaja + altoPunta).toFloat())
-        close()
-    }
-    canvas.drawPath(punta, pFondo)
-    canvas.drawText(nombreCorto, 10f * d, 18f * d, pNombre)
-    canvas.drawText(precio, 10f * d, 36f * d, pPrecio)
-    return BitmapDrawable(context.resources, bitmap)
 }
