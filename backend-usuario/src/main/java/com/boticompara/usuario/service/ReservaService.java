@@ -79,7 +79,10 @@ public class ReservaService {
             throw ApiException.notFound("El producto no está disponible");
         }
 
+        // H19: si el dueño eliminó su cuenta mientras tanto, el producto ya está desactivado al obtener el bloqueo
+        // (sus pedidos se rechazaron antes de que esta reserva existiera): se vuelve a revisar con la fila bloqueada
         Producto p = productos.bloquearPorId(productoId)
+                .filter(Producto::isActivo)
                 .orElseThrow(() -> ApiException.notFound("El producto no está disponible"));
 
         // H72: después del 404 y antes de calcular lo disponible. CON_RECETA y null sí se reservan

@@ -158,6 +158,20 @@ class ReservaServiceTest {
     }
 
     @Test
+    void productoDesactivadoMientrasSeEsperabaElBloqueoEs404() {
+        // H19: la búsqueda todavía lo veía, pero el dueño eliminó su cuenta antes de que se obtuviera el bloqueo
+        Producto desactivado = producto(5);
+        desactivado.setActivo(false);
+        when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(desactivado));
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.crear(USUARIO, PRODUCTO, 1));
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+        assertEquals("El producto no está disponible", ex.getMessage());
+        verifyNoInteractions(reservas, condiciones, eventos);
+    }
+
+    @Test
     void yaTieneUnaReservaActivaDelMismoProductoEs409() {
         when(productos.bloquearPorId(PRODUCTO)).thenReturn(Optional.of(producto(5)));
         when(reservas.existeActivaDelProducto(eq(USUARIO), eq(PRODUCTO), eq(EstadoReserva.ACTIVAS), any()))
