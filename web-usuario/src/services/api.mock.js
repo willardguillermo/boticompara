@@ -312,11 +312,21 @@ function pedidoDto(reserva) {
 const ahoraIso = () => new Date().toISOString()
 const yaVencio = (reserva) => new Date(reserva.venceEn).getTime() <= Date.now()
 
-/** H84: imita el proceso programado, que pasa a VENCIDA las activas con venceEn pasado. */
-function vencerReservas() {
-  for (const r of db.reservas) {
-    if (ESTADOS_ACTIVOS.includes(r.estado) && yaVencio(r)) Object.assign(r, { estado: 'VENCIDA', actualizadoEn: ahoraIso() })
+/** H84 (S4-01): pasa a VENCIDA las activas con venceEn pasado y devuelve las que cambiaron. */
+export function vencerActivas(reservas, ahora = Date.now()) {
+  const vencidas = []
+  for (const r of reservas) {
+    if (ESTADOS_ACTIVOS.includes(r.estado) && new Date(r.venceEn).getTime() <= ahora) {
+      Object.assign(r, { estado: 'VENCIDA', actualizadoEn: new Date(ahora).toISOString() })
+      vencidas.push(r)
+    }
   }
+  return vencidas
+}
+
+/** Imita el proceso programado de H84, con el aviso RESERVA_VENCIDA para el dueño (sección 12). */
+function vencerReservas() {
+  for (const r of vencerActivas(db.reservas)) crearNotificacion('RESERVA_VENCIDA', r)
 }
 
 const reservasDeBotica = (botica) =>
@@ -1213,6 +1223,7 @@ export const apiMock = {
     await esperar()
     validarEstado(estado, true)
     const reserva = pedidoPropio(id)
+    if (reserva.estado === 'VENCIDA') throw crearError(409, 'La reserva ya venció')
     if (TRANSICIONES[reserva.estado] !== estado) {
       throw crearError(409, `No se puede pasar de ${reserva.estado} a ${estado}`)
     }
@@ -1243,6 +1254,7 @@ export const apiMock = {
       throw crearError(400, 'El motivo debe tener entre 10 y 300 caracteres.')
     }
     const reserva = pedidoPropio(id)
+    if (reserva.estado === 'VENCIDA') throw crearError(409, 'La reserva ya venció')
     if (!['PENDIENTE', 'CONFIRMADA'].includes(reserva.estado)) {
       throw crearError(409, `No se puede rechazar un pedido ${reserva.estado}`)
     }
@@ -1298,6 +1310,7 @@ export const apiMock = {
   // Últimos 7 días, de la más reciente a la más antigua, máximo 50. Sin botica: lista vacía, no 404
   async listarNotificaciones({ soloNoLeidas = false } = {}) {
     await esperar()
+    vencerReservas()
     const propias = misNotificacionesRecientes()
     if (typeof soloNoLeidas !== 'boolean') throw crearError(400, 'soloNoLeidas debe ser true o false.')
     return propias
@@ -1310,6 +1323,7 @@ export const apiMock = {
   // Cuenta las no leídas de los últimos 7 días, sin el límite de 50
   async contarNotificacionesNoLeidas() {
     await esperar()
+    vencerReservas()
     return { total: misNotificacionesRecientes().filter((n) => !n.leida).length }
   },
 

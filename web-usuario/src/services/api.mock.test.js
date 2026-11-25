@@ -1,7 +1,7 @@
 // Pruebas del modo simulado: npm test
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { soloRecientes, titularCoincide } from './api.mock.js'
+import { soloRecientes, titularCoincide, vencerActivas } from './api.mock.js'
 
 const DIA = 24 * 60 * 60 * 1000
 const AHORA = Date.parse('2026-11-22T15:30:00Z')
@@ -27,3 +27,27 @@ test('titularCoincide: cada palabra de la cuenta está en el titular, sin tildes
   assert.equal(titularCoincide('Ros Quispe', 'QUISPE MAMANI ROSA'), false)
   assert.equal(titularCoincide('   ', 'QUISPE MAMANI ROSA'), false)
 })
+
+const reserva = (id, estado, venceEnMs) => ({ id, estado, venceEn: new Date(venceEnMs).toISOString() })
+
+test('vencerActivas: solo las activas con venceEn pasado pasan a VENCIDA (H84, S4-01)', () => {
+  const pendiente = reserva(1, 'PENDIENTE', AHORA - 1)
+  const confirmada = reserva(2, 'CONFIRMADA', AHORA - DIA)
+  const lista = reserva(3, 'LISTA', AHORA)
+  const vigente = reserva(4, 'PENDIENTE', AHORA + 1)
+  const entregada = reserva(5, 'ENTREGADA', AHORA - DIA)
+
+  const vencidas = vencerActivas([pendiente, confirmada, lista, vigente, entregada], AHORA)
+
+  assert.deepEqual(vencidas.map((r) => r.id), [1, 2, 3])
+  assert.equal(pendiente.estado, 'VENCIDA')
+  assert.equal(lista.actualizadoEn, new Date(AHORA).toISOString())
+  assert.equal(vigente.estado, 'PENDIENTE')
+  assert.equal(entregada.estado, 'ENTREGADA')
+})
+
+test('vencerActivas: una reserva ya VENCIDA no se vuelve a contar (H84)', () => {
+  const ya = reserva(1, 'VENCIDA', AHORA - DIA)
+  assert.deepEqual(vencerActivas([ya], AHORA), [])
+})
+

@@ -67,6 +67,7 @@ public class PedidoService {
     public PedidoResponse cambiarEstado(Long usuarioId, Long id, String estadoTexto) {
         EstadoReserva nuevo = parsear(estadoTexto);
         Reserva r = pedidoBloqueadoDeMiBotica(usuarioId, id);
+        exigirNoVencida(r);
 
         if (!r.getEstado().puedePasarPorEstadoA(nuevo)) {
             throw ApiException.conflict("No se puede pasar de " + r.getEstado() + " a " + nuevo);
@@ -101,6 +102,7 @@ public class PedidoService {
             throw ApiException.badRequest("El motivo debe tener entre " + MOTIVO_MIN + " y " + MOTIVO_MAX + " caracteres");
         }
         Reserva r = pedidoBloqueadoDeMiBotica(usuarioId, id);
+        exigirNoVencida(r);
 
         if (r.getEstado() != EstadoReserva.PENDIENTE && r.getEstado() != EstadoReserva.CONFIRMADA) {
             throw ApiException.conflict("No se puede rechazar un pedido " + r.getEstado());
@@ -121,7 +123,7 @@ public class PedidoService {
      * Nunca es negativo. Es el mismo cálculo que el campo disponible y que la validación al confirmar.
      */
     private long disponibleParaPedido(Producto p, Reserva r) {
-        long otras = reservas.unidadesApartadasSinEsta(p.getId(), EstadoReserva.ACTIVAS, r.getId());
+        long otras = reservas.unidadesApartadasSinEsta(p.getId(), EstadoReserva.ACTIVAS, r.getId(), Instant.now());
         return Math.max(0, p.getStock() - otras);
     }
 
@@ -164,6 +166,13 @@ public class PedidoService {
         Botica b = miBotica(usuarioId);
         return reservas.bloquearPedidoDeBotica(id, b.getId())
                 .orElseThrow(() -> ApiException.notFound("El pedido no existe"));
+    }
+
+    /** S4-01: una reserva que H84 ya pasó a VENCIDA responde lo mismo que una con venceEn pasado. */
+    private static void exigirNoVencida(Reserva r) {
+        if (r.getEstado() == EstadoReserva.VENCIDA) {
+            throw ApiException.conflict("La reserva ya venció");
+        }
     }
 
     private boolean venció(Reserva r) {
