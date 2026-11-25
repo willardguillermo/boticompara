@@ -933,7 +933,7 @@ function exigirTitular(dueno, ruc) {
   const titular = RUCS_SUNAT[ruc]?.razonSocial
   if (!/^(10|15)/.test(ruc) || !titular) return
   if (!titularCoincide(dueno.nombre, titular)) {
-    throw crearError(400, `Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular (según SUNAT: ${titular})`)
+    throw crearError(400, 'Este RUC pertenece a una persona: la cuenta debe estar a nombre del titular del RUC')
   }
 }
 
