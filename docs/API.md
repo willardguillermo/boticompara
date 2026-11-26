@@ -28,17 +28,21 @@ Este archivo es el acuerdo entre el backend, la web y el móvil.
 }
 ```
 
+Algunos errores traen además un campo `codigo` (texto fijo en mayúsculas) para que la web y la app los reconozcan sin
+comparar el `mensaje`. Hoy solo existe `CORREO_NO_VERIFICADO` (403 de `POST /auth/login`). Si no aplica, el campo no
+viene en el JSON.
+
 | Código | Cuándo |
 |---|---|
 | 400 | Datos inválidos (validación) |
 | 401 | Sin token, token vencido o credenciales incorrectas |
-| 403 | Rol sin permiso, botica no aprobada intentando crear productos o usar el asistente, acción no permitida por el estado de la botica, reseña sin una reserva entregada (H85), o comprador sin el correo verificado intentando usar el asistente o reservar |
+| 403 | Rol sin permiso, botica no aprobada intentando crear productos o usar el asistente, acción no permitida por el estado de la botica, reseña sin una reserva entregada (H85), comprador sin el correo verificado intentando usar el asistente o reservar, o login con la contraseña correcta y el correo sin verificar (`codigo: CORREO_NO_VERIFICADO`) |
 | 404 | Recurso no existe o no pertenece al usuario |
 | 409 | Duplicado (correo ya registrado, o RUC de una botica ya aprobada), o conflicto con el estado actual: cambio de estado no permitido de una reserva o pedido, stock insuficiente, reserva activa repetida, reserva de un medicamento con receta retenida (H72) |
-| 429 | Demasiados pedidos (`POST /chat`, `GET /boticas/validar-ruc`, `POST /auth/registro`, `POST /auth/recuperar`) o demasiados intentos fallidos (`POST /auth/login`, SEC-05). Siempre con el header `Retry-After` (segundos) |
-| 503, 504 | El asistente no está disponible o tardó demasiado (solo `POST /chat`) |
+| 429 | Demasiados pedidos (`POST /chat`, `GET /boticas/validar-ruc`, `POST /auth/registro/codigo`, `POST /auth/registro/validar-ruc`, `POST /auth/verificacion/codigo`, `POST /auth/recuperar`) o demasiados intentos fallidos (`POST /auth/login`, SEC-05). Siempre con el header `Retry-After` (segundos) |
+| 503, 504 | El asistente no está disponible o tardó demasiado (`POST /chat`). 503 también si no se pudo enviar el código de `POST /auth/registro/codigo` |
 
-Única excepción al formato JSON: `GET /auth/verificar` responde una página HTML (ver H20).
+Única excepción al formato JSON: `GET /auth/verificar` (obsoleto) responde una página HTML (ver H20).
 
 ---
 
@@ -78,12 +82,95 @@ Inicia sesión con Google o crea la cuenta si no existe. No requiere token.
 | 403 | Cuenta dada de baja | "Tu cuenta fue dada de baja" |
 | 409 | Ya existe una cuenta con contraseña y ese correo | "Ya existe una cuenta con este correo. Inicia sesión con tu contraseña" |
 
-### `POST /auth/registro` — H1, H15, H20
-Crea un comprador o un dueño de botica.
+### Registro con el correo verificado — H1, H15, H20
 
+Desde el 26/11/2026 la cuenta se crea **solo con el correo ya verificado**. Antes de crearla no se guarda nada en
+`usuario` ni en `botica`: el código y el token viven en la tabla `codigo_correo` (`database/v9_verificacion_correo.sql`).
+Lo único que el dueño puede dejar para después es la licencia (`POST /boticas/mia/licencia`). Google no cambia
+(`POST /auth/google`: Google ya verificó el correo).
+
+Pasos (web del dueño y app del comprador):
+
+1. `POST /auth/registro/codigo` → llega un código de 6 dígitos al correo.
+2. `POST /auth/registro/verificar` con el código → `tokenVerificacion`.
+3. Solo el dueño: `POST /auth/registro/validar-ruc` con el token, para avisar mientras escribe el RUC (opcional).
+4. `POST /auth/registro` con el token y todos los datos → 201 con la sesión (mismo JSON que el login).
+5. Solo el dueño, cuando quiera: `POST /boticas/mia/licencia` con el token de la sesión.
+
+Ya no hay forma de crear una cuenta con contraseña sin verificar: `POST /auth/registro` sin `tokenVerificacion` da 400.
+
+### `POST /auth/registro/codigo` — H20
+Envía un código de 6 dígitos al correo para empezar el registro. No requiere token.
 ```json
 // Request
+{ "correo": "carlos@boticompara.nissidev.dev" }
+```
+```json
+// 200 OK
+{ "mensaje": "Te enviamos un código a tu correo. Vence en 15 minutos" }
+```
+- Solo se usa el `correo` (en minúsculas y sin espacios). **No se pide el nombre:** el correo sale hacia una dirección
+  que todavía nadie verificó, y no debe llevar texto que escriba quien pide el código (evita usar BotiCompara para
+  mandar mensajes a terceros). Si la web o la app envían `nombre`, se ignora.
+- El código vence a los **15 minutos**, se invalida tras **5 intentos fallidos** y solo sirve una vez. Pedir un código
+  nuevo anula el anterior de ese correo (y el `tokenVerificacion` que hubiera dado).
+- El correo sale con el mismo remitente que los demás (`MAIL_FROM`). Si el envío falla, o el backend no tiene correo
+  configurado (`MAIL_HOST` vacío) → 503 "No pudimos enviar el correo. Intenta en unos minutos", y ese intento no cuenta
+  en los límites. El código nunca se escribe en el log; en local se prueba con Mailpit (ver `docs/registro-verificado-local.md`).
+
+**Límites** (cada código es un correo, y el plan da 100 envíos al día):
+- **Por correo:** como mínimo **60 s** entre un código y el siguiente, y como máximo **5 códigos por hora**. Al pasarlo
+  → 429 con `Retry-After` y el mensaje "Espera un momento antes de pedir otro código" (60 s) o "Pediste demasiados
+  códigos para este correo. Intenta más tarde" (por hora). Se cuenta en la base, así que no se reinicia con el backend.
+- **Por IP:** como máximo **5 códigos por hora** (`auth.limite.registro-por-ip-hora`, el mismo valor que tenía el
+  registro). Solo cuentan los códigos enviados: un 400, 409 o 429 por correo no gastan. Al pasarlo → 429 con
+  `Retry-After` y el mensaje "Hiciste demasiados registros desde esta conexión. Intenta más tarde". La IP se toma igual
+  que en el login.
+
+Errores: 400 (falta `correo` o no tiene formato válido), 409 "El correo ya está registrado" (también si es una cuenta de
+Google; igual que antes, el registro revela si un correo existe), 429 (límites), 503 (no se pudo enviar el correo).
+
+### `POST /auth/registro/verificar` — H20
+```json
+// Request
+{ "correo": "carlos@boticompara.nissidev.dev", "codigo": "483920" }
+```
+```json
+// 200 OK
+{ "tokenVerificacion": "9f2c4e...(64 caracteres hexadecimales)" }
+```
+- Si el código es correcto, vigente y no usado, queda usado y se entrega un `tokenVerificacion` que **vence a los
+  30 minutos** y **sirve para crear una sola cuenta**. En la base solo se guarda su hash (HMAC-SHA256), nunca el token.
+- Cada código incorrecto suma un intento; al **quinto** queda invalidado y hay que pedir otro.
+- **400 con un único mensaje** para todo lo que no sea un código válido (no existe, vencido, ya usado, invalidado por
+  intentos o reemplazado por otro): "El código no es válido o venció. Pide uno nuevo".
+
+Errores: 400 (faltan campos, el código no tiene 6 dígitos, o el mensaje de arriba).
+
+### `POST /auth/registro/validar-ruc` — H2
+Para que la web valide el RUC **antes** de que exista la cuenta. Hace lo mismo que `GET /boticas/validar-ruc/{ruc}` y
+responde el mismo JSON (ver sección 3), pero en lugar de la sesión del dueño pide el `tokenVerificacion` vigente.
+Va por `POST` para que el token no quede en la URL ni en los logs. **No gasta el token.**
+```json
+// Request
+{ "tokenVerificacion": "9f2c4e...", "ruc": "20601234565" }
+```
+- **Límites de SUNAT:** los mismos de `validar-ruc`, pero contados **por token** en lugar de por usuario: 5 consultas
+  por hora por token (`ruc.limite.por-usuario-hora`) → 429 "Consultaste demasiados RUC. Espera un momento y vuelve a
+  intentar", y el **tope global de 10 por día** compartido con todo lo demás. La caché de 24 h y los RUC mal escritos
+  no gastan. Conseguir otro token exige otro código por correo (con sus propios límites), y aunque alguien junte muchos
+  tokens, el tope global sigue protegiendo la cuota de Decolecta.
+- Si el token no existe, venció o ya se usó → 400 "Tu verificación del correo venció. Vuelve a pedir un código".
+
+Errores: 400 (faltan campos o token inválido), 429 (límite por token).
+
+### `POST /auth/registro` — H1, H15, H20
+Crea la cuenta con el correo ya verificado. **Exige `tokenVerificacion`**, y el `correo` debe ser el mismo que se
+verificó.
+```json
+// Request — comprador
 {
+  "tokenVerificacion": "9f2c4e...",
   "nombre": "Carlos Ramírez",
   "correo": "carlos@boticompara.nissidev.dev",
   "password": "Boti2026!",
@@ -92,15 +179,94 @@ Crea un comprador o un dueño de botica.
 }
 ```
 ```json
-// 201 Created
-{ "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev", "rol": "COMPRADOR" }
+// Request — dueño: la botica va en el mismo cuerpo (mismos campos que POST /boticas)
+{
+  "tokenVerificacion": "9f2c4e...",
+  "nombre": "Rosa Quispe",
+  "correo": "rosa@boticompara.nissidev.dev",
+  "password": "Boti2026!",
+  "telefono": "987654321",
+  "rol": "DUENO_BOTICA",
+  "botica": {
+    "nombreComercial": "Botica Salud Total",
+    "ruc": "20601234565",
+    "razonSocial": "Salud Total Farma S.A.C.",
+    "direccion": "Av. Lima Sur 450",
+    "distrito": "Lurigancho-Chosica",
+    "telefono": "014567890",
+    "latitud": -11.942500,
+    "longitud": -76.699000
+  }
+}
 ```
-Validaciones: correo con formato válido, password de mínimo 8 caracteres, `rol` = `COMPRADOR` o `DUENO_BOTICA`. Nunca se piden datos de salud (H21).
-Tras el registro se envía un correo con un enlace de verificación (H20). El login **no** exige tener el correo verificado, pero el comprador lo necesita para usar el asistente (`POST /chat`) y para reservar (`POST /reservas`).
+```json
+// 201 Created — el mismo JSON que POST /auth/login (la sesión ya queda abierta)
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "tipo": "Bearer",
+  "usuario": { "id": 4, "nombre": "Carlos Ramírez", "correo": "carlos@boticompara.nissidev.dev", "rol": "COMPRADOR" }
+}
+```
+- Validaciones de la cuenta: `nombre` obligatorio (máx. 100), correo con formato válido, password de 8 a 72
+  caracteres, `rol` = `COMPRADOR` o `DUENO_BOTICA`. Nunca se piden datos de salud (H21).
+- `COMPRADOR`: no lleva `botica` (si la trae → 400 "Un comprador no registra botica"). Se crea con
+  `correoVerificado = true`.
+- `DUENO_BOTICA`: `botica` es **obligatoria** (si falta → 400 "Faltan los datos de la botica"), con las mismas
+  validaciones y reglas que `POST /boticas`: RUC válido y consultado en SUNAT (H2), el 409 de A5 (RUC de una botica ya
+  `APROBADO`), el titular de un RUC `10` o `15` (A7, con el `nombre` de este mismo cuerpo) y las coordenadas (H3).
+  La consulta a SUNAT cuenta en los límites **por token** (ver `validar-ruc` de arriba) y en el tope global; pasado un
+  límite se usa la validación local, igual que en `POST /boticas`.
+- **Una sola transacción:** cuenta y botica (`PENDIENTE`, sin licencia) se guardan juntas. Si la botica falla, no se
+  crea la cuenta y **el token sigue sirviendo** (mientras no venza) para corregir los datos y volver a enviar.
+- El token se gasta solo cuando la cuenta se crea. Dos envíos a la vez con el mismo token: uno crea la cuenta y el otro
+  recibe 400.
+- Ya no se envía ningún correo al registrarse (el enlace de H20 se reemplazó por el código), así que este endpoint ya no
+  tiene límite por IP: el límite está en `POST /auth/registro/codigo`.
 
-**Límite por IP:** como máximo 5 registros por hora desde la misma IP (`auth.limite.registro-por-ip-hora`), porque cada registro envía un correo y el plan de correo tiene 100 envíos al día. Solo cuentan los registros creados: un 400 o un 409 no gastan el límite. Al pasarlo → 429 con el header `Retry-After` y el mensaje "Hiciste demasiados registros desde esta conexión. Intenta más tarde". La IP se toma igual que en el login.
+Errores: 400 (validación; falta `tokenVerificacion`; token inválido, vencido, ya usado o de otro correo → "Tu
+verificación del correo venció. Vuelve a pedir un código"; botica faltante o sobrante; reglas del RUC; A7;
+coordenadas), 409 (correo ya registrado; RUC de una botica aprobada).
 
-Errores: 400, 409 (correo ya registrado), 429 (límite por IP).
+### Cuentas que ya existían sin verificar — H20
+Las cuentas con contraseña creadas antes de este cambio pueden tener `correoVerificado = false`. Desde ahora el login se
+lo exige (ver `POST /auth/login`, 403 `CORREO_NO_VERIFICADO`), y estos dos endpoints permiten verificarlo sin quedar
+bloqueado. Sirven igual para compradores y dueños.
+
+#### `POST /auth/verificacion/codigo`
+```json
+// Request
+{ "correo": "lucia@boticompara.nissidev.dev" }
+```
+```json
+// 200 OK — siempre, exista o no la cuenta
+{ "mensaje": "Si el correo tiene una cuenta sin verificar, te enviamos un código" }
+```
+- Solo se envía el código si el correo es de una cuenta activa, con contraseña y sin verificar. Mismo código de 6
+  dígitos, 15 minutos y 5 intentos que en el registro.
+- **Siempre 200**, para no revelar qué correos existen ni cuáles están verificados. Por correo, si pasó menos de 60 s
+  desde el último código o ya se enviaron 5 en la hora, no se envía otro (y la respuesta sigue siendo 200).
+- **Por IP:** como máximo 5 solicitudes por hora (`auth.limite.verificacion-por-ip-hora`). Cuentan todas, exista o no
+  el correo, como en `POST /auth/recuperar`. Al pasarlo → 429 con `Retry-After` y el mensaje "Hiciste demasiadas
+  solicitudes desde esta conexión. Intenta más tarde".
+
+Errores: 400 (falta `correo`), 429 (límite por IP).
+
+#### `POST /auth/verificacion/confirmar`
+```json
+// Request
+{ "correo": "lucia@boticompara.nissidev.dev", "codigo": "483920" }
+```
+```json
+// 200 OK
+{ "mensaje": "Correo verificado. Ya puedes iniciar sesión" }
+```
+Marca `correoVerificado = true`. No abre sesión: la web o la app repiten `POST /auth/login` con la contraseña que el
+usuario acaba de escribir. Mismas reglas de intentos que `POST /auth/registro/verificar`.
+Errores: 400 (faltan campos, código sin 6 dígitos, o "El código no es válido o venció. Pide uno nuevo" para cualquier
+código que no sirva, exista o no la cuenta).
+
+Además, restablecer la contraseña con el código de `POST /auth/recuperar` también deja el correo verificado: ese código
+llegó al mismo correo.
 
 ### `POST /auth/login` — H18
 ```json
@@ -120,6 +286,11 @@ El token dura 24 h. Errores:
 - **400:** falta `correo` o `password`, o vienen vacíos (S4-13). Mensaje "El correo es obligatorio" o "La contraseña es obligatoria" (los dos, separados por "; ", si faltan ambos). No cuenta como intento fallido.
 - **401:** correo o contraseña incorrectos, o cuenta sin contraseña (creada con Google). Es el mismo mensaje en todos los casos, para no revelar qué correos existen.
 - **403:** cuenta dada de baja o suspendida, **solo si la contraseña es correcta**. Responde "Tu cuenta fue dada de baja" o "Tu cuenta está suspendida hasta el dd/MM/yyyy" (fecha en hora de Lima). Sin contraseña correcta no se revela el estado de la cuenta.
+- **403 `CORREO_NO_VERIFICADO`** (H20): la contraseña es correcta, la cuenta está activa y no suspendida, pero el correo no está verificado (cuentas creadas antes del registro con código). Es el único error que trae el campo `codigo`, para que la web y la app lo reconozcan sin comparar textos:
+  ```json
+  { "status": 403, "error": "Forbidden", "mensaje": "Verifica tu correo para entrar", "codigo": "CORREO_NO_VERIFICADO", "timestamp": "2026-11-26T21:30:00Z" }
+  ```
+  La web o la app llevan al usuario a `POST /auth/verificacion/codigo` y `POST /auth/verificacion/confirmar` (arriba), y luego repiten el login. No cuenta como intento fallido.
 - **429:** demasiados intentos fallidos. Se cuenta por correo e IP: 5 contraseñas incorrectas en 15 minutos bloquean nuevos intentos de ese correo desde esa IP durante 15 minutos. Responde con el header `Retry-After` (segundos restantes) y el mensaje "Demasiados intentos fallidos. Espera 15 minutos". Un login correcto limpia el contador de ese correo e IP.
 
 En Render la IP se toma de la cabecera `CF-Connecting-IP`, que pone Cloudflare con la IP real del cliente (`SERVER_TOMCAT_REMOTEIP_REMOTEIPHEADER`, ver `docs/despliegue/render.md`, sección 7). Sin proxy, por ejemplo en local, se usa la IP de conexión.
@@ -152,12 +323,14 @@ Errores: 400 (falta el campo `correo`), 429 (límite por IP).
 El código de 6 dígitos no es único entre usuarios, por eso se envía junto con el `correo`. Cada intento con un código incorrecto se cuenta; al quinto, el código queda invalidado y hay que pedir uno nuevo con `POST /auth/recuperar`. Al restablecer, los demás códigos pendientes de ese usuario quedan invalidados.
 Errores: 400 (código inválido, vencido, ya usado o invalidado; o password de menos de 8 caracteres). El mensaje es el mismo en todos los casos de código inválido, para no revelar si el correo existe.
 
-### `GET /auth/verificar?token=...` — H20
-Es el enlace que llega por correo al registrarse. No requiere sesión. **Responde una página HTML, no JSON**, para que se pueda abrir en cualquier navegador.
+### `GET /auth/verificar?token=...` — H20 (obsoleto)
+Era el enlace que llegaba por correo al registrarse. **Ya no se envía**: el registro usa el código de 6 dígitos. Sigue
+funcionando solo para los enlaces que ya se enviaron (vencen a las 48 horas de enviados), así nadie que tenga uno en su
+bandeja queda a medias. No requiere sesión. **Responde una página HTML, no JSON**.
 - 200: página "Correo verificado". Marca `correoVerificado = true`.
 - 400: página "El enlace no es válido o ya venció".
 
-El token vence a las 48 horas.
+Se puede retirar en un PR posterior, cuando hayan pasado 48 horas desde el despliegue de este cambio.
 
 ---
 
@@ -170,7 +343,7 @@ El token vence a las 48 horas.
   "telefono": "954321098", "direccion": "Av. Lima 123, Chosica", "rol": "COMPRADOR",
   "correoVerificado": true, "notificacionesPrecio": true }
 ```
-`correoVerificado` (D5): `true` si el usuario ya abrió el enlace de verificación del correo (H20). El login no lo exige.
+`correoVerificado` (D5): `true` si el correo está verificado (H20). Toda cuenta nueva nace verificada (código en el registro o Google). Las cuentas antiguas con `false` no pueden iniciar sesión hasta verificarlo (403 `CORREO_NO_VERIFICADO` del login).
 `notificacionesPrecio` (H66): `true` si el usuario quiere recibir alertas de baja de precio. Por defecto `true`.
 
 ### `PUT /usuarios/me` 🔒 — H16
@@ -214,7 +387,7 @@ Respuesta: 204 sin cuerpo. El token usado deja de ser válido (las siguientes ll
 ## 3. Botica (rol `DUENO_BOTICA`)
 
 ### `GET /boticas/validar-ruc/{ruc}` 🔒 — H2
-Requiere sesión de `DUENO_BOTICA`: sin token → 401; con otro rol → 403. La web lo usa al registrar o corregir la botica, cuando la cuenta ya existe.
+Requiere sesión de `DUENO_BOTICA`: sin token → 401; con otro rol → 403. La web lo usa al corregir la botica, cuando la cuenta ya existe. Durante el registro, cuando la cuenta todavía no existe, se usa `POST /auth/registro/validar-ruc` con el `tokenVerificacion` (sección 1).
 
 Primero valida el formato y el dígito verificador. Si pasan, consulta el RUC en SUNAT (servicio Decolecta) para obtener la razón social, el estado y la condición. La web lo usa para avisar mientras se escribe y para mostrar la razón social.
 ```json
@@ -250,7 +423,7 @@ Errores: 401 (sin token), 403 (el rol no es `DUENO_BOTICA`), 429 (límite por us
 4. El resultado debe ser igual al dígito 11.
 
 ### `POST /boticas` 🔒 — H1, H2, H3
-Registra la botica del dueño logueado. Queda en estado `PENDIENTE`.
+Registra la botica del dueño logueado. Queda en estado `PENDIENTE`. Los dueños nuevos ya la registran dentro de `POST /auth/registro` (sección 1); este endpoint queda para las cuentas de dueño que ya existían sin botica.
 El RUC se verifica igual que en `validar-ruc` y la consulta a SUNAT cuenta en los mismos límites (ver arriba). Si SUNAT responde, se guarda su razón social (reemplaza la enviada); si no responde o se llegó a un límite, se guarda la enviada.
 ```json
 // Request
