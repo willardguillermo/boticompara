@@ -44,6 +44,9 @@ async function solicitar(metodo, ruta, cuerpo, { signal } = {}) {
       error: datos?.error ?? respuesta.statusText,
       mensaje: datos?.mensaje ?? MENSAJE_INESPERADO,
       timestamp: datos?.timestamp,
+      codigo: datos?.codigo ?? null,
+      // Solo se puede leer si el backend lo expone por CORS (Access-Control-Expose-Headers)
+      retryAfter: respuesta.headers.get('Retry-After'),
     })
   }
   return datos
@@ -52,7 +55,18 @@ async function solicitar(metodo, ruta, cuerpo, { signal } = {}) {
 export const apiReal = {
   // 1. Autenticación
   login: (credenciales) => solicitar('POST', '/auth/login', credenciales),
+  // H20: registro con el correo verificado. El código y el token van solo en el cuerpo, nunca en la URL
+  pedirCodigoRegistro: (correo) => solicitar('POST', '/auth/registro/codigo', { correo: correo.trim().toLowerCase() }),
+  verificarCodigoRegistro: ({ correo, codigo }) =>
+    solicitar('POST', '/auth/registro/verificar', { correo: correo.trim().toLowerCase(), codigo }),
+  validarRucRegistro: ({ tokenVerificacion, ruc }) =>
+    solicitar('POST', '/auth/registro/validar-ruc', { tokenVerificacion, ruc }),
   registro: (datos) => solicitar('POST', '/auth/registro', datos),
+  // H20: cuentas que ya existían sin verificar (403 CORREO_NO_VERIFICADO del login)
+  pedirCodigoVerificacion: (correo) =>
+    solicitar('POST', '/auth/verificacion/codigo', { correo: correo.trim().toLowerCase() }),
+  confirmarVerificacion: ({ correo, codigo }) =>
+    solicitar('POST', '/auth/verificacion/confirmar', { correo: correo.trim().toLowerCase(), codigo }),
   // H17: el código y la contraseña van solo en el cuerpo, nunca en la URL
   recuperarPassword: (correo) => solicitar('POST', '/auth/recuperar', { correo: correo.trim() }),
   restablecerPassword: ({ correo, token, password }) =>

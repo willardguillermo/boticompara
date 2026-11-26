@@ -113,3 +113,49 @@ test('vencerActivas: una reserva ya VENCIDA no se vuelve a contar (H84)', () => 
   const ya = reserva(1, 'VENCIDA', AHORA - DIA)
   assert.deepEqual(vencerActivas([ya], AHORA), [])
 })
+
+// H20: registro con el correo verificado y cuentas antiguas sin verificar (docs/API.md, sección 1)
+const { apiMock } = await import('./api.mock.js')
+const BOTICA_NUEVA = {
+  nombreComercial: 'Botica Sol', ruc: '20601030013', razonSocial: 'Rextie', direccion: 'Av. Sol 1',
+  distrito: 'Ate', telefono: null,
+}
+const cuentaNueva = (correo, tokenVerificacion, botica = BOTICA_NUEVA) => ({
+  tokenVerificacion, nombre: 'Ana Ruiz', correo, password: 'Clave2026!', telefono: null, rol: 'DUENO_BOTICA', botica,
+})
+
+test('registro: código, 429 con Retry-After al repetirlo, código incorrecto y cuenta creada (H20)', async () => {
+  const correo = 'ana.registro@ejemplo.test'
+  await apiMock.pedirCodigoRegistro(correo)
+  await assert.rejects(apiMock.pedirCodigoRegistro(correo), (e) => e.status === 429 && Number(e.retryAfter) > 0)
+  await assert.rejects(apiMock.verificarCodigoRegistro({ correo, codigo: '000000' }), (e) => e.status === 400)
+  const { tokenVerificacion } = await apiMock.verificarCodigoRegistro({ correo, codigo: '123456' })
+  assert.match(tokenVerificacion, /^[0-9a-f]{64}$/)
+
+  // Un RUC inválido no crea nada y el token sigue sirviendo
+  await assert.rejects(
+    apiMock.registro(cuentaNueva(correo, tokenVerificacion, { ...BOTICA_NUEVA, ruc: '20601030012' })),
+    (e) => e.status === 400 && /RUC/.test(e.mensaje),
+  )
+  const sesion = await apiMock.registro(cuentaNueva(correo, tokenVerificacion))
+  assert.equal(sesion.usuario.rol, 'DUENO_BOTICA')
+  assert.match(sesion.token, /^mock-token\./)
+  // El token sirve para una sola cuenta
+  await assert.rejects(apiMock.registro(cuentaNueva('otra@ejemplo.test', tokenVerificacion)), (e) => e.status === 400)
+})
+
+test('registro: sin token o con el de otro correo responde 400 (H20)', async () => {
+  await assert.rejects(apiMock.registro(cuentaNueva('x@ejemplo.test', undefined)), (e) => e.status === 400)
+  await assert.rejects(apiMock.registro(cuentaNueva('x@ejemplo.test', 'no-existe')), (e) => e.status === 400)
+})
+
+test('login: una cuenta sin verificar da 403 CORREO_NO_VERIFICADO y entra después de confirmar (H20)', async () => {
+  const credenciales = { correo: 'nora@ejemplo.test', password: 'Boti2026!' }
+  await assert.rejects(apiMock.login(credenciales), (e) => e.status === 403 && e.codigo === 'CORREO_NO_VERIFICADO')
+  // Con la contraseña incorrecta no se revela nada
+  await assert.rejects(apiMock.login({ ...credenciales, password: 'otra' }), (e) => e.status === 401 && !e.codigo)
+  await apiMock.pedirCodigoVerificacion(credenciales.correo)
+  await assert.rejects(apiMock.confirmarVerificacion({ correo: credenciales.correo, codigo: '111111' }), (e) => e.status === 400)
+  await apiMock.confirmarVerificacion({ correo: credenciales.correo, codigo: '123456' })
+  assert.equal((await apiMock.login(credenciales)).usuario.correo, credenciales.correo)
+})
