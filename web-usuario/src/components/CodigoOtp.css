@@ -1,0 +1,139 @@
+/* H17, H20: casillas del código (CodigoOtp), Soft UI verde azulado */
+.otp {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.otp-etiqueta {
+  font-weight: 600;
+}
+
+.otp-casillas {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 3.25rem));
+  gap: clamp(0.35rem, 1.6vw, 0.6rem);
+  /* Del ancho de las casillas, para que el check quede sobre la última */
+  justify-self: start;
+  max-width: 100%;
+}
+
+.otp-casilla {
+  width: 100%;
+  min-width: 0;
+  height: 3.5rem;
+  padding: 0;
+  border: 1px solid var(--color-borde-control);
+  border-radius: var(--radio);
+  background: var(--color-fondo);
+  box-shadow: var(--sombra-hundida);
+  color: var(--color-texto);
+  font: inherit;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  caret-color: var(--color-primario);
+  transition:
+    border-color 0.2s var(--curva),
+    box-shadow 0.25s var(--curva),
+    background-color 0.2s var(--curva);
+}
+
+/* Brillo en el foco; el contorno se queda para quien navega con teclado */
+.otp-casilla:focus-visible {
+  border-color: var(--color-primario);
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+  box-shadow:
+    var(--sombra-hundida),
+    0 0 16px color-mix(in srgb, var(--color-primario) 40%, transparent);
+}
+
+/* La casilla "se llena": un pequeño pulso al recibir el dígito */
+.otp-casilla[data-llena='true'] {
+  border-color: var(--color-primario);
+  background: var(--color-superficie-plana);
+  box-shadow: var(--sombra-elevada-suave);
+  animation: otp-llenar 0.22s var(--curva);
+}
+
+.otp-casilla:disabled {
+  border-color: var(--deshabilitado-borde);
+  background: var(--deshabilitado-fondo);
+  color: var(--deshabilitado-texto);
+}
+
+.otp-con-error .otp-casilla {
+  border-color: var(--error);
+  background: var(--error-campo);
+}
+
+.otp-validado .otp-casilla {
+  border-color: var(--exito);
+  background: var(--exito-fondo);
+  color: var(--exito);
+}
+
+.otp-check {
+  position: absolute;
+  top: -0.6rem;
+  right: -0.6rem;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--exito);
+  box-shadow: var(--sombra-elevada-suave);
+  color: var(--color-fondo);
+  animation: otp-check 0.35s var(--curva);
+}
+
+.otp-check svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.otp-error {
+  font-size: 0.85rem;
+  color: var(--error);
+}
+
+.otp-error:empty {
+  display: none;
+}
+
+@keyframes otp-llenar {
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+@keyframes otp-check {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .otp-casilla,
+  .otp-casilla[data-llena='true'],
+  .otp-check {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Bloque de verificación: reenviar y cambiar correo */
+.verificacion-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.verificacion-acciones .espera {
+  font-variant-numeric: tabular-nums;
+}
