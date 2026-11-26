@@ -35,20 +35,22 @@ export function AuthProvider({ children }) {
     return { esComprador: false, usuario: datos }
   }, [])
 
-  /** H1. Crea la cuenta del dueño y entra directamente. */
-  const registrarDueno = useCallback(
-    async ({ nombre, correo, password, telefono }) => {
-      await api.registro({
-        nombre: nombre.trim(),
-        correo: correo.trim().toLowerCase(),
-        password,
-        telefono: telefono.trim() || null,
-        rol: 'DUENO_BOTICA',
-      })
-      return iniciarSesion(correo, password)
-    },
-    [iniciarSesion],
-  )
+  /**
+   * H1, H20. Crea la cuenta y la botica (POST /auth/registro, con el correo ya verificado) y guarda la sesión
+   * que devuelve el 201. Todavía no la pasa al contexto: así el registro puede subir la licencia antes de que
+   * RutaPublica lo lleve al panel. Para entrar, llamar a entrar(usuario).
+   */
+  const registrarDueno = useCallback(async (cuerpo) => {
+    const { token, usuario: datos } = await api.registro(cuerpo)
+    guardarSesion(token, datos)
+    return datos
+  }, [])
+
+  /** Abre en la pantalla la sesión que ya se guardó (después del registro). */
+  const entrar = useCallback((datos) => {
+    setAviso('')
+    setUsuario(datos)
+  }, [])
 
   const cerrarSesion = useCallback(() => {
     borrarSesion()
@@ -79,8 +81,8 @@ export function AuthProvider({ children }) {
   )
 
   const valor = useMemo(
-    () => ({ usuario, aviso, iniciarSesion, registrarDueno, cerrarSesion, actualizarUsuario, salirConAviso }),
-    [usuario, aviso, iniciarSesion, registrarDueno, cerrarSesion, actualizarUsuario, salirConAviso],
+    () => ({ usuario, aviso, iniciarSesion, registrarDueno, entrar, cerrarSesion, actualizarUsuario, salirConAviso }),
+    [usuario, aviso, iniciarSesion, registrarDueno, entrar, cerrarSesion, actualizarUsuario, salirConAviso],
   )
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>
 }

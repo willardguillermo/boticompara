@@ -11,14 +11,24 @@ const PASOS = [
 ]
 
 /**
+ * pasos: la lista de pasos ({ titulo, descripcion, hecho }); por defecto, la del registro de la botica de una
+ * cuenta que ya existía. esVisitable(numero): qué pasos hechos se pueden clicar (por defecto, todos menos el 1).
  * paso: el paso actual (1 a 5), o 6 para la pantalla final, con los 5 pasos hechos.
  * children: el contenido del paso. pie: los botones del pie (opcional).
  * onIrAPaso(numero): si se pasa, los pasos hechos se pueden clicar para volver a ellos,
  * salvo el paso 1, porque la cuenta ya existe.
  * descripciones: textos que reemplazan la descripción de un paso, por número ({ 4: '...' }).
  */
-export default function RegistroPasos({ paso, pie, onIrAPaso, descripciones, children }) {
-  const final = paso > PASOS.length
+export default function RegistroPasos({
+  paso,
+  pie,
+  onIrAPaso,
+  descripciones,
+  pasos = PASOS,
+  esVisitable = (numero) => numero > 1,
+  children,
+}) {
+  const final = paso > pasos.length
   const lista = useRef(null)
 
   // En celular la lista es una fila con scroll: se desplaza (solo en horizontal) hasta el paso actual
@@ -35,10 +45,10 @@ export default function RegistroPasos({ paso, pie, onIrAPaso, descripciones, chi
         <p className="pasos-titulo">Registro de botica</p>
         <p className="pasos-duracion">Toma unos 5 minutos</p>
         <ol ref={lista} className="pasos-lista">
-          {PASOS.map(({ titulo, descripcion, hecho }, i) => {
+          {pasos.map(({ titulo, descripcion, hecho }, i) => {
             const numero = i + 1
             const estado = numero < paso ? 'hecho' : numero === paso ? 'actual' : 'pendiente'
-            const visitable = Boolean(onIrAPaso) && estado === 'hecho' && numero > 1
+            const visitable = Boolean(onIrAPaso) && estado === 'hecho' && esVisitable(numero)
             return (
               <li key={titulo}>
                 <button
@@ -66,10 +76,14 @@ export default function RegistroPasos({ paso, pie, onIrAPaso, descripciones, chi
 
       <section className="pasos-tarjeta">
         <div className="pasos-barra" aria-hidden="true">
-          <div style={{ width: `${Math.min(paso, PASOS.length) * 20}%` }} />
+          <div style={{ width: `${(Math.min(paso, pasos.length) / pasos.length) * 100}%` }} />
         </div>
         <div className="pasos-cuerpo">
-          {!final && <p className="pasos-contador">Paso {paso} de 5</p>}
+          {!final && (
+            <p className="pasos-contador">
+              Paso {paso} de {pasos.length}
+            </p>
+          )}
           {/* La key hace que el contenido entre con un fundido al cambiar de paso */}
           <div key={paso} className="pasos-contenido">
             {children}
