@@ -544,6 +544,59 @@ end
 $$;
 
 -- ---------------------------------------------------------------------
+-- CODIGO_CORREO (H1, H20): códigos de 6 dígitos que verifican el correo
+-- ANTES de crear la cuenta (REGISTRO) o de una cuenta antigua sin verificar
+-- (VERIFICACION). Sin llave foránea: en el registro la cuenta aún no existe.
+-- Solo hashes (HMAC-SHA256). La API borra cada hora las filas de más de un
+-- día. En la BD que ya existe se agregó con v9_verificacion_correo.sql.
+-- ---------------------------------------------------------------------
+create table if not exists codigo_correo (
+  id              bigserial primary key,
+  correo          varchar(150)  not null,
+  proposito       varchar(20)   not null,
+  codigo_hash     varchar(64)   not null,
+  intentos        smallint      not null default 0,
+  vence_en        timestamptz   not null,
+  verificado_en   timestamptz,
+  token_hash      varchar(64),
+  token_vence_en  timestamptz,
+  usado_en        timestamptz,
+  anulado         boolean       not null default false,
+  creado_en       timestamptz   not null default now(),
+  constraint chk_codigo_correo_proposito
+    check (proposito in ('REGISTRO', 'VERIFICACION')),
+  constraint chk_codigo_correo_minusculas
+    check (correo = lower(btrim(correo))),
+  constraint chk_codigo_correo_intentos
+    check (intentos between 0 and 5),
+  constraint chk_codigo_correo_token
+    check ((token_hash is null) = (token_vence_en is null)
+           and (token_hash is null or (proposito = 'REGISTRO' and verificado_en is not null)))
+);
+
+create index if not exists idx_codigo_correo_correo
+  on codigo_correo(correo, proposito, creado_en desc);
+create unique index if not exists uq_codigo_correo_token
+  on codigo_correo(token_hash) where token_hash is not null;
+create index if not exists idx_codigo_correo_creado
+  on codigo_correo(creado_en);
+
+alter table codigo_correo enable row level security;
+revoke all on codigo_correo from anon, authenticated;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'boticompara_app') then
+    grant select, insert, update, delete on codigo_correo to boticompara_app;
+    grant usage, select on sequence codigo_correo_id_seq to boticompara_app;
+    drop policy if exists app_acceso_total on codigo_correo;
+    create policy app_acceso_total on codigo_correo
+      for all to boticompara_app using (true) with check (true);
+  end if;
+end
+$$;
+
+-- ---------------------------------------------------------------------
 -- SEGURIDAD DEL CATÁLOGO MAESTRO (H29-H32): mismo esquema que token_usuario.
 -- RLS activado, sin acceso para la API automática de Supabase y política
 -- app_acceso_total solo para boticompara_app (si el rol ya existe).
