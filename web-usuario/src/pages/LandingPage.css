@@ -1308,6 +1308,9 @@ html:has(.landing) {
 }
 
 .lp-stack li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.45rem 1rem;
   border: 1px solid var(--lp-borde-tarjeta);
   border-radius: 999px;
@@ -1321,6 +1324,18 @@ html:has(.landing) {
 .lp-stack li:hover {
   color: var(--color-primario);
   transform: translateY(-2px);
+}
+
+/* Logo de Simple Icons: color de marca; en oscuro, los de bajo contraste toman el color del texto */
+.lp-logo-stack {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: var(--lp-logo-color);
+}
+
+:root[data-tema='oscuro'] .lp-logo-stack-texto {
+  fill: var(--color-texto);
 }
 
 /* ---------- 7. Cierre y pie ---------- */

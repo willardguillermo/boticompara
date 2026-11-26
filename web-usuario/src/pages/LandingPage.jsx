@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router'
 import ComparadorHero from '../components/landing/ComparadorHero.jsx'
+import LogoStack from '../components/landing/LogosStack.jsx'
 import NavLanding from '../components/landing/NavLanding.jsx'
 import Icono from '../components/Icono.jsx'
 import Marca from '../components/Marca.jsx'
@@ -386,7 +387,10 @@ export default function LandingPage() {
             </ul>
             <ul className="lp-stack revelar" aria-label="Tecnologías">
               {STACK.map((t) => (
-                <li key={t}>{t}</li>
+                <li key={t}>
+                  <LogoStack tecnologia={t} />
+                  {t}
+                </li>
               ))}
             </ul>
           </div>
