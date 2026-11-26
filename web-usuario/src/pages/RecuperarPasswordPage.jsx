@@ -1,13 +1,15 @@
 // H17 - Recuperar la contraseña del dueño de botica (docs/API.md, /auth/recuperar y /auth/restablecer)
 // El código y la contraseña solo viven en el estado del componente: nunca en localStorage ni en la URL.
+// H20: el código se escribe en las 6 casillas de CodigoOtp (pegar el código completo lo reparte).
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Campo from '../components/Campo.jsx'
+import CodigoOtp from '../components/CodigoOtp.jsx'
 import Marca from '../components/Marca.jsx'
 import SpotlightCard from '../components/reactbits/SpotlightCard.jsx'
 import { MODO_SIMULADO, api } from '../services/index.js'
-import { LARGO_CODIGO, MIN_PASSWORD, limpiarCodigo, validarCorreoRecuperacion, validarRestablecer } from '../utils/recuperacion.js'
+import { LARGO_CODIGO, MIN_PASSWORD, validarCorreoRecuperacion, validarRestablecer } from '../utils/recuperacion.js'
 import { propsError } from '../utils/validacion.js'
 
 const AVISO_PASSWORD_ACTUALIZADA = 'Contraseña actualizada, ingresa con tu nueva contraseña.'
@@ -21,6 +23,8 @@ export default function RecuperarPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmacion, setConfirmacion] = useState('')
   const [errores, setErrores] = useState({})
+  // Cambia con cada código rechazado: CodigoOtp se sacude y vuelve a la primera casilla
+  const [sacudir, setSacudir] = useState(0)
   const [error, setError] = useState('')
   // Siempre el mensaje que manda el servidor, para no revelar si el correo existe
   const [mensaje, setMensaje] = useState('')
@@ -75,17 +79,27 @@ export default function RecuperarPasswordPage() {
 
   async function restablecer(e) {
     e.preventDefault()
-    const nuevos = validarRestablecer({ codigo, password, confirmacion })
+    // Una casilla vacía en el medio es un espacio: sin él, el código queda incompleto y lo dice la validación
+    const limpio = codigo.replace(/\s/g, '')
+    const nuevos = validarRestablecer({ codigo: limpio, password, confirmacion })
     setErrores(nuevos)
     setError('')
+    if (nuevos.codigo) setSacudir((n) => n + 1)
     if (Object.keys(nuevos).length) return
 
     setEnviando(true)
     try {
-      await api.restablecerPassword({ correo, token: codigo, password })
+      await api.restablecerPassword({ correo, token: limpio, password })
       navigate('/login', { replace: true, state: { exito: AVISO_PASSWORD_ACTUALIZADA, correo: correo.trim() } })
     } catch (err) {
-      setError(err.mensaje ?? 'No se pudo actualizar la contraseña.')
+      // El 400 del código (inválido, vencido o usado) va bajo las casillas; lo demás, arriba
+      if (err.status === 400 && /c[oó]digo/i.test(err.mensaje ?? '')) {
+        setErrores({ codigo: err.mensaje })
+        setCodigo('')
+        setSacudir((n) => n + 1)
+      } else {
+        setError(err.mensaje ?? 'No se pudo actualizar la contraseña.')
+      }
       setEnviando(false)
     }
   }
@@ -132,21 +146,16 @@ export default function RecuperarPasswordPage() {
               <Alerta tipo="info">{mensaje && <p>{mensaje}</p>}</Alerta>
               <Alerta tipo="error">{error && <p>{error}</p>}</Alerta>
 
-              <Campo id="codigo" etiqueta="Código de verificación" error={errores.codigo}>
-                <input
-                  {...propsError('codigo', errores.codigo)}
-                  className="input-codigo"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]*"
-                  maxLength={LARGO_CODIGO}
-                  value={codigo}
-                  onChange={(e) => setCodigo(limpiarCodigo(e.target.value))}
-                  placeholder="000000"
-                  autoFocus
-                />
-              </Campo>
+              <CodigoOtp
+                valor={codigo}
+                onCambio={(nuevo) => {
+                  setCodigo(nuevo)
+                  setErrores((er) => ({ ...er, codigo: undefined }))
+                }}
+                error={errores.codigo}
+                sacudir={sacudir}
+                autoFocus
+              />
               <Campo
                 id="password"
                 etiqueta="Nueva contraseña"
