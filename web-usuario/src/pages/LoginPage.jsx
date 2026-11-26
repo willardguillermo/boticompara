@@ -1,4 +1,7 @@
 // H18 - Inicio de sesión del dueño de botica
+// H20 - Si la cuenta es anterior al registro con código, el login responde 403 CORREO_NO_VERIFICADO: se envía un
+//       código (/auth/verificacion/codigo), se pide con CodigoOtp (/auth/verificacion/confirmar) y se repite el login
+//       con la contraseña que ya escribió (solo en memoria, en el estado de esta pantalla).
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
@@ -6,9 +9,14 @@ import AvisoSoloMovil from '../components/AvisoSoloMovil.jsx'
 import Campo from '../components/Campo.jsx'
 import Marca from '../components/Marca.jsx'
 import SpotlightCard from '../components/reactbits/SpotlightCard.jsx'
+import VerificacionCorreo from '../components/VerificacionCorreo.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import { MODO_SIMULADO } from '../services/index.js'
+import useCuentaRegresiva from '../hooks/useCuentaRegresiva.js'
+import { MODO_SIMULADO, api } from '../services/index.js'
+import { ESPERA_POR_DEFECTO, segundosDeEspera } from '../utils/cuentaRegresiva.js'
 import { propsError } from '../utils/validacion.js'
+
+const CORREO_NO_VERIFICADO = 'CORREO_NO_VERIFICADO'
 
 export default function LoginPage() {
   const { iniciarSesion, aviso } = useAuth()
@@ -22,6 +30,30 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [comprador, setComprador] = useState(null)
   const [enviando, setEnviando] = useState(false)
+  // H20: el correo no está verificado; { mensaje } del 403 mientras se pide el código
+  const [verificacion, setVerificacion] = useState(null)
+  const espera = useCuentaRegresiva()
+
+  async function entrar() {
+    const resultado = await iniciarSesion(correo, password)
+    if (resultado.esComprador) {
+      setComprador(resultado.usuario)
+      setPassword('')
+    } else {
+      navigate(state?.desde ?? '/panel', { replace: true })
+    }
+  }
+
+  /** Pide el código de verificación; un 429 se muestra con su espera, sin salir de la pantalla del código. */
+  async function pedirCodigo() {
+    try {
+      await api.pedirCodigoVerificacion(correo)
+      espera.iniciar(ESPERA_POR_DEFECTO)
+    } catch (err) {
+      if (err.status === 429) espera.iniciar(segundosDeEspera(err.retryAfter))
+      throw err
+    }
+  }
 
   async function enviar(e) {
     e.preventDefault()
@@ -34,18 +66,27 @@ export default function LoginPage() {
 
     setEnviando(true)
     try {
-      const resultado = await iniciarSesion(correo, password)
-      if (resultado.esComprador) {
-        setComprador(resultado.usuario)
-        setPassword('')
-      } else {
-        navigate(state?.desde ?? '/panel', { replace: true })
-      }
+      await entrar()
     } catch (err) {
-      setError(err.mensaje ?? 'No se pudo iniciar sesión.')
+      if (err.status === 403 && err.codigo === CORREO_NO_VERIFICADO) {
+        let aviso = ''
+        try {
+          await pedirCodigo()
+        } catch (errCodigo) {
+          aviso = errCodigo.mensaje ?? 'No se pudo enviar el código. Usa «Reenviar código».'
+        }
+        setVerificacion({ mensaje: err.mensaje ?? 'Verifica tu correo para entrar', aviso })
+      } else {
+        setError(err.mensaje ?? 'No se pudo iniciar sesión.')
+      }
     } finally {
       setEnviando(false)
     }
+  }
+
+  function volverAlLogin() {
+    setVerificacion(null)
+    setError('')
   }
 
   return (
@@ -55,6 +96,41 @@ export default function LoginPage() {
         <Marca a="/login" degradado />
         {comprador ? (
           <AvisoSoloMovil nombre={comprador.nombre} onVolver={() => setComprador(null)} />
+        ) : verificacion ? (
+          <>
+            <h1>{verificacion.mensaje}</h1>
+            <p className="texto-suave">
+              Tu cuenta es anterior a la verificación por código. Te enviamos uno a{' '}
+              <strong className="correo-recuperacion">{correo.trim()}</strong>; vence en 15 minutos.
+            </p>
+            <Alerta tipo="error">{verificacion.aviso && <p>{verificacion.aviso}</p>}</Alerta>
+            <VerificacionCorreo
+              espera={espera}
+              onVerificar={(codigo) => api.confirmarVerificacion({ correo, codigo })}
+              // Correo verificado: se repite el login con la contraseña que ya escribió
+              onVerificado={async () => {
+                try {
+                  await entrar()
+                } catch (err) {
+                  setVerificacion(null)
+                  setError(err.mensaje ?? 'No se pudo iniciar sesión.')
+                }
+              }}
+              onReenviar={() => api.pedirCodigoVerificacion(correo)}
+              onCambiarCorreo={volverAlLogin}
+              textoCambiar="Volver al inicio de sesión"
+              textoBoton="Verificar y entrar"
+            />
+            {import.meta.env.DEV && MODO_SIMULADO && (
+              <div className="datos-prueba">
+                <Alerta tipo="info">
+                  <p>
+                    <strong>Modo simulado.</strong> El código válido es <code>123456</code>.
+                  </p>
+                </Alerta>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <h1>Panel de botica</h1>
@@ -113,8 +189,8 @@ export default function LoginPage() {
                 <Alerta tipo="info">
                   <p>
                     <strong>Modo simulado.</strong> Prueba con <code>rosa@boticompara.nissidev.dev</code>{' '}
-                    (aprobada) o <code>lucia@boticompara.nissidev.dev</code> (rechazada), contraseña{' '}
-                    <code>Boti2026!</code>
+                    (aprobada), <code>lucia@boticompara.nissidev.dev</code> (rechazada) o{' '}
+                    <code>nora@ejemplo.test</code> (correo sin verificar), contraseña <code>Boti2026!</code>
                   </p>
                 </Alerta>
               </div>
