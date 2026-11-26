@@ -1,11 +1,20 @@
 package com.boticompara.usuario.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+/**
+ * H1, H15, H20: POST /auth/registro. Exige el tokenVerificacion de POST /auth/registro/verificar. El dueño envía
+ * además su botica (mismos campos y validaciones que POST /boticas); el comprador no.
+ */
 public record RegistroRequest(
+        @NotBlank(message = "Falta el token de verificación")
+        @Size(max = 100, message = "El token de verificación no es válido")
+        String tokenVerificacion,
+
         @NotBlank(message = "El nombre es obligatorio")
         @Size(max = 100, message = "El nombre admite máximo 100 caracteres")
         String nombre,
@@ -24,6 +33,9 @@ public record RegistroRequest(
 
         @NotBlank(message = "El rol es obligatorio")
         @Pattern(regexp = "COMPRADOR|DUENO_BOTICA", message = "El rol debe ser COMPRADOR o DUENO_BOTICA")
-        String rol
+        String rol,
+
+        @Valid
+        BoticaRequest botica
 ) {
 }

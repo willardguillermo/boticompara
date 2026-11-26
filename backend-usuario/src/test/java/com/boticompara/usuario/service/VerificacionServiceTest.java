@@ -1,6 +1,10 @@
 package com.boticompara.usuario.service;
 
+import com.boticompara.usuario.entity.CodigoCorreo;
+import com.boticompara.usuario.entity.CodigoCorreo.Proposito;
 import com.boticompara.usuario.entity.TokenUsuario;
+import com.boticompara.usuario.error.ApiException;
+import com.boticompara.usuario.limite.LimiteExcedidoException;
 import com.boticompara.usuario.entity.Usuario;
 import com.boticompara.usuario.repository.TokenUsuarioRepository;
 import com.boticompara.usuario.repository.UsuarioRepository;
@@ -14,13 +18,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -44,12 +46,14 @@ class VerificacionServiceTest {
     @Mock
     CorreoService correo;
 
+    @Mock
+    CodigoCorreoService codigos;
+
     VerificacionService service;
 
     @BeforeEach
     void preparar() {
-        // La barra final de la URL base se ignora a propósito
-        service = new VerificacionService(usuarios, tokens, correo, SECRETO, "http://localhost:8080/api/");
+        service = new VerificacionService(usuarios, tokens, correo, codigos, SECRETO);
     }
 
     private Usuario usuario(boolean activo, boolean verificado) {
@@ -80,63 +84,79 @@ class VerificacionServiceTest {
         when(tokens.findByTokenAndTipo(service.hash(token), "VERIFICACION")).thenReturn(Optional.of(t));
     }
 
-    // ---------- enviarAlRegistrarse ----------
+    // ---------- enviarCodigo (POST /auth/verificacion/codigo) ----------
+
+    private Usuario conClave(Usuario u) {
+        u.setPasswordHash("$2a$10$hash");
+        return u;
+    }
 
     @Test
-    void enviarGuardaElTokenHasheadoYMandaElEnlace() {
-        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true, false)));
+    void enviarCodigoACuentaSinVerificarMandaElCodigo() {
+        when(usuarios.findByCorreoIgnoreCase("ana@correo.com")).thenReturn(Optional.of(conClave(usuario(true, false))));
+        when(codigos.emitir("ana@correo.com", Proposito.VERIFICACION)).thenReturn("123456");
 
-        service.enviarAlRegistrarse(10L);
+        service.enviarCodigo("  Ana@Correo.com ");
 
-        ArgumentCaptor<TokenUsuario> guardado = ArgumentCaptor.forClass(TokenUsuario.class);
-        verify(tokens).save(guardado.capture());
         ArgumentCaptor<String> texto = ArgumentCaptor.forClass(String.class);
         verify(correo).enviar(eq("ana@correo.com"), anyString(), texto.capture());
-
-        Matcher m = Pattern.compile("http://localhost:8080/api/auth/verificar\\?token=([0-9a-f]{64})")
-                .matcher(texto.getValue());
-        assertTrue(m.find());
-        String token = m.group(1);
-
-        TokenUsuario t = guardado.getValue();
-        assertEquals(10L, t.getUsuarioId());
-        assertEquals("VERIFICACION", t.getTipo());
-        assertFalse(t.isUsado());
-        assertEquals(service.hash(token), t.getToken());
-        assertNotEquals(token, t.getToken());
-        assertTrue(t.getExpiraEn().isAfter(enHoras(47)));
-        assertTrue(t.getExpiraEn().isBefore(enHoras(49)));
-        assertTrue(texto.getValue().contains("Hola Ana Torres"));
+        assertTrue(texto.getValue().contains("123456"));
     }
 
     @Test
-    void enviarNoFallaSiElCorreoNoSePudoEnviar() {
-        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true, false)));
-        when(correo.enviar(anyString(), anyString(), anyString())).thenReturn(false);
+    void enviarCodigoNoHaceNadaSiNoHayCuentaOYaEstaVerificadaOEsDeGoogleOEstaDeBaja() {
+        when(usuarios.findByCorreoIgnoreCase("nadie@correo.com")).thenReturn(Optional.empty());
+        service.enviarCodigo("nadie@correo.com");
 
-        assertDoesNotThrow(() -> service.enviarAlRegistrarse(10L));
+        when(usuarios.findByCorreoIgnoreCase("ana@correo.com")).thenReturn(Optional.of(conClave(usuario(true, true))));
+        service.enviarCodigo("ana@correo.com");
 
-        verify(tokens).save(any(TokenUsuario.class));
-    }
+        when(usuarios.findByCorreoIgnoreCase("ana@correo.com")).thenReturn(Optional.of(usuario(true, false)));
+        service.enviarCodigo("ana@correo.com");
 
-    @Test
-    void enviarNoFallaSiLaBaseDeDatosFallaAlGuardarElToken() {
-        when(usuarios.findById(10L)).thenReturn(Optional.of(usuario(true, false)));
-        when(tokens.save(any(TokenUsuario.class))).thenThrow(new RuntimeException("base de datos caida"));
+        when(usuarios.findByCorreoIgnoreCase("ana@correo.com")).thenReturn(Optional.of(conClave(usuario(false, false))));
+        service.enviarCodigo("ana@correo.com");
 
-        assertDoesNotThrow(() -> service.enviarAlRegistrarse(10L));
-
-        verify(correo, never()).enviar(anyString(), anyString(), anyString());
-    }
-
-    @Test
-    void enviarConUnUsuarioInexistenteNoHaceNada() {
-        when(usuarios.findById(10L)).thenReturn(Optional.empty());
-
-        service.enviarAlRegistrarse(10L);
-
-        verifyNoInteractions(tokens);
+        verifyNoInteractions(codigos);
         verifyNoInteractions(correo);
+    }
+
+    @Test
+    void enviarCodigoConElLimiteDelCorreoNoFallaNiEnvia() {
+        when(usuarios.findByCorreoIgnoreCase("ana@correo.com")).thenReturn(Optional.of(conClave(usuario(true, false))));
+        when(codigos.emitir("ana@correo.com", Proposito.VERIFICACION))
+                .thenThrow(new LimiteExcedidoException("espera", 60));
+
+        assertDoesNotThrow(() -> service.enviarCodigo("ana@correo.com"));
+
+        verifyNoInteractions(correo);
+    }
+
+    // ---------- confirmarCodigo (POST /auth/verificacion/confirmar) ----------
+
+    @Test
+    void confirmarCodigoMarcaElCorreoYCierraElCodigo() {
+        Usuario u = conClave(usuario(true, false));
+        CodigoCorreo fila = new CodigoCorreo();
+        when(codigos.confirmar("ana@correo.com", Proposito.VERIFICACION, "123456")).thenReturn(fila);
+        when(usuarios.findByCorreoIgnoreCase("ana@correo.com")).thenReturn(Optional.of(u));
+
+        service.confirmarCodigo("ANA@correo.com", "123456");
+
+        assertTrue(u.isCorreoVerificado());
+        verify(usuarios).save(u);
+        verify(codigos).gastar(fila);
+    }
+
+    @Test
+    void confirmarCodigoIncorrectoNoVerificaNada() {
+        when(codigos.confirmar("ana@correo.com", Proposito.VERIFICACION, "000000"))
+                .thenThrow(CodigoCorreoService.codigoInvalido());
+
+        ApiException e = assertThrows(ApiException.class, () -> service.confirmarCodigo("ana@correo.com", "000000"));
+
+        assertEquals(CodigoCorreoService.MENSAJE_CODIGO, e.getMessage());
+        verifyNoInteractions(usuarios);
     }
 
     // ---------- verificar ----------

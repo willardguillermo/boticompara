@@ -4,9 +4,7 @@ import com.boticompara.usuario.dto.LoginRequest;
 import com.boticompara.usuario.dto.LoginResponse;
 import com.boticompara.usuario.dto.MensajeResponse;
 import com.boticompara.usuario.dto.RecuperarRequest;
-import com.boticompara.usuario.dto.RegistroRequest;
 import com.boticompara.usuario.dto.RestablecerRequest;
-import com.boticompara.usuario.dto.UsuarioResponse;
 import com.boticompara.usuario.limite.LimitesPorIp;
 import com.boticompara.usuario.service.AuthService;
 import com.boticompara.usuario.service.RecuperacionService;
@@ -20,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/** Login, Google, recuperación de contraseña y el enlace viejo de verificación. El registro está en RegistroController. */
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -29,27 +28,6 @@ public class AuthController {
     private final RecuperacionService recuperacion;
     private final VerificacionService verificacion;
     private final LimitesPorIp limites;
-
-    /**
-     * H1, H15, H20: el registro se guarda primero; el correo de verificación se manda después y nunca lo hace fallar.
-     * Como cada registro envía un correo, hay un límite por IP (429). Si el registro falla (400, 409), no cuenta.
-     */
-    @PostMapping("/registro")
-    @ResponseStatus(HttpStatus.CREATED)
-    public UsuarioResponse registro(@Valid @RequestBody RegistroRequest request, HttpServletRequest http) {
-        String ip = http.getRemoteAddr();
-        limites.consumirRegistro(ip);
-        UsuarioResponse nuevo;
-        try {
-            nuevo = auth.registrar(request);
-        } catch (RuntimeException e) {
-            limites.devolverRegistro(ip);
-            throw e;
-        }
-        verificacion.enviarAlRegistrarse(nuevo.id());
-        return nuevo;
-    }
-
 
     /** H67: login o alta con Google. El token lo verifica Firebase en el servidor. */
     @PostMapping("/google")
@@ -79,7 +57,11 @@ public class AuthController {
         return new MensajeResponse("Contraseña actualizada");
     }
 
-    /** H20: enlace del correo. Responde una página HTML, no JSON (única excepción al formato de error). */
+    /**
+     * H20 (obsoleto): enlace que llegaba por correo al registrarse. Ya no se envía (el registro usa un código, ver
+     * RegistroController), pero atiende los enlaces enviados antes del cambio, que vencen a las 48 h. Responde una
+     * página HTML, no JSON (única excepción al formato de error).
+     */
     @GetMapping("/verificar")
     public ResponseEntity<String> verificar(@RequestParam(required = false) String token) {
         boolean ok = verificacion.verificar(token);

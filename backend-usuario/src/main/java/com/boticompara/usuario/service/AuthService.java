@@ -2,7 +2,6 @@ package com.boticompara.usuario.service;
 
 import com.boticompara.usuario.dto.LoginRequest;
 import com.boticompara.usuario.dto.LoginResponse;
-import com.boticompara.usuario.dto.RegistroRequest;
 import com.boticompara.usuario.dto.UsuarioResponse;
 import com.boticompara.usuario.entity.Usuario;
 import com.boticompara.usuario.auth.LimitadorLogin;
@@ -12,6 +11,7 @@ import com.boticompara.usuario.security.GoogleIdentidad;
 import com.boticompara.usuario.security.JwtService;
 import com.boticompara.usuario.security.VerificadorGoogle;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,27 +25,15 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class AuthService {
 
+    /** H20: código fijo del 403 del login para la web y la app (ErrorResponse.codigo). */
+    public static final String CORREO_NO_VERIFICADO = "CORREO_NO_VERIFICADO";
+    static final String MENSAJE_SIN_VERIFICAR = "Verifica tu correo para entrar";
+
     private final UsuarioRepository usuarios;
     private final PasswordEncoder encoder;
     private final JwtService jwt;
     private final VerificadorGoogle verificador;
     private final LimitadorLogin limitador;
-
-    /** H1, H15: la contraseña se guarda siempre con BCrypt. */
-    @Transactional
-    public UsuarioResponse registrar(RegistroRequest r) {
-        String correo = r.correo().trim().toLowerCase(Locale.ROOT);
-        if (usuarios.existsByCorreoIgnoreCase(correo)) {
-            throw ApiException.conflict("El correo ya está registrado");
-        }
-        Usuario u = new Usuario();
-        u.setNombre(r.nombre().trim());
-        u.setCorreo(correo);
-        u.setPasswordHash(encoder.encode(r.password()));
-        u.setTelefono(r.telefono() == null || r.telefono().isBlank() ? null : r.telefono().trim());
-        u.setRol(r.rol());
-        return UsuarioResponse.from(usuarios.save(u));
-    }
 
     /** Compatibilidad: sin IP conocida (tests o llamadas internas). */
     @Transactional(readOnly = true)
@@ -72,6 +60,11 @@ public class AuthService {
         }
         if (u.estaSuspendido()) {
             throw ApiException.forbidden("Tu cuenta está suspendida hasta " + fechaLima(u.getSuspendidoHasta()));
+        }
+        // H20: solo las cuentas antiguas pueden estar sin verificar (las nuevas nacen verificadas). Va después de la
+        // contraseña, como la baja y la suspensión, para no revelar nada sin ella.
+        if (!u.isCorreoVerificado()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, MENSAJE_SIN_VERIFICAR, CORREO_NO_VERIFICADO);
         }
         return new LoginResponse(jwt.generar(u), "Bearer", UsuarioResponse.from(u));
     }

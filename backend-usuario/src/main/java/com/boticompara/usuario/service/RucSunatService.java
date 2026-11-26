@@ -60,24 +60,37 @@ public class RucSunatService {
      * @throws LimiteExcedidoException 429 si el usuario pasó su límite de consultas y el RUC no está en la caché
      */
     public RucResponse consultarParaValidar(String ruc, Long usuarioId) {
-        return verificar(ruc, usuarioId, true);
+        return verificar(ruc, String.valueOf(usuarioId), true);
+    }
+
+    /**
+     * H20: lo mismo durante el registro, cuando la cuenta todavía no existe. {@code claveCuota} reemplaza al usuario
+     * en el límite por usuario de CuotaSunat (el tope global es el mismo).
+     */
+    public RucResponse consultarParaValidar(String ruc, String claveCuota) {
+        return verificar(ruc, claveCuota, true);
     }
 
     /** Para registrar o corregir una botica: 400 si el RUC no sirve. Pasado un límite, solo la validación local. */
     public RucResponse exigirValido(String ruc, Long usuarioId) {
-        RucResponse r = verificar(ruc, usuarioId, false);
+        return exigirValido(ruc, String.valueOf(usuarioId));
+    }
+
+    /** H20: igual, con la clave del límite por usuario explícita (el token de verificación durante el registro). */
+    public RucResponse exigirValido(String ruc, String claveCuota) {
+        RucResponse r = verificar(ruc, claveCuota, false);
         if (!r.valido()) {
             throw ApiException.badRequest(r.mensaje());
         }
         return r;
     }
 
-    private RucResponse verificar(String ruc, Long usuarioId, boolean limiteDaError) {
+    private RucResponse verificar(String ruc, String claveCuota, boolean limiteDaError) {
         RucResponse local = RucValidator.validar(ruc);
         if (!local.valido()) {
             return local;
         }
-        ResultadoSunat r = consultar(ruc, usuarioId, limiteDaError);
+        ResultadoSunat r = consultar(ruc, claveCuota, limiteDaError);
         return switch (r.tipo()) {
             case NO_DISPONIBLE -> new RucResponse(ruc, true, "RUC válido (no se pudo consultar SUNAT)",
                     null, null, null, "LOCAL", null, null);
@@ -91,20 +104,20 @@ public class RucSunatService {
         };
     }
 
-    private ResultadoSunat consultar(String ruc, Long usuarioId, boolean limiteDaError) {
+    private ResultadoSunat consultar(String ruc, String claveCuota, boolean limiteDaError) {
         Instant ahora = reloj.instant();
         EnCache guardado = cache.get(ruc);
         if (guardado != null && ahora.isBefore(guardado.guardado().plus(VIGENCIA_CACHE))) {
             return guardado.resultado();
         }
-        CuotaSunat.Permiso permiso = cuota.pedir(usuarioId);
+        CuotaSunat.Permiso permiso = cuota.pedir(claveCuota);
         switch (permiso.resultado()) {
             case LIMITE_USUARIO -> {
                 if (limiteDaError) {
                     throw new LimiteExcedidoException(MENSAJE_LIMITE, permiso.reintentarEnSegundos());
                 }
                 log.warn("El usuario {} pasó su límite de consultas a SUNAT: el RUC se acepta solo con la validación local",
-                        usuarioId);
+                        claveCuota);
                 return ResultadoSunat.noDisponible();
             }
             case TOPE_GLOBAL -> {

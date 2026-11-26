@@ -17,6 +17,7 @@ import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +32,20 @@ public class BoticaService {
     /** H1, H2, H3: la botica queda PENDIENTE hasta que el admin la apruebe en Django. */
     @Transactional
     public BoticaCreadaResponse registrar(Long usuarioId, BoticaRequest r) {
+        return crear(usuarioId, r, ruc -> rucSunat.exigirValido(ruc, usuarioId));
+    }
+
+    /**
+     * H20: registra la botica dentro de la transacción de POST /auth/registro, con las mismas reglas. La consulta a
+     * SUNAT cuenta en el límite de {@code claveCuota} (el token de verificación), no en el del usuario recién creado.
+     * Si algo falla, la excepción deshace también la cuenta.
+     */
+    @Transactional
+    public BoticaCreadaResponse registrar(Long usuarioId, BoticaRequest r, String claveCuota) {
+        return crear(usuarioId, r, ruc -> rucSunat.exigirValido(ruc, claveCuota));
+    }
+
+    private BoticaCreadaResponse crear(Long usuarioId, BoticaRequest r, Function<String, RucResponse> consultarSunat) {
         String ruc = r.ruc().trim();
         if (!RucValidator.esValido(ruc)) {
             throw ApiException.badRequest("El RUC no es válido");
@@ -41,7 +56,7 @@ public class BoticaService {
         }
         exigirRucLibre(ruc);
         // SUNAT al final: no se gasta cuota en registros que igual se rechazarían
-        RucResponse sunat = rucSunat.exigirValido(ruc, usuarioId);
+        RucResponse sunat = consultarSunat.apply(ruc);
         exigirTitular(usuarioId, ruc, sunat);
         String razonSocial = razonSocial(r, sunat);
         Botica b = new Botica();

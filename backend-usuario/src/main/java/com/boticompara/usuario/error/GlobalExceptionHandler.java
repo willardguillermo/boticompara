@@ -26,7 +26,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> api(ApiException e) {
-        return responder(e.getStatus(), e.getMessage());
+        return ResponseEntity.status(e.getStatus()).body(ErrorResponse.de(e.getStatus(), e.getMessage(), e.getCodigo()));
     }
 
     /** validar-ruc, registro y recuperar: 429 con los segundos de espera en Retry-After. */

@@ -1,7 +1,11 @@
 package com.boticompara.usuario.service;
 
+import com.boticompara.usuario.entity.CodigoCorreo;
+import com.boticompara.usuario.entity.CodigoCorreo.Proposito;
 import com.boticompara.usuario.entity.TokenUsuario;
 import com.boticompara.usuario.entity.Usuario;
+import com.boticompara.usuario.error.ApiException;
+import com.boticompara.usuario.limite.LimiteExcedidoException;
 import com.boticompara.usuario.repository.TokenUsuarioRepository;
 import com.boticompara.usuario.repository.UsuarioRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -14,12 +18,14 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 
-/** H20: verificación del correo con un enlace que llega al registrarse. */
+/**
+ * H20: verificación del correo de las cuentas que ya existían. Las cuentas nuevas nacen verificadas (RegistroService).
+ * El enlace de 48 h ya no se envía; {@link #verificar} sigue atendiendo los enlaces enviados antes del cambio.
+ */
 @Slf4j
 @Service
 public class VerificacionService {
@@ -30,52 +36,61 @@ public class VerificacionService {
     private final UsuarioRepository usuarios;
     private final TokenUsuarioRepository tokens;
     private final CorreoService correo;
+    private final CodigoCorreoService codigos;
     private final byte[] clave;
-    private final String baseUrl;
-    private final SecureRandom azar = new SecureRandom();
 
     public VerificacionService(UsuarioRepository usuarios, TokenUsuarioRepository tokens, CorreoService correo,
-                               @Value("${jwt.secret}") String secreto,
-                               @Value("${app.base-url:http://localhost:8080/api}") String baseUrl) {
+                               CodigoCorreoService codigos, @Value("${jwt.secret}") String secreto) {
         this.usuarios = usuarios;
         this.tokens = tokens;
         this.correo = correo;
+        this.codigos = codigos;
         this.clave = secreto.getBytes(StandardCharsets.UTF_8);
-        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 
     /**
-     * Crea el token y envía el enlace. No lanza nunca: el registro ya está guardado y no debe fallar si el
-     * correo o el guardado del token fallan. A propósito NO es @Transactional: cada llamada al repositorio
-     * usa su propia transacción, así un error aquí no puede deshacer el registro.
+     * POST /auth/verificacion/codigo (H20): cuentas antiguas con el correo sin verificar. Solo envía el código si el
+     * correo es de una cuenta activa, con contraseña y sin verificar; si no, o si el correo pasó sus límites (60 s,
+     * 5 por hora), no hace nada. Nunca lanza por eso: el endpoint siempre responde 200, para no revelar cuentas.
      */
-    public void enviarAlRegistrarse(Long usuarioId) {
-        try {
-            Usuario u = usuarios.findById(usuarioId).orElse(null);
-            if (u == null) {
-                return;
-            }
-            byte[] bytes = new byte[32];
-            azar.nextBytes(bytes);
-            String token = HexFormat.of().formatHex(bytes);
-
-            TokenUsuario t = new TokenUsuario();
-            t.setUsuarioId(u.getId());
-            t.setToken(hash(token));
-            t.setTipo(TIPO);
-            t.setExpiraEn(Instant.now().plus(VIGENCIA));
-            tokens.save(t);
-
-            String enlace = baseUrl + "/auth/verificar?token=" + token;
-            correo.enviar(u.getCorreo(), "BotiCompara: confirma tu correo",
-                    "Hola " + u.getNombre() + ",\n\n"
-                            + "Gracias por registrarte en BotiCompara. Confirma tu correo abriendo este enlace:\n\n"
-                            + enlace + "\n\n"
-                            + "El enlace vence en 48 horas. Si no creaste esta cuenta, ignora este mensaje.\n\n"
-                            + "BotiCompara\n");
-        } catch (RuntimeException e) {
-            log.error("No se pudo enviar el correo de verificacion al usuario {}: {}", usuarioId, e.getMessage());
+    @Transactional
+    public void enviarCodigo(String correoIngresado) {
+        String destino = CodigoCorreoService.normalizar(correoIngresado);
+        Usuario u = usuarios.findByCorreoIgnoreCase(destino)
+                .filter(x -> x.isActivo() && x.getPasswordHash() != null && !x.isCorreoVerificado())
+                .orElse(null);
+        if (u == null) {
+            return;
         }
+        String codigo;
+        try {
+            codigo = codigos.emitir(destino, Proposito.VERIFICACION);
+        } catch (LimiteExcedidoException e) {
+            log.info("Verificación: el correo de la cuenta {} pasó su límite de códigos", u.getId());
+            return;
+        }
+        // Si el correo no sale, CorreoService ya lo deja en el log; la respuesta sigue siendo 200
+        correo.enviar(u.getCorreo(), "BotiCompara: tu código para verificar el correo",
+                "Hola " + u.getNombre() + ",\n\n"
+                        + "Tu código para verificar tu correo en BotiCompara es: " + codigo + "\n\n"
+                        + "Vence en 15 minutos y solo se puede usar una vez. "
+                        + "Si no lo pediste tú, ignora este mensaje.\n\n"
+                        + "BotiCompara\n");
+    }
+
+    /**
+     * POST /auth/verificacion/confirmar (H20): con el código correcto marca correoVerificado = true. No abre sesión.
+     * Los intentos fallidos se guardan aunque responda 400.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
+    public void confirmarCodigo(String correoIngresado, String codigo) {
+        String destino = CodigoCorreoService.normalizar(correoIngresado);
+        CodigoCorreo fila = codigos.confirmar(destino, Proposito.VERIFICACION, codigo);
+        Usuario u = usuarios.findByCorreoIgnoreCase(destino).filter(Usuario::isActivo)
+                .orElseThrow(CodigoCorreoService::codigoInvalido);
+        u.setCorreoVerificado(true);
+        usuarios.save(u);
+        codigos.gastar(fila);
     }
 
     /**
