@@ -190,7 +190,9 @@ db.resenas = [
 }))
 
 const siguienteId = (lista) => Math.max(0, ...lista.map((x) => x.id)) + 1
-const esperar = () => new Promise((r) => setTimeout(r, 250))
+const esperar = (ms = 250) => new Promise((r) => setTimeout(r, ms))
+// H20: verificar un código tarda un poco más, para ver la cruz LED encendida en la web
+const ESPERA_VERIFICAR_MS = 700
 const copia = (x) => structuredClone(x)
 const normalizar = (texto) =>
   String(texto ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -1086,7 +1088,7 @@ export const apiMock = {
   },
 
   async verificarCodigoRegistro({ correo, codigo }) {
-    await esperar()
+    await esperar(ESPERA_VERIFICAR_MS)
     const correoNormal = normalizarCorreo(correo)
     comprobarCodigo('registro', correoNormal, codigo)
     const tokenVerificacion = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('')
@@ -1161,7 +1163,7 @@ export const apiMock = {
   },
 
   async confirmarVerificacion({ correo, codigo }) {
-    await esperar()
+    await esperar(ESPERA_VERIFICAR_MS)
     const correoNormal = normalizarCorreo(correo)
     comprobarCodigo('verificacion', correoNormal, codigo)
     const usuario = db.usuarios.find((u) => u.correo === correoNormal)
@@ -1175,14 +1177,16 @@ export const apiMock = {
     if (!String(correo ?? '').trim()) throw crearError(400, 'El correo es obligatorio')
     const ahora = Date.now()
     recuperaciones = recuperaciones.filter((t) => ahora - t < HORA)
-    if (recuperaciones.length >= MAX_RECUPERAR_HORA) throw crearError(429, MENSAJE_RECUPERAR_429)
+    if (recuperaciones.length >= MAX_RECUPERAR_HORA) {
+      throw crearError(429, MENSAJE_RECUPERAR_429, { retryAfter: segundosHasta(recuperaciones[0] + HORA_MS - ahora) })
+    }
     recuperaciones.push(ahora)
     return { mensaje: MENSAJE_RECUPERAR }
   },
 
   // H17: en el simulador el código válido es siempre 123456
   async restablecerPassword({ correo, token, password }) {
-    await esperar()
+    await esperar(ESPERA_VERIFICAR_MS)
     if (String(password ?? '').length < 8) throw crearError(400, 'La contraseña debe tener al menos 8 caracteres')
     const usuario = db.usuarios.find((u) => u.correo === String(correo ?? '').trim().toLowerCase())
     if (!usuario || token !== CODIGO_RECUPERACION_PRUEBA) throw crearError(400, MENSAJE_CODIGO_INVALIDO)

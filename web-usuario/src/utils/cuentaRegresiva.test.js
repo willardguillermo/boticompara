@@ -1,7 +1,7 @@
 // Pruebas de la espera para reenviar el código: npm test
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { formatoEspera, segundosDeEspera, segundosRestantes } from './cuentaRegresiva.js'
+import { formatoEspera, formatoReloj, segundosDeEspera, segundosRestantes } from './cuentaRegresiva.js'
 
 const AHORA = Date.parse('2026-11-26T15:00:00Z')
 
@@ -38,4 +38,12 @@ test('formatoEspera: minutos y segundos con dos cifras', () => {
   assert.equal(formatoEspera(5), '0:05')
   assert.equal(formatoEspera(0), '0:00')
   assert.equal(formatoEspera(-3), '0:00')
+})
+
+test('formatoReloj: minutos y segundos con dos cifras cada uno', () => {
+  assert.equal(formatoReloj(38), '00:38')
+  assert.equal(formatoReloj(60), '01:00')
+  assert.equal(formatoReloj(3340), '55:40')
+  assert.equal(formatoReloj(0), '00:00')
+  assert.equal(formatoReloj(-1), '00:00')
 })

@@ -3318,20 +3318,6 @@ a.resumen-inicio:active {
   color: var(--color-texto);
 }
 
-/* H20: en el paso "Tu cuenta" del registro, el correo ya verificado */
-.correo-verificado {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-weight: 600;
-}
-
-.correo-verificado svg {
-  flex: none;
-  color: var(--exito);
-}
 
 .acciones-recuperacion {
   display: flex;

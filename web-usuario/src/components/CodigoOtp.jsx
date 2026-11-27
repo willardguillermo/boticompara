@@ -2,28 +2,37 @@
 // - Pegar el código completo en cualquier casilla lo reparte; el autocompletado del celular (one-time-code) también.
 // - Flechas, Inicio, Fin, Backspace, Supr y Tab funcionan como en un campo normal.
 // - Un solo rótulo para el grupo ("Código de 6 dígitos") y el error se anuncia con role="alert".
-// - Animaciones sutiles (llenado, brillo en el foco, sacudida al fallar, check al validar);
-//   con prefers-reduced-motion no hay ninguna (CSS y la sacudida, que se hace con JS).
-import { useEffect, useId, useRef } from 'react'
+// - `fase` dibuja la verificación: las casillas vuelan al centro y se funden en una cruz de botica hecha de LEDs,
+//   que se enciende como el letrero mientras se espera; luego se vuelve check (éxito) o falla en rojo y se rompe en
+//   las 6 casillas (error). Solo se animan transform y opacity; con prefers-reduced-motion todo es un fundido.
+import { useEffect, useId, useLayoutEffect, useRef } from 'react'
 import useMenosMovimiento from '../hooks/useMenosMovimiento.js'
 import { borrar, casillas, codigoCompleto, escribir, LARGO_OTP, textoNuevo } from '../utils/codigoOtp.js'
-import Icono from './Icono.jsx'
+import { puntosCruz } from '../utils/cruzLed.js'
 import './CodigoOtp.css'
 
 const SACUDIDA = [
   { transform: 'translateX(0)' },
-  { transform: 'translateX(-6px)' },
-  { transform: 'translateX(5px)' },
-  { transform: 'translateX(-3px)' },
+  { transform: 'translateX(-7px)' },
+  { transform: 'translateX(6px)' },
+  { transform: 'translateX(-4px)' },
   { transform: 'translateX(2px)' },
   { transform: 'translateX(0)' },
 ]
+
+// 45 LEDs en una cuadrícula de 9 x 9 (10 unidades entre puntos)
+const LEDS = puntosCruz(9, 3)
+const PASO = 10
+const RADIO = 3.3
+
+/** Fases: 'escribiendo' | 'reunir' (vuela y se enciende) | 'fija' | 'exito' | 'falla' | 'volver'. */
+const FASES_OCUPADAS = new Set(['reunir', 'fija', 'exito', 'falla', 'volver'])
 
 /**
  * valor: texto de hasta 6 caracteres (un espacio es una casilla vacía). onCambio(valor).
  * onCompleto(codigo): al quedar los 6 dígitos. error: mensaje bajo las casillas.
  * sacudir: número que cambia con cada código incorrecto (sacude y vuelve el foco a la primera casilla).
- * validado: muestra el check. autoFocus: enfoca la primera casilla al aparecer.
+ * fase: el momento de la verificación (ver arriba). autoFocus: enfoca la primera casilla al aparecer.
  */
 export default function CodigoOtp({
   valor,
@@ -31,16 +40,18 @@ export default function CodigoOtp({
   onCompleto,
   error,
   sacudir = 0,
-  validado = false,
+  fase = 'escribiendo',
   deshabilitado = false,
   autoFocus = false,
   etiqueta = 'Código de 6 dígitos',
 }) {
   const id = useId()
   const grupo = useRef(null)
+  const celdas = useRef([])
   const entradas = useRef([])
   const menosMovimiento = useMenosMovimiento()
   const lista = casillas(valor)
+  const ocupado = deshabilitado || FASES_OCUPADAS.has(fase)
 
   function enfocar(indice) {
     const entrada = entradas.current[Math.min(Math.max(indice, 0), LARGO_OTP - 1)]
@@ -52,14 +63,26 @@ export default function CodigoOtp({
     if (autoFocus) enfocar(0)
   }, [autoFocus])
 
+  // Cuánto se mueve cada casilla para llegar al centro de la fila (offsetLeft no cambia con transform)
+  useLayoutEffect(() => {
+    const contenedor = grupo.current
+    if (!contenedor || fase === 'escribiendo') return
+    const centro = contenedor.clientWidth / 2
+    for (const celda of celdas.current) {
+      if (celda) celda.style.setProperty('--dx', `${centro - (celda.offsetLeft + celda.offsetWidth / 2)}px`)
+    }
+  }, [fase])
+
   // Código incorrecto: sacudida suave (Web Animations, se puede repetir sin volver a montar) y foco al inicio
   useEffect(() => {
     if (!sacudir) return
     enfocar(0)
-    if (!menosMovimiento) grupo.current?.animate?.(SACUDIDA, { duration: 380, easing: 'ease-out' })
+    if (!menosMovimiento) grupo.current?.animate?.(SACUDIDA, { duration: 420, easing: 'ease-out' })
   }, [sacudir, menosMovimiento])
 
   function aplicar({ valor: nuevo, foco }) {
+    // Mientras se verifica no se cambia el código (por ejemplo, un pegado que llegue tarde)
+    if (ocupado) return
     if (nuevo !== valor) onCambio(nuevo)
     enfocar(foco)
     const codigo = codigoCompleto(nuevo)
@@ -96,10 +119,10 @@ export default function CodigoOtp({
     aplicar(escribir(valor, indice, e.clipboardData.getData('text')))
   }
 
-  const clases = ['otp', error && 'otp-con-error', validado && 'otp-validado'].filter(Boolean).join(' ')
+  const clases = ['otp', error && 'otp-con-error'].filter(Boolean).join(' ')
 
   return (
-    <div className={clases}>
+    <div className={clases} data-fase={fase}>
       <span id={`${id}-etiqueta`} className="otp-etiqueta">
         {etiqueta}
       </span>
@@ -111,39 +134,63 @@ export default function CodigoOtp({
         aria-describedby={error ? `${id}-error` : undefined}
       >
         {lista.map((digito, i) => (
-          <input
+          <span
             // Las casillas son fijas: el índice es su identidad
             key={i}
             ref={(el) => {
-              entradas.current[i] = el
+              celdas.current[i] = el
             }}
-            className="otp-casilla"
+            className="otp-celda"
             data-llena={digito ? 'true' : 'false'}
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="one-time-code"
-            aria-label={`Dígito ${i + 1} de ${LARGO_OTP}`}
-            aria-invalid={Boolean(error)}
-            value={digito}
-            disabled={deshabilitado}
-            onChange={(e) => alCambiar(i, e)}
-            onKeyDown={(e) => alTeclear(i, e)}
-            onPaste={(e) => alPegar(i, e)}
-            onFocus={(e) => e.target.select()}
-          />
-        ))}
-        {validado && (
-          <span className="otp-check" aria-hidden="true">
-            <Icono nombre="check" />
+            style={{ '--i': i }}
+          >
+            <input
+              ref={(el) => {
+                entradas.current[i] = el
+              }}
+              className="otp-casilla"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="one-time-code"
+              aria-label={`Dígito ${i + 1} de ${LARGO_OTP}`}
+              aria-invalid={Boolean(error)}
+              value={digito}
+              disabled={ocupado}
+              onChange={(e) => alCambiar(i, e)}
+              onKeyDown={(e) => alTeclear(i, e)}
+              onPaste={(e) => alPegar(i, e)}
+              onFocus={(e) => e.target.select()}
+            />
           </span>
-        )}
+        ))}
+
+        {/* La escena de la verificación: decorativa, el estado lo anuncia quien usa el componente */}
+        <span className="otp-escena" aria-hidden="true">
+          <span className="otp-halo" />
+          <svg className="otp-cruz" viewBox={`0 0 ${PASO * 9} ${PASO * 9}`}>
+            {LEDS.map(({ columna, fila, d }) => {
+              const cx = PASO / 2 + columna * PASO
+              const cy = PASO / 2 + fila * PASO
+              return (
+                <g key={`${columna}-${fila}`} style={{ '--d': d }}>
+                  <circle className="led-base" cx={cx} cy={cy} r={RADIO} />
+                  <circle className="led-luz" cx={cx} cy={cy} r={RADIO} />
+                  <circle className="led-falla" cx={cx} cy={cy} r={RADIO} />
+                </g>
+              )
+            })}
+          </svg>
+          <span className="otp-onda" />
+          <span className="otp-onda otp-onda-2" />
+          <svg className="otp-check" viewBox="0 0 52 52">
+            <circle className="otp-check-fondo" cx="26" cy="26" r="24" />
+            <path className="otp-check-trazo" d="M15 27.5l7.5 7.5L38 19" pathLength="1" />
+          </svg>
+        </span>
       </div>
       <span id={`${id}-error`} className="error-campo otp-error" role="alert">
         {error}
-      </span>
-      <span className="sr-only" role="status">
-        {validado ? 'Código verificado' : ''}
       </span>
     </div>
   )

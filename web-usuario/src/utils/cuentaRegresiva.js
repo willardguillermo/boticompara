@@ -25,3 +25,9 @@ export function formatoEspera(segundos) {
   const s = Math.max(0, Math.floor(segundos))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
+
+/** 38 → "00:38"; 75 → "01:15" (el reloj de "Reenviar en 00:38"). */
+export function formatoReloj(segundos) {
+  const s = Math.max(0, Math.floor(segundos))
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}

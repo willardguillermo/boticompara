@@ -11,11 +11,12 @@ import { Link, useNavigate } from 'react-router'
 import Alerta from '../components/Alerta.jsx'
 import Campo from '../components/Campo.jsx'
 import Icono from '../components/Icono.jsx'
+import InsigniaVerificado from '../components/InsigniaVerificado.jsx'
 import MapaUbicacion from '../components/MapaUbicacion.jsx'
 import Marca from '../components/Marca.jsx'
 import RegistroPasos from '../components/RegistroPasos.jsx'
 import SelectorLicencia from '../components/SelectorLicencia.jsx'
-import VerificacionCorreo from '../components/VerificacionCorreo.jsx'
+import VerificacionCodigo from '../components/VerificacionCodigo.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import useCuentaRegresiva from '../hooks/useCuentaRegresiva.js'
@@ -351,14 +352,16 @@ export default function RegistroPage() {
     return marco(
       null,
       <>
-        {encabezado(
-          'Revisa tu correo',
-          <>
-            Escribe el código que enviamos a <strong className="correo-recuperacion">{estado.correo}</strong>. Vence en
-            15 minutos; si no lo ves, revisa la carpeta de spam.
-          </>,
-        )}
-        <VerificacionCorreo
+        <VerificacionCodigo
+          Titulo="h1"
+          tituloRef={titulo}
+          subtitulo={
+            <>
+              Escribe el código que enviamos a <strong className="correo-recuperacion">{estado.correo}</strong>. Vence
+              en 15 minutos; si no lo ves, revisa la carpeta de spam.
+            </>
+          }
+          subtituloExito="Listo. Ahora completa los datos de tu cuenta."
           espera={espera}
           onVerificar={async (codigo) => {
             const { tokenVerificacion } = await api.verificarCodigoRegistro({ correo: estado.correo, codigo })
@@ -394,9 +397,7 @@ export default function RegistroPage() {
         {encabezado('Tu cuenta', 'Con esta cuenta administrarás tu botica y tu catálogo.')}
         <form id="form-cuenta" className="formulario" onSubmit={siguienteCuenta} noValidate>
           {alerta}
-          <p className="correo-verificado">
-            <Icono nombre="check" /> {estado.correo} <span className="texto-suave">· verificado</span>
-          </p>
+          <InsigniaVerificado correo={estado.correo} />
           <Campo id="nombre" etiqueta="Nombre completo" error={errores.nombre}>
             <input
               {...propsError('nombre', errores.nombre)}

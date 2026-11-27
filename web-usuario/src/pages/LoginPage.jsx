@@ -9,7 +9,7 @@ import AvisoSoloMovil from '../components/AvisoSoloMovil.jsx'
 import Campo from '../components/Campo.jsx'
 import Marca from '../components/Marca.jsx'
 import SpotlightCard from '../components/reactbits/SpotlightCard.jsx'
-import VerificacionCorreo from '../components/VerificacionCorreo.jsx'
+import VerificacionCodigo from '../components/VerificacionCodigo.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import useCuentaRegresiva from '../hooks/useCuentaRegresiva.js'
 import { MODO_SIMULADO, api } from '../services/index.js'
@@ -98,13 +98,17 @@ export default function LoginPage() {
           <AvisoSoloMovil nombre={comprador.nombre} onVolver={() => setComprador(null)} />
         ) : verificacion ? (
           <>
-            <h1>{verificacion.mensaje}</h1>
-            <p className="texto-suave">
-              Tu cuenta es anterior a la verificación por código. Te enviamos uno a{' '}
-              <strong className="correo-recuperacion">{correo.trim()}</strong>; vence en 15 minutos.
-            </p>
             <Alerta tipo="error">{verificacion.aviso && <p>{verificacion.aviso}</p>}</Alerta>
-            <VerificacionCorreo
+            <VerificacionCodigo
+              Titulo="h1"
+              titulo={verificacion.mensaje}
+              subtitulo={
+                <>
+                  Tu cuenta es anterior a la verificación por código. Te enviamos uno a{' '}
+                  <strong className="correo-recuperacion">{correo.trim()}</strong>; vence en 15 minutos.
+                </>
+              }
+              subtituloExito="Listo. Entrando a tu panel…"
               espera={espera}
               onVerificar={(codigo) => api.confirmarVerificacion({ correo, codigo })}
               // Correo verificado: se repite el login con la contraseña que ya escribió
