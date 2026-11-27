@@ -5,6 +5,16 @@ export function formatoSoles(valor) {
   return soles.format(Number(valor))
 }
 
+/**
+ * Cierra una frase que viene del servidor para poder seguirla con otra: "No está configurado" ->
+ * "No está configurado."; si ya termina en . ! ? o …, se deja igual (sin espacios al final).
+ */
+export function conPuntoFinal(texto) {
+  const limpio = String(texto ?? '').trim()
+  if (!limpio || /[.!?…]$/.test(limpio)) return limpio
+  return `${limpio}.`
+}
+
 /** 2 400 000 -> "2.3 MB"; 84 000 -> "82 KB" */
 export function formatoTamano(bytes) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`

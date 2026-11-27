@@ -24,6 +24,7 @@ import { MODO_SIMULADO, api } from '../services/index.js'
 import { esErrorDeTitular } from '../utils/cuenta.js'
 import { ESPERA_POR_DEFECTO, formatoEspera, segundosDeEspera } from '../utils/cuentaRegresiva.js'
 import { DISTRITOS, distritoDeLista } from '../utils/distritos.js'
+import { conPuntoFinal } from '../utils/formato.js'
 import {
   cuerpoRegistro,
   ESTADO_INICIAL,
@@ -564,7 +565,7 @@ export default function RegistroPage() {
         {encabezado('Tu cuenta está creada', 'Tu botica quedó registrada y en revisión.')}
         <Alerta tipo="aviso">
           <p>
-            No pudimos subir tu licencia: {creada.mensaje} Tu cuenta y tu botica ya existen, así que no tienes que
+            No pudimos subir tu licencia: {conPuntoFinal(creada.mensaje)} Tu cuenta y tu botica ya existen, así que no tienes que
             registrarte de nuevo. Vuelve a intentarlo desde <strong>Mi botica</strong>.
           </p>
         </Alerta>
