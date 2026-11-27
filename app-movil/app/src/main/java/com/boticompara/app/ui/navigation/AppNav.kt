@@ -16,8 +16,6 @@ import com.boticompara.app.ui.alertas.AlertasViewModel
 import com.boticompara.app.ui.auth.LoginScreen
 import com.boticompara.app.ui.auth.RecuperarScreen
 import com.boticompara.app.ui.auth.RegisterScreen
-import com.boticompara.app.ui.auth.RestablecerScreen
-import com.boticompara.app.ui.auth.VerificarCorreoScreen
 import com.boticompara.app.ui.busqueda.SearchScreen
 import com.boticompara.app.ui.detalle.ProductoDetalleScreen
 import com.boticompara.app.ui.favoritos.FavoritosScreen
@@ -48,12 +46,6 @@ fun AppNav(
         composable("login") { LoginScreen(navController) }
         composable("registro") { RegisterScreen(navController) }
         composable("recuperar") { RecuperarScreen(navController) }
-        composable("restablecer/{correo}") { entry ->
-            RestablecerScreen(navController, entry.arguments?.getString("correo") ?: "")
-        }
-        composable("verificar/{correo}") { entry ->
-            VerificarCorreoScreen(navController, entry.arguments?.getString("correo") ?: "")
-        }
         composable("busqueda") { SearchScreen(navController) }
         composable("favoritos") { FavoritosScreen(navController) }
         composable("alertas") { AlertasScreen(navController, alertasViewModel) }
