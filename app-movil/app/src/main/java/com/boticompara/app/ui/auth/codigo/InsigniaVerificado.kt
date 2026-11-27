@@ -6,6 +6,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,12 +36,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.boticompara.app.ui.theme.LocalExtendedColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -52,7 +53,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun InsigniaVerificado(correo: String, modifier: Modifier = Modifier) {
     val reducido = rememberMovimientoReducido()
-    val colores = LocalExtendedColors.current
+    // Verde azulado de la marca, como en la web: fondo suave, borde fino, y check y texto en el color primario
+    val esquema = MaterialTheme.colorScheme
+    val oscuro = esquema.surface.luminance() < 0.5f
+    val color = esquema.primary
+    val fondo = esquema.primary.copy(alpha = if (oscuro) 0.16f else 0.10f)
+    val borde = esquema.primary.copy(alpha = if (oscuro) 0.45f else 0.30f)
+    val brilloColor = Color.White.copy(alpha = if (oscuro) 0.18f else 0.55f)
     val aparicion = remember { Animatable(if (reducido) 1f else 0f) }
     val trazo = remember { Animatable(if (reducido) 1f else 0f) }
     val brillo = remember { Animatable(if (reducido) 1f else 0f) }
@@ -83,7 +90,8 @@ fun InsigniaVerificado(correo: String, modifier: Modifier = Modifier) {
                     scaleY = escala
                 }
                 .clip(CircleShape)
-                .background(colores.exitoContainer)
+                .background(fondo)
+                .border(1.dp, borde, CircleShape)
                 .drawWithContent {
                     drawContent()
                     // Un brillo que cruza la insignia una vez
@@ -92,7 +100,7 @@ fun InsigniaVerificado(correo: String, modifier: Modifier = Modifier) {
                         val x = -size.width * 0.3f + size.width * 1.6f * b
                         drawRect(
                             Brush.linearGradient(
-                                listOf(Color.Transparent, Color.White.copy(alpha = 0.45f), Color.Transparent),
+                                listOf(Color.Transparent, brilloColor, Color.Transparent),
                                 start = Offset(x - 36.dp.toPx(), 0f),
                                 end = Offset(x + 36.dp.toPx(), size.height)
                             )
@@ -103,22 +111,21 @@ fun InsigniaVerificado(correo: String, modifier: Modifier = Modifier) {
         ) {
             Box(
                 Modifier
-                    .size(20.dp)
-                    .background(colores.exito, CircleShape)
+                    .size(18.dp)
                     .drawWithCache {
                         val ruta = Path().apply {
-                            moveTo(size.width * 0.27f, size.height * 0.52f)
-                            lineTo(size.width * 0.44f, size.height * 0.68f)
-                            lineTo(size.width * 0.74f, size.height * 0.36f)
+                            moveTo(size.width * 0.18f, size.height * 0.52f)
+                            lineTo(size.width * 0.40f, size.height * 0.74f)
+                            lineTo(size.width * 0.84f, size.height * 0.28f)
                         }
                         val medida = PathMeasure().apply { setPath(ruta, false) }
                         val parcial = Path()
-                        val grosor = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        val grosor = Stroke(width = 2.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                         onDrawWithContent {
                             drawContent()
                             parcial.reset()
                             medida.getSegment(0f, medida.length * trazo.value, parcial, true)
-                            drawPath(parcial, colores.onExito, style = grosor)
+                            drawPath(parcial, color, style = grosor)
                         }
                     }
             )
@@ -127,7 +134,7 @@ fun InsigniaVerificado(correo: String, modifier: Modifier = Modifier) {
                 "Correo verificado",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = colores.onExitoContainer
+                color = color
             )
         }
         Spacer(Modifier.height(6.dp))

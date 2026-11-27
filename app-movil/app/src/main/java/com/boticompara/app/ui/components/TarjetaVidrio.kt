@@ -16,7 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -29,7 +28,9 @@ import com.boticompara.app.ui.theme.LocalExtendedColors
 /**
  * H20: tarjeta de vidrio de los pasos del acceso (registro, verificación y recuperación), en claro y en oscuro.
  * Superficie translúcida con un brillo arriba y dos luces de la marca detrás. No usa blur (en Android 11 o
- * menos no existe): las luces son degradados radiales, que cuestan poco.
+ * menos no existe): las luces son degradados radiales, que cuestan poco. Tampoco lleva sombra de elevación:
+ * Android la dibuja debajo de la superficie y, como es translúcida, se veía como un panel interno de
+ * esquinas rectas. El contenido no debe ponerse fondos propios: la tarjeta es una sola pieza.
  * `tinte` (0 a 1) la tiñe de verde al verificar; se lee al dibujar, así animarlo no recompone la tarjeta.
  */
 @Composable
@@ -64,7 +65,6 @@ fun TarjetaVidrio(
         Column(
             Modifier
                 .fillMaxWidth()
-                .shadow(if (oscuro) 0.dp else 10.dp, forma, ambientColor = esquema.primary, spotColor = esquema.primary)
                 .clip(forma)
                 .background(esquema.surfaceContainerLowest.copy(alpha = if (oscuro) 0.58f else 0.72f))
                 .background(

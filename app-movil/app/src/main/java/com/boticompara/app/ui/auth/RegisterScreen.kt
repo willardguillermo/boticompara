@@ -209,6 +209,7 @@ private fun PasoCorreo(vm: RegistroViewModel, onIniciarSesion: () -> Unit) {
 
         BotiTextField(
             value = vm.correo,
+            reservarAyuda = false,
             onValueChange = vm::cambiarCorreo,
             label = "Correo electrónico",
             leadingIcon = Icons.Rounded.Mail,
@@ -226,7 +227,7 @@ private fun PasoCorreo(vm: RegistroViewModel, onIniciarSesion: () -> Unit) {
                 }
             }
         }
-        Spacer(Modifier.height(Dimens.Space8))
+        Spacer(Modifier.height(Dimens.Space12))
 
         BotiButton(
             text = when {
@@ -262,6 +263,7 @@ private fun PasoCuenta(vm: RegistroViewModel) {
 
         BotiTextField(
             value = vm.nombre,
+            reservarAyuda = false,
             onValueChange = vm::cambiarNombre,
             label = "Nombre completo",
             leadingIcon = Icons.Rounded.Person,
@@ -269,8 +271,10 @@ private fun PasoCuenta(vm: RegistroViewModel) {
             errorMessage = vm.errorNombre,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
         )
+        Spacer(Modifier.height(Dimens.Space12))
         BotiTextField(
             value = vm.password,
+            reservarAyuda = false,
             onValueChange = vm::cambiarPassword,
             label = "Contraseña",
             leadingIcon = Icons.Rounded.Lock,
@@ -285,8 +289,10 @@ private fun PasoCuenta(vm: RegistroViewModel) {
             supportingText = "Mínimo 8 caracteres.",
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next)
         )
+        Spacer(Modifier.height(Dimens.Space12))
         BotiTextField(
             value = vm.confirmar,
+            reservarAyuda = false,
             onValueChange = vm::cambiarConfirmar,
             label = "Repite la contraseña",
             leadingIcon = Icons.Rounded.Lock,
@@ -295,8 +301,10 @@ private fun PasoCuenta(vm: RegistroViewModel) {
             errorMessage = vm.errorConfirmar,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next)
         )
+        Spacer(Modifier.height(Dimens.Space12))
         BotiTextField(
             value = vm.telefono,
+            reservarAyuda = false,
             onValueChange = vm::cambiarTelefono,
             label = "Teléfono (opcional)",
             leadingIcon = Icons.Rounded.Phone,
@@ -305,6 +313,7 @@ private fun PasoCuenta(vm: RegistroViewModel) {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { vm.crearCuenta() })
         )
+        Spacer(Modifier.height(Dimens.Space12))
         AvisoPrivacidad()
         Spacer(Modifier.height(Dimens.Space16))
 

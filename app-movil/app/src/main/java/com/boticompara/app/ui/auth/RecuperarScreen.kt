@@ -171,6 +171,7 @@ private fun PasoCorreoRecuperar(vm: RecuperarViewModel) {
             }
             BotiTextField(
                 value = vm.correo,
+                reservarAyuda = false,
                 onValueChange = vm::cambiarCorreo,
                 label = "Correo electrónico",
                 leadingIcon = Icons.Rounded.Mail,
@@ -179,7 +180,7 @@ private fun PasoCorreoRecuperar(vm: RecuperarViewModel) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { vm.pedirCodigo() })
             )
-            Spacer(Modifier.height(Dimens.Space8))
+            Spacer(Modifier.height(Dimens.Space12))
             BotiButton(
                 text = when {
                     vm.enviando -> "Enviando…"
@@ -201,6 +202,7 @@ private fun CamposPassword(vm: RecuperarViewModel) {
     val ocupado = vm.codigo.ocupado
     BotiTextField(
         value = vm.password,
+        reservarAyuda = false,
         onValueChange = vm::cambiarPassword,
         label = "Nueva contraseña",
         leadingIcon = Icons.Rounded.Lock,
@@ -216,8 +218,10 @@ private fun CamposPassword(vm: RecuperarViewModel) {
         enabled = !ocupado,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next)
     )
+    Spacer(Modifier.height(Dimens.Space12))
     BotiTextField(
         value = vm.confirmar,
+        reservarAyuda = false,
         onValueChange = vm::cambiarConfirmar,
         label = "Repite la nueva contraseña",
         leadingIcon = Icons.Rounded.Lock,

@@ -39,8 +39,16 @@ fun BotiTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     singleLine: Boolean = true,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    // false: la línea de ayuda solo ocupa espacio cuando hay un error o una ayuda que mostrar,
+    // así el espacio entre campos es parejo (lo pone quien los usa)
+    reservarAyuda: Boolean = true
 ) {
+    val ayuda = when {
+        isError && !errorMessage.isNullOrEmpty() -> errorMessage
+        !supportingText.isNullOrEmpty() -> supportingText
+        else -> null
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -49,11 +57,8 @@ fun BotiTextField(
         leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null) } },
         trailingIcon = trailingIcon,
         isError = isError,
-        supportingText = {
-            when {
-                isError && !errorMessage.isNullOrEmpty() -> Text(errorMessage)
-                !supportingText.isNullOrEmpty() -> Text(supportingText)
-            }
+        supportingText = if (ayuda == null && !reservarAyuda) null else {
+            { ayuda?.let { Text(it) } }
         },
         visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
