@@ -342,7 +342,9 @@ private fun BarraEscritura(
     escuchando: Boolean,
     puedeEnviar: Boolean
 ) {
-    Surface(tonalElevation = 3.dp) {
+    // Sin fondo propio: el de la pantalla sigue continuo detrás de la caja (con la barra flotante debajo,
+    // un Surface con elevación se veía como una franja de otro tono)
+    Box {
         BotiTextField(
             value = texto,
             onValueChange = onTextoChange,
