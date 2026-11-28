@@ -12,8 +12,22 @@ interface ApiService {
     @POST("auth/google")
     suspend fun loginGoogle(@Body request: GoogleAuthRequest): Response<AuthResponse>
 
-    @POST("auth/registro")   // 201, devuelve el usuario SIN token -> luego llamar a login
-    suspend fun registro(@Body request: RegistroRequest): Response<UsuarioResponse>
+    // H20: registro con el correo verificado (código de 6 dígitos → tokenVerificacion → cuenta)
+    @POST("auth/registro/codigo")   // 200; 409 si el correo ya tiene cuenta; 429 con Retry-After; 503 si no salió el correo
+    suspend fun registroCodigo(@Body request: CorreoRequest): Response<MensajeResponse>
+
+    @POST("auth/registro/verificar")   // 200 con el tokenVerificacion; 400 si el código no sirve
+    suspend fun registroVerificar(@Body request: CodigoCorreoRequest): Response<TokenVerificacionResponse>
+
+    @POST("auth/registro")   // 201 con la sesión (mismo JSON que el login)
+    suspend fun registro(@Body request: RegistroRequest): Response<AuthResponse>
+
+    // H20: cuentas anteriores al registro con código (el login responde 403 CORREO_NO_VERIFICADO)
+    @POST("auth/verificacion/codigo")   // siempre 200 (no revela si el correo existe); 429 por IP
+    suspend fun verificacionCodigo(@Body request: CorreoRequest): Response<MensajeResponse>
+
+    @POST("auth/verificacion/confirmar")   // 200; 400 si el código no sirve. No abre sesión
+    suspend fun verificacionConfirmar(@Body request: CodigoCorreoRequest): Response<MensajeResponse>
 
     @POST("auth/recuperar")   // H17: siempre responde 200, exista o no el correo
     suspend fun recuperar(@Body request: RecuperarRequest): Response<MensajeResponse>

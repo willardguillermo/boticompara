@@ -1,5 +1,6 @@
 package com.boticompara.app.ui.auth
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,7 +16,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -23,19 +27,69 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.boticompara.app.ui.auth.codigo.TarjetaCodigo
 import com.boticompara.app.ui.components.BotiButton
 import com.boticompara.app.ui.components.BotiTonalButton
 import com.boticompara.app.ui.components.BotiTextField
 import com.boticompara.app.ui.components.IconoCircular
 import com.boticompara.app.ui.components.SeccionTitulo
 import com.boticompara.app.ui.theme.Dimens
+import com.boticompara.app.ui.theme.LocalExtendedColors
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @Composable
-fun LoginScreen(navController: NavController, authViewModel: AuthViewModel = viewModel()) {
+fun LoginScreen(
+    navController: NavController,
+    authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Factory)
+) {
     var correo by remember { mutableStateOf("") }
     var contrasena by remember { mutableStateOf("") }
     var verContrasena by remember { mutableStateOf(false) }
     val contexto = LocalContext.current
+    val entrar = {
+        navController.navigate("busqueda") { popUpTo("login") { inclusive = true } }
+    }
+
+    // H17 y H20: al volver de la recuperación o del registro llegan el aviso y el correo (nunca la contraseña)
+    val estadoGuardado = navController.currentBackStackEntry?.savedStateHandle
+    val aviso by (estadoGuardado?.getStateFlow<String?>(CLAVE_AVISO_LOGIN, null) ?: MutableStateFlow(null))
+        .collectAsState()
+    LaunchedEffect(estadoGuardado) {
+        estadoGuardado?.remove<String>(CLAVE_CORREO_LOGIN)?.takeIf { it.isNotBlank() }?.let { correo = it }
+    }
+
+    // H20: la cuenta no tiene el correo verificado (403 CORREO_NO_VERIFICADO): se pide el código aquí mismo
+    val verificacion = authViewModel.verificacion
+    if (verificacion != null) {
+        BackHandler(enabled = !verificacion.ocupado) { authViewModel.cancelarVerificacion() }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
+                .verticalScroll(rememberScrollState())
+                .padding(Dimens.Space24),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            TarjetaCodigo(
+                estado = verificacion,
+                titulo = authViewModel.tituloVerificacion,
+                subtitulo = buildAnnotatedString {
+                    append("Tu cuenta es anterior a la verificación por código. Te enviamos uno a ")
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(authViewModel.correoVerificacion) }
+                    append("; vence en 15 minutos.")
+                },
+                subtituloExito = "Listo. Entrando a BotiCompara…",
+                onCambio = { authViewModel.cambiarCodigo(it, entrar) },
+                onVerificar = { authViewModel.confirmarCodigo(entrar) },
+                onReenviar = authViewModel::reenviarCodigo,
+                textoBoton = "Verificar y entrar",
+                textoCambiar = "Volver al inicio de sesión",
+                onCambiar = authViewModel::cancelarVerificacion
+            )
+        }
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -114,9 +168,8 @@ fun LoginScreen(navController: NavController, authViewModel: AuthViewModel = vie
                 BotiButton(
                     text = if (authViewModel.isLoading) "Iniciando..." else "Iniciar sesión",
                     onClick = {
-                        authViewModel.login(correo, contrasena) {
-                            navController.navigate("busqueda") { popUpTo("login") { inclusive = true } }
-                        }
+                        estadoGuardado?.remove<String>(CLAVE_AVISO_LOGIN)
+                        authViewModel.login(correo, contrasena, entrar)
                     },
                     enabled = correo.isNotBlank() && contrasena.isNotBlank() && !authViewModel.isLoading,
                     modifier = Modifier.fillMaxWidth()
@@ -135,13 +188,26 @@ fun LoginScreen(navController: NavController, authViewModel: AuthViewModel = vie
                 BotiTonalButton(
                     text = "Continuar con Google",
                     icon = Icons.Rounded.AccountCircle,
-                    onClick = {
-                        authViewModel.loginConGoogle(contexto) {
-                            navController.navigate("busqueda") { popUpTo("login") { inclusive = true } }
-                        }
-                    },
+                    onClick = { authViewModel.loginConGoogle(contexto, entrar) },
                     enabled = !authViewModel.isLoading,
                     modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        if (aviso != null && authViewModel.errorMessage == null) {
+            Spacer(Modifier.height(Dimens.Space16))
+            Surface(
+                color = LocalExtendedColors.current.exitoContainer,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    aviso.orEmpty(),
+                    color = LocalExtendedColors.current.onExitoContainer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(Dimens.Space16)
                 )
             }
         }
