@@ -14,6 +14,27 @@ const MENSAJE_RECUPERAR_429 = 'Hiciste demasiadas solicitudes desde esta conexi�
 const MENSAJE_CODIGO_INVALIDO = 'El código no es válido o venció. Pide uno nuevo'
 const MAX_RECUPERAR_HORA = 5
 let recuperaciones = []
+// H20: registro y verificación con un código por correo (docs/API.md, sección 1). El código válido es 123456.
+const CODIGO_CORREO_PRUEBA = CODIGO_RECUPERACION_PRUEBA
+const MENSAJE_CODIGO_ENVIADO = 'Te enviamos un código a tu correo. Vence en 15 minutos'
+const MENSAJE_ESPERA_CODIGO = 'Espera un momento antes de pedir otro código'
+const MENSAJE_CODIGOS_HORA = 'Pediste demasiados códigos para este correo. Intenta más tarde'
+const MENSAJE_REGISTROS_IP = 'Hiciste demasiados registros desde esta conexión. Intenta más tarde'
+const MENSAJE_TOKEN_VENCIDO = 'Tu verificación del correo venció. Vuelve a pedir un código'
+const MENSAJE_VERIFICACION = 'Si el correo tiene una cuenta sin verificar, te enviamos un código'
+const MENSAJE_SIN_VERIFICAR = 'Verifica tu correo para entrar'
+const ESPERA_CODIGO_MS = 60 * 1000
+const HORA_MS = 60 * ESPERA_CODIGO_MS
+const VIGENCIA_CODIGO_MS = 15 * ESPERA_CODIGO_MS
+const VIGENCIA_TOKEN_MS = 30 * ESPERA_CODIGO_MS
+const MAX_CODIGOS_HORA = 5
+const MAX_INTENTOS_CODIGO = 5
+// Clave `${proposito}:${correo}` → { enviados: [ms], vence, intentos, usado }
+const codigosCorreo = new Map()
+// tokenVerificacion → { correo, vence, usado }
+const tokensVerificacion = new Map()
+let codigosRegistroIp = []
+let solicitudesVerificacion = []
 const STOCK_MINIMO_DEFECTO = 5 // H12: igual que el default de la columna stock_minimo
 // H2: únicos RUC que el modo simulado "encuentra" en SUNAT
 const RUCS_SUNAT = {
@@ -72,6 +93,8 @@ const db = {
       id: 7 + i, nombre, correo: `comprador${7 + i}@ejemplo.test`, password: PASSWORD_PRUEBA,
       telefono: null, direccion: null, rol: 'COMPRADOR',
     })),
+    // H20: dueña de una cuenta creada antes del registro con código: el login responde 403 CORREO_NO_VERIFICADO
+    { id: 18, nombre: 'Nora Salas', correo: 'nora@ejemplo.test', password: PASSWORD_PRUEBA, telefono: null, direccion: null, rol: 'DUENO_BOTICA', correoVerificado: false },
   ],
   boticas: [
     { id: 1, usuarioId: 1, nombreComercial: 'Botica Salud Total', ruc: '20601234565', razonSocial: 'Salud Total Farma S.A.C.', direccion: 'Av. Lima Sur 450', distrito: 'Lurigancho-Chosica', telefono: '014567890', latitud: -11.942500, longitud: -76.699000, tieneLicencia: true, estado: 'APROBADO', motivoRechazo: null },
@@ -167,7 +190,9 @@ db.resenas = [
 }))
 
 const siguienteId = (lista) => Math.max(0, ...lista.map((x) => x.id)) + 1
-const esperar = () => new Promise((r) => setTimeout(r, 250))
+const esperar = (ms = 250) => new Promise((r) => setTimeout(r, ms))
+// H20: verificar un código tarda un poco más, para ver la cruz LED encendida en la web
+const ESPERA_VERIFICAR_MS = 700
 const copia = (x) => structuredClone(x)
 const normalizar = (texto) =>
   String(texto ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -973,12 +998,70 @@ function exigirTitular(dueno, ruc) {
   }
 }
 
+// ---------- H20: códigos por correo ----------
+const normalizarCorreo = (correo) => String(correo ?? '').trim().toLowerCase()
+const segundosHasta = (ms) => String(Math.max(1, Math.ceil(ms / 1000)))
+
+/** Registra un envío si los límites por correo lo permiten; si no, devuelve el 429 que correspondería. */
+function enviarCodigo(proposito, correo) {
+  const clave = `${proposito}:${correo}`
+  const ahora = Date.now()
+  const enviados = (codigosCorreo.get(clave)?.enviados ?? []).filter((t) => ahora - t < HORA_MS)
+  const ultimo = enviados.at(-1)
+  if (ultimo && ahora - ultimo < ESPERA_CODIGO_MS) {
+    return crearError(429, MENSAJE_ESPERA_CODIGO, { retryAfter: segundosHasta(ESPERA_CODIGO_MS - (ahora - ultimo)) })
+  }
+  if (enviados.length >= MAX_CODIGOS_HORA) {
+    return crearError(429, MENSAJE_CODIGOS_HORA, { retryAfter: segundosHasta(enviados[0] + HORA_MS - ahora) })
+  }
+  codigosCorreo.set(clave, { enviados: [...enviados, ahora], vence: ahora + VIGENCIA_CODIGO_MS, intentos: 0, usado: false })
+  // Un código nuevo anula el token que hubiera dado el anterior
+  for (const datos of tokensVerificacion.values()) if (datos.correo === correo) datos.usado = true
+  return null
+}
+
+/** Mismas reglas que el backend: 15 minutos, 5 intentos, un solo uso y un único mensaje de error. */
+function comprobarCodigo(proposito, correo, codigo) {
+  if (!/^\d{6}$/.test(String(codigo ?? ''))) throw crearError(400, 'El código debe tener 6 dígitos')
+  const datos = codigosCorreo.get(`${proposito}:${correo}`)
+  if (!datos || datos.usado || datos.intentos >= MAX_INTENTOS_CODIGO || Date.now() > datos.vence) {
+    throw crearError(400, MENSAJE_CODIGO_INVALIDO)
+  }
+  if (codigo !== CODIGO_CORREO_PRUEBA) {
+    datos.intentos += 1
+    throw crearError(400, MENSAJE_CODIGO_INVALIDO)
+  }
+  datos.usado = true
+}
+
+function tokenVigente(token, correo) {
+  const datos = tokensVerificacion.get(String(token ?? ''))
+  const vigente = datos && !datos.usado && Date.now() <= datos.vence && (!correo || datos.correo === correo)
+  if (!vigente) throw crearError(400, MENSAJE_TOKEN_VENCIDO)
+  return datos
+}
+
+/** H2: simula la consulta a SUNAT solo para RUCS_SUNAT; los demás RUC válidos salen como LOCAL. */
+function respuestaValidarRuc(ruc) {
+  const { valido, mensaje } = validarRuc(ruc)
+  if (valido && RUCS_SUNAT[ruc]) return { ...RUCS_SUNAT[ruc], valido, mensaje, fuente: 'SUNAT' }
+  return {
+    ruc, valido,
+    mensaje: valido ? 'RUC válido (no se pudo consultar SUNAT)' : mensaje,
+    razonSocial: null, estado: null, condicion: null, fuente: 'LOCAL', direccion: null, distrito: null,
+  }
+}
+
 export const apiMock = {
   // ---------- 1. Autenticación ----------
   async login({ correo, password }) {
     await esperar()
     const usuario = db.usuarios.find((u) => u.correo === String(correo ?? '').trim().toLowerCase())
     if (!usuario || usuario.password !== password) throw crearError(401, 'Correo o contraseña incorrectos.')
+    // H20: solo con la contraseña correcta se revela que falta verificar el correo
+    if (usuario.correoVerificado === false) {
+      throw crearError(403, MENSAJE_SIN_VERIFICAR, { codigo: 'CORREO_NO_VERIFICADO' })
+    }
     programarReservaNueva(usuario.id)
     return {
       token: `mock-token.${usuario.id}.${crypto.randomUUID()}`,
@@ -987,21 +1070,105 @@ export const apiMock = {
     }
   },
 
-  async registro({ nombre, correo, password, telefono, rol }) {
+  // H20: paso 1 del registro. Imita los límites por correo (60 s y 5 por hora) y por IP (5 por hora).
+  async pedirCodigoRegistro(correo) {
     await esperar()
-    const correoNormal = String(correo ?? '').trim().toLowerCase()
-    if (!String(nombre ?? '').trim()) throw crearError(400, 'El nombre es obligatorio.')
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoNormal)) throw crearError(400, 'El correo no tiene un formato válido.')
-    if (String(password ?? '').length < 8) throw crearError(400, 'La contraseña debe tener al menos 8 caracteres.')
-    if (!['COMPRADOR', 'DUENO_BOTICA'].includes(rol)) throw crearError(400, 'El rol no es válido.')
-    if (db.usuarios.some((u) => u.correo === correoNormal)) throw crearError(409, 'El correo ya está registrado.')
+    const correoNormal = normalizarCorreo(correo)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoNormal)) throw crearError(400, 'El correo no tiene un formato válido')
+    if (db.usuarios.some((u) => u.correo === correoNormal)) throw crearError(409, 'El correo ya está registrado')
+    const porCorreo = enviarCodigo('registro', correoNormal)
+    if (porCorreo) throw porCorreo
+    const ahora = Date.now()
+    codigosRegistroIp = codigosRegistroIp.filter((t) => ahora - t < HORA_MS)
+    if (codigosRegistroIp.length >= MAX_CODIGOS_HORA) {
+      throw crearError(429, MENSAJE_REGISTROS_IP, { retryAfter: segundosHasta(codigosRegistroIp[0] + HORA_MS - ahora) })
+    }
+    codigosRegistroIp.push(ahora)
+    return { mensaje: MENSAJE_CODIGO_ENVIADO }
+  },
+
+  async verificarCodigoRegistro({ correo, codigo }) {
+    await esperar(ESPERA_VERIFICAR_MS)
+    const correoNormal = normalizarCorreo(correo)
+    comprobarCodigo('registro', correoNormal, codigo)
+    const tokenVerificacion = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('')
+    tokensVerificacion.set(tokenVerificacion, { correo: correoNormal, vence: Date.now() + VIGENCIA_TOKEN_MS, usado: false })
+    return { tokenVerificacion }
+  },
+
+  // H2 con el token del registro: no lo gasta
+  async validarRucRegistro({ tokenVerificacion, ruc }) {
+    await esperar()
+    if (!tokenVerificacion || !ruc) throw crearError(400, 'Faltan el token y el RUC')
+    tokenVigente(tokenVerificacion)
+    return respuestaValidarRuc(String(ruc))
+  },
+
+  // H1, H15, H20: cuenta (y botica del dueño) en una sola transacción, con el correo ya verificado
+  async registro({ tokenVerificacion, nombre, correo, password, telefono, rol, botica }) {
+    await esperar()
+    const correoNormal = normalizarCorreo(correo)
+    if (!tokenVerificacion) throw crearError(400, 'Falta el tokenVerificacion: primero verifica tu correo')
+    if (!String(nombre ?? '').trim()) throw crearError(400, 'El nombre es obligatorio')
+    if (String(nombre).trim().length > 100) throw crearError(400, 'El nombre admite máximo 100 caracteres')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoNormal)) throw crearError(400, 'El correo no tiene un formato válido')
+    const largo = String(password ?? '').length
+    if (largo < 8 || largo > 72) throw crearError(400, 'La contraseña debe tener entre 8 y 72 caracteres')
+    if (!['COMPRADOR', 'DUENO_BOTICA'].includes(rol)) throw crearError(400, 'El rol no es válido')
+    const token = tokenVigente(tokenVerificacion, correoNormal)
+    if (db.usuarios.some((u) => u.correo === correoNormal)) throw crearError(409, 'El correo ya está registrado')
+    if (rol === 'COMPRADOR' && botica) throw crearError(400, 'Un comprador no registra botica')
+    if (rol === 'DUENO_BOTICA') {
+      if (!botica) throw crearError(400, 'Faltan los datos de la botica')
+      // Si la botica falla no se crea nada y el token sigue sirviendo
+      validarDatosBotica(botica)
+      exigirRucLibre(botica.ruc)
+      exigirTitular({ nombre }, botica.ruc)
+    }
 
     const usuario = {
       id: siguienteId(db.usuarios), nombre: nombre.trim(), correo: correoNormal, password,
-      telefono: telefono?.trim() || null, direccion: null, rol,
+      telefono: telefono?.trim() || null, direccion: null, rol, correoVerificado: true,
     }
     db.usuarios.push(usuario)
-    return usuarioCorto(usuario)
+    if (rol === 'DUENO_BOTICA') {
+      // Como POST /boticas: si SUNAT responde, se guarda su razón social
+      const razonSunat = RUCS_SUNAT[botica.ruc]?.razonSocial
+      db.boticas.push({
+        id: siguienteId(db.boticas), usuarioId: usuario.id,
+        ...datosBotica({ ...botica, ...(razonSunat && { razonSocial: razonSunat }) }),
+        tieneLicencia: false, estado: 'PENDIENTE', motivoRechazo: null,
+      })
+    }
+    token.usado = true
+    return { token: `mock-token.${usuario.id}.${crypto.randomUUID()}`, tipo: 'Bearer', usuario: usuarioCorto(usuario) }
+  },
+
+  // H20: cuentas antiguas sin verificar. Siempre 200; solo el límite por IP (5 por hora) da 429.
+  async pedirCodigoVerificacion(correo) {
+    await esperar()
+    const correoNormal = normalizarCorreo(correo)
+    if (!correoNormal) throw crearError(400, 'El correo es obligatorio')
+    const ahora = Date.now()
+    solicitudesVerificacion = solicitudesVerificacion.filter((t) => ahora - t < HORA_MS)
+    if (solicitudesVerificacion.length >= MAX_RECUPERAR_HORA) {
+      throw crearError(429, MENSAJE_RECUPERAR_429, { retryAfter: segundosHasta(solicitudesVerificacion[0] + HORA_MS - ahora) })
+    }
+    solicitudesVerificacion.push(ahora)
+    const usuario = db.usuarios.find((u) => u.correo === correoNormal)
+    if (usuario?.password && !usuario.eliminado && usuario.correoVerificado === false) {
+      enviarCodigo('verificacion', correoNormal)
+    }
+    return { mensaje: MENSAJE_VERIFICACION }
+  },
+
+  async confirmarVerificacion({ correo, codigo }) {
+    await esperar(ESPERA_VERIFICAR_MS)
+    const correoNormal = normalizarCorreo(correo)
+    comprobarCodigo('verificacion', correoNormal, codigo)
+    const usuario = db.usuarios.find((u) => u.correo === correoNormal)
+    if (usuario) usuario.correoVerificado = true
+    return { mensaje: 'Correo verificado. Ya puedes iniciar sesión' }
   },
 
   // H17: siempre el mismo mensaje, exista o no el correo. Imita el límite de 5 solicitudes por hora por IP.
@@ -1010,18 +1177,22 @@ export const apiMock = {
     if (!String(correo ?? '').trim()) throw crearError(400, 'El correo es obligatorio')
     const ahora = Date.now()
     recuperaciones = recuperaciones.filter((t) => ahora - t < HORA)
-    if (recuperaciones.length >= MAX_RECUPERAR_HORA) throw crearError(429, MENSAJE_RECUPERAR_429)
+    if (recuperaciones.length >= MAX_RECUPERAR_HORA) {
+      throw crearError(429, MENSAJE_RECUPERAR_429, { retryAfter: segundosHasta(recuperaciones[0] + HORA_MS - ahora) })
+    }
     recuperaciones.push(ahora)
     return { mensaje: MENSAJE_RECUPERAR }
   },
 
   // H17: en el simulador el código válido es siempre 123456
   async restablecerPassword({ correo, token, password }) {
-    await esperar()
+    await esperar(ESPERA_VERIFICAR_MS)
     if (String(password ?? '').length < 8) throw crearError(400, 'La contraseña debe tener al menos 8 caracteres')
     const usuario = db.usuarios.find((u) => u.correo === String(correo ?? '').trim().toLowerCase())
     if (!usuario || token !== CODIGO_RECUPERACION_PRUEBA) throw crearError(400, MENSAJE_CODIGO_INVALIDO)
     usuario.password = password
+    // H20: el código llegó a ese correo, así que también queda verificado
+    usuario.correoVerificado = true
     return { mensaje: 'Contraseña actualizada' }
   },
 
@@ -1054,16 +1225,9 @@ export const apiMock = {
   },
 
   // ---------- 3. Botica ----------
-  // H2: simula la consulta a SUNAT solo para RUCS_SUNAT; los demás RUC válidos salen como LOCAL
   async validarRuc(ruc) {
     await esperar()
-    const { valido, mensaje } = validarRuc(ruc)
-    if (valido && RUCS_SUNAT[ruc]) return { ...RUCS_SUNAT[ruc], valido, mensaje, fuente: 'SUNAT' }
-    return {
-      ruc, valido,
-      mensaje: valido ? 'RUC válido (no se pudo consultar SUNAT)' : mensaje,
-      razonSocial: null, estado: null, condicion: null, fuente: 'LOCAL', direccion: null, distrito: null,
-    }
+    return respuestaValidarRuc(ruc)
   },
 
   async registrarBotica(datos) {

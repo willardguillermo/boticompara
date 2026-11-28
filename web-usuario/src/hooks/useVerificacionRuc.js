@@ -3,6 +3,7 @@
 //      la dirección fiscal y el distrito se sugieren en sus campos, que siguen siendo editables.
 // H7 - Al corregir la botica, el RUC cargado se consulta al entrar para sugerir la dirección fiscal.
 // Lo usan el formulario de la botica (BoticaForm) y el registro por pasos.
+// H20: en el registro la cuenta todavía no existe; ahí `consultar` usa POST /auth/registro/validar-ruc con el token.
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../services/index.js'
 import { distritoDeLista } from '../utils/distritos.js'
@@ -82,6 +83,7 @@ export function esErrorDeRuc(err) {
 /**
  * Estado de la verificación del RUC de un formulario cuyos datos (ruc, razonSocial, direccion, distrito)
  * y errores guarda quien lo usa; el hook los actualiza con setDatos y setErrores.
+ * consultar(ruc): la llamada a la API (por defecto GET /boticas/validar-ruc/{ruc}, con la sesión del dueño).
  * Con consultarAlIniciar (H7) consulta una vez el rucInicial; cargados es la dirección y el distrito
  * que ya tenía la botica.
  */
@@ -91,6 +93,7 @@ export function useVerificacionRuc({
   cargados = SIN_SUGERENCIAS,
   setDatos,
   setErrores,
+  consultar = api.validarRuc,
 }) {
   // { ruc, cargando: true } mientras se consulta, luego { ruc, resultado }
   const [consulta, setConsulta] = useState(() =>
@@ -110,8 +113,7 @@ export function useVerificacionRuc({
   function consultarRuc(ruc) {
     if (ultimaConsulta.current?.ruc === ruc) return Promise.resolve(ultimaConsulta.current.resultado)
     if (consultaEnCurso.current?.ruc === ruc) return consultaEnCurso.current.promesa
-    const promesa = api
-      .validarRuc(ruc)
+    const promesa = consultar(ruc)
       .then((resultado) => {
         ultimaConsulta.current = { ruc, resultado }
         return resultado

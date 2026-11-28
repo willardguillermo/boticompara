@@ -1,0 +1,268 @@
+/* H17, H20: tarjeta de vidrio de la verificación del código (VerificacionCodigo).
+   Vidrio claro en modo claro y oscuro en modo oscuro; el tinte de éxito y el brillo solo animan opacity y transform. */
+.vidrio-escena {
+  position: relative;
+  isolation: isolate;
+  padding-block: 0.25rem;
+}
+
+/* Dos luces suaves detrás, para que el desenfoque del vidrio tenga algo que desenfocar */
+.vidrio-luz {
+  position: absolute;
+  z-index: -1;
+  width: 13rem;
+  height: 13rem;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.vidrio-luz-1 {
+  top: -2rem;
+  left: -2.5rem;
+  background: radial-gradient(circle, rgb(20 184 166 / 45%), transparent 68%);
+}
+
+.vidrio-luz-2 {
+  right: -2rem;
+  bottom: -2.5rem;
+  background: radial-gradient(circle, rgb(34 197 94 / 30%), transparent 68%);
+}
+
+.vidrio {
+  --vidrio-fondo: rgb(255 255 255 / 45%);
+  --vidrio-borde-1: rgb(255 255 255 / 90%);
+  --vidrio-borde-2: color-mix(in srgb, var(--color-primario) 40%, transparent);
+  --vidrio-borde-3: rgb(255 255 255 / 25%);
+  --vidrio-brillo: rgb(255 255 255 / 40%);
+
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  overflow: hidden;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border-radius: 24px;
+  background: var(--vidrio-fondo);
+  box-shadow:
+    0 18px 44px rgb(16 48 44 / 14%),
+    inset 0 1px 0 rgb(255 255 255 / 65%);
+  text-align: center;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+:root[data-tema='oscuro'] .vidrio {
+  --vidrio-fondo: rgb(22 36 32 / 58%);
+  --vidrio-borde-1: rgb(255 255 255 / 24%);
+  --vidrio-borde-2: color-mix(in srgb, var(--color-primario) 45%, transparent);
+  --vidrio-borde-3: rgb(255 255 255 / 5%);
+  --vidrio-brillo: rgb(255 255 255 / 9%);
+
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 42%),
+    inset 0 1px 0 rgb(255 255 255 / 9%);
+}
+
+/* Borde con degradado sutil (un marco de 1 px recortado con máscara) */
+.vidrio::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--vidrio-borde-1), var(--vidrio-borde-2) 45%, var(--vidrio-borde-3));
+  pointer-events: none;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+}
+
+.vidrio[data-estado='exito'] {
+  --vidrio-borde-2: color-mix(in srgb, var(--exito) 60%, transparent);
+}
+
+/* El contenido va sobre el tinte y el brillo */
+.vidrio > :not(.vidrio-tinte, .vidrio-brillo) {
+  position: relative;
+}
+
+/* Brillo diagonal: pasa una vez al aparecer y se queda quieto */
+.vidrio-brillo {
+  position: absolute;
+  inset: -30% -60%;
+  background: linear-gradient(115deg, transparent 42%, var(--vidrio-brillo) 50%, transparent 58%);
+  pointer-events: none;
+  animation: vidrio-barrido 1.3s cubic-bezier(0.4, 0, 0.2, 1) 0.15s both;
+}
+
+/* Éxito: la tarjeta se tiñe de verde */
+.vidrio-tinte {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    color-mix(in srgb, var(--exito) 24%, transparent),
+    color-mix(in srgb, var(--exito-fondo) 65%, transparent)
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.vidrio[data-estado='exito'] .vidrio-tinte {
+  opacity: 1;
+}
+
+/* Ícono de llave, que se vuelve escudo al verificar */
+.vidrio-icono {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-primario) 14%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 45%),
+    0 8px 20px color-mix(in srgb, var(--color-primario) 22%, transparent);
+  color: var(--color-primario);
+  transition: color 0.3s ease;
+}
+
+.vidrio-icono .icono {
+  grid-area: 1 / 1;
+  width: 1.65rem;
+  height: 1.65rem;
+  transition:
+    opacity 0.3s ease,
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.vidrio-icono-escudo {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.vidrio[data-estado='exito'] .vidrio-icono {
+  color: var(--exito);
+}
+
+.vidrio[data-estado='exito'] .vidrio-icono-llave {
+  opacity: 0;
+  transform: scale(0.5) rotate(-20deg);
+}
+
+.vidrio[data-estado='exito'] .vidrio-icono-escudo {
+  opacity: 1;
+  transform: none;
+}
+
+.vidrio-titulo {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.vidrio-titulo:focus {
+  outline: none;
+}
+
+.vidrio-subtitulo {
+  margin: -0.4rem 0 0;
+  color: var(--color-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.vidrio .alerta {
+  text-align: left;
+}
+
+/* Campos extra (la contraseña nueva en la recuperación) */
+.vidrio-campos {
+  display: grid;
+  gap: 1rem;
+  text-align: left;
+}
+
+.vidrio-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.vidrio-boton .icono {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.vidrio-boton-exito,
+.vidrio-boton-exito:disabled {
+  border-color: var(--exito);
+  background: var(--exito);
+  color: var(--color-fondo);
+  opacity: 1;
+  cursor: default;
+}
+
+.vidrio-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentcolor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: vidrio-girar 0.75s linear infinite;
+}
+
+.vidrio-pie {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  font-size: 0.95rem;
+  color: var(--color-texto-suave);
+}
+
+.vidrio-pie p {
+  margin: 0;
+}
+
+.vidrio-pie .espera {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes vidrio-barrido {
+  from {
+    opacity: 0;
+    transform: translateX(-35%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes vidrio-girar {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vidrio-brillo {
+    animation: none;
+  }
+
+  .vidrio-icono .icono {
+    transform: none !important;
+  }
+
+  /* Nada gira: el texto "Verificando código…" basta */
+  .vidrio-spinner {
+    display: none;
+  }
+}

@@ -1,0 +1,96 @@
+/* H20: insignia "Correo verificado" (InsigniaVerificado). Anima stroke-dashoffset, opacity y transform. */
+.insignia-verificado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  margin: 0;
+}
+
+.insignia {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow: hidden;
+  padding: 0.35rem 0.85rem 0.35rem 0.6rem;
+  border: 1px solid var(--exito-borde);
+  border-radius: 999px;
+  background: var(--exito-fondo);
+  color: var(--exito);
+  font-size: 0.9rem;
+  font-weight: 700;
+  animation: insignia-entrar 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.insignia svg {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* El check se dibuja */
+.insignia path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: insignia-trazo 0.45s cubic-bezier(0.65, 0, 0.35, 1) 0.2s forwards;
+}
+
+/* Un brillo pasa una vez */
+.insignia::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 55%) 50%, transparent 70%);
+  transform: translateX(-120%);
+  pointer-events: none;
+  animation: insignia-brillo 0.9s ease-in-out 0.6s forwards;
+}
+
+:root[data-tema='oscuro'] .insignia::after {
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 18%) 50%, transparent 70%);
+}
+
+.insignia-correo {
+  overflow-wrap: anywhere;
+  color: var(--color-texto-suave);
+}
+
+@keyframes insignia-entrar {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes insignia-trazo {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes insignia-brillo {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insignia {
+    animation: none;
+  }
+
+  .insignia path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .insignia::after {
+    display: none;
+  }
+}
