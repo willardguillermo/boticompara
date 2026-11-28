@@ -52,9 +52,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         private set
     private var ubicacion by mutableStateOf<UbicacionProvider.Coordenadas?>(null)
 
-    val coordenadasUsuario: Pair<Double, Double>?
-        get() = ubicacion?.let { it.lat to it.lng }
-
     var radioKm by mutableStateOf<Double?>(null)
         private set
 
@@ -63,6 +60,26 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     fun cambiarVista(mapa: Boolean) {
         vistaMapa = mapa
+        if (mapa) prepararMapa()
+    }
+
+    // H48: dónde abre el mapa. Se muestra ya con lo que se sabe (GPS previo, manual o Lima centro)
+    // y, si hay permiso, se pide una ubicación GPS nueva y el mapa se recentra al llegar.
+    var ubicacionMapa by mutableStateOf<UbicacionInicial?>(null)
+        private set
+    private var trabajoMapa: Job? = null
+
+    fun prepararMapa() {
+        val manual = ubicacionManual?.let { Punto(it.lat, it.lng) }
+        // Sin ubicación manual, la que haya en `ubicacion` vino del GPS (Más cercanas)
+        val gpsPrevio = if (ubicacionManual == null) ubicacion?.let { Punto(it.lat, it.lng) } else null
+        ubicacionMapa = elegirUbicacionInicial(gpsPrevio, manual)
+        trabajoMapa?.cancel()
+        if (!ubicacionProvider.tienePermiso()) return
+        trabajoMapa = viewModelScope.launch {
+            val gps = ubicacionProvider.obtener() ?: return@launch
+            ubicacionMapa = elegirUbicacionInicial(Punto(gps.lat, gps.lng), manual)
+        }
     }
 
     var ubicacionManual by mutableStateOf<UbicacionManual?>(null)
@@ -183,6 +200,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         mensajeUbicacion = null
         mostrarSelector = false
         viewModelScope.launch { ubicacionStore.guardar(nueva) }
+        if (vistaMapa) prepararMapa()
         if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
     }
 
@@ -192,6 +210,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         ordenCercanas = false
         mostrarSelector = false
         viewModelScope.launch { ubicacionStore.borrar() }
+        if (vistaMapa) prepararMapa()
         if (searchQuery.trim().length >= 2) programarBusqueda(inmediata = true)
     }
 

@@ -23,9 +23,15 @@ class UbicacionProvider(private val context: Context) {
         permitido(Manifest.permission.ACCESS_FINE_LOCATION) ||
                 permitido(Manifest.permission.ACCESS_COARSE_LOCATION)
 
-    // null si no hay permiso, el GPS está apagado o no se pudo obtener
+    // null si no hay permiso, el GPS está apagado o no se pudo obtener.
+    // El permiso se comprueba aquí mismo, justo antes de usarlo (lint, MissingPermission), y además se
+    // captura SecurityException: el usuario puede quitarlo desde Ajustes mientras se espera la ubicación.
     suspend fun obtener(): Coordenadas? {
-        if (!tienePermiso()) return null
+        val fino = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        val grueso = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        if (!fino && !grueso) return null
         try {
             val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
             val activos = manager.getProviders(true)
@@ -34,24 +40,46 @@ class UbicacionProvider(private val context: Context) {
             // 1. Pedir una ubicación nueva (Android 11 o más)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 val proveedor = when {
-                    permitido(Manifest.permission.ACCESS_FINE_LOCATION) &&
-                            LocationManager.GPS_PROVIDER in activos -> LocationManager.GPS_PROVIDER
+                    fino && LocationManager.GPS_PROVIDER in activos -> LocationManager.GPS_PROVIDER
                     LocationManager.NETWORK_PROVIDER in activos -> LocationManager.NETWORK_PROVIDER
                     else -> activos.first()
                 }
                 val nueva = suspendCancellableCoroutine<Coordenadas?> { cont ->
                     val senal = CancellationSignal()
                     cont.invokeOnCancellation { senal.cancel() }
-                    manager.getCurrentLocation(proveedor, senal, ContextCompat.getMainExecutor(context)) { loc ->
-                        if (cont.isActive) cont.resume(loc?.let { Coordenadas(it.latitude, it.longitude) })
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) !=
+                        PackageManager.PERMISSION_GRANTED &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) !=
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        cont.resume(null)
+                        return@suspendCancellableCoroutine
+                    }
+                    try {
+                        manager.getCurrentLocation(proveedor, senal, ContextCompat.getMainExecutor(context)) { loc ->
+                            if (cont.isActive) cont.resume(loc?.let { Coordenadas(it.latitude, it.longitude) })
+                        }
+                    } catch (e: SecurityException) {
+                        if (cont.isActive) cont.resume(null)
                     }
                 }
                 if (nueva != null) return nueva
             }
 
             // 2. Si no hubo, usar la última conocida
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED
+            ) return null
             val ultima = activos
-                .mapNotNull { runCatching { manager.getLastKnownLocation(it) }.getOrNull() }
+                .mapNotNull { proveedor ->
+                    try {
+                        manager.getLastKnownLocation(proveedor)
+                    } catch (e: SecurityException) {
+                        null
+                    }
+                }
                 .maxByOrNull { it.time }
             return ultima?.let { Coordenadas(it.latitude, it.longitude) }
         } catch (e: CancellationException) {

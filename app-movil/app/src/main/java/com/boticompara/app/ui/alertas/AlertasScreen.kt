@@ -1,5 +1,6 @@
 package com.boticompara.app.ui.alertas
 
+import com.boticompara.app.ui.navigation.LocalEspacioBarra
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -103,7 +104,9 @@ fun AlertasScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = {
+            SnackbarHost(snackbarHostState, Modifier.padding(bottom = LocalEspacioBarra.current))
+        }
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -177,7 +180,7 @@ fun AlertasScreen(
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             verticalArrangement = Arrangement.spacedBy(Dimens.Space12),
-                            contentPadding = PaddingValues(top = Dimens.Space8, bottom = Dimens.Space24)
+                            contentPadding = PaddingValues(top = Dimens.Space8, bottom = Dimens.Space24 + LocalEspacioBarra.current)
                         ) {
                             items(vm.alertas, key = { it.id }) { alerta ->
                                 ItemAlertaCard(

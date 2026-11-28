@@ -1,5 +1,6 @@
 package com.boticompara.app.ui.chat
 
+import com.boticompara.app.ui.navigation.LocalEspacioBarra
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -122,7 +123,7 @@ fun ChatScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.padding(bottom = LocalEspacioBarra.current)) },
         topBar = {
             CabeceraPantalla(
                 titulo = "Asistente",
@@ -152,6 +153,8 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                // La caja de texto queda encima de la barra flotante; con el teclado abierto, encima del teclado
+                .padding(bottom = LocalEspacioBarra.current)
                 .imePadding()
         ) {
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -339,7 +342,9 @@ private fun BarraEscritura(
     escuchando: Boolean,
     puedeEnviar: Boolean
 ) {
-    Surface(tonalElevation = 3.dp) {
+    // Sin fondo propio: el de la pantalla sigue continuo detrás de la caja (con la barra flotante debajo,
+    // un Surface con elevación se veía como una franja de otro tono)
+    Box {
         BotiTextField(
             value = texto,
             onValueChange = onTextoChange,
