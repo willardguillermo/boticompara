@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Savings
@@ -181,18 +182,23 @@ fun MapaResultados(
             uiSettings = MapUiSettings(zoomControlsEnabled = false, mapToolbarEnabled = false),
             onMapClick = { seleccionadaId = null }
         ) {
-            if (ubicacion?.esDelUsuario == true) {
+            // Una sola ubicación del usuario: el punto azul si es el GPS, el marcador claro si es la elegida
+            val tipoUsuario = ubicacion?.let { marcadorUsuario(it.origen) }
+            if (ubicacion != null && tipoUsuario != null) {
+                val esGps = tipoUsuario == MarcadorUsuario.PUNTO_GPS
                 MarkerComposable(
-                    ubicacion.origen,
+                    tipoUsuario,
                     state = rememberUpdatedMarkerState(position = ubicacion.punto.aLatLng()),
-                    contentDescription = "Tu ubicación",
-                    title = "Tu ubicación",
+                    contentDescription = if (esGps) "Tu ubicación" else "Tu ubicación elegida",
+                    title = if (esGps) "Tu ubicación" else "Tu ubicación elegida",
+                    // Centrado en la ubicación: los pines crecen hacia arriba desde su punta, así que aunque
+                    // una botica esté en el mismo punto, el marcador del usuario asoma debajo de su precio
                     anchor = Offset(0.5f, 0.5f),
                     // Debajo de los pines: si se superponen, el precio siempre se lee
                     zIndex = 0f,
                     onClick = { true }
                 ) {
-                    PuntoUbicacion()
+                    if (esGps) PuntoUbicacion() else MarcadorUbicacionElegida()
                 }
             }
             marcadores.forEach { marcador ->
@@ -359,6 +365,29 @@ private fun PuntoUbicacion() {
                 .background(Color.White, CircleShape)
                 .padding(3.dp)
                 .background(AzulUbicacion, CircleShape)
+        )
+    }
+}
+
+/**
+ * La ubicación elegida a mano: un marcador claro y compacto (círculo blanco con borde e ícono verde
+ * azulado) para que no se confunda con el punto azul del GPS ni con los pines de precio, que son
+ * píldoras verdes. El aviso de arriba del mapa dice qué es.
+ */
+@Composable
+private fun MarcadorUbicacionElegida() {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .background(Color.White, CircleShape)
+            .border(BorderStroke(2.5.dp, VerdeMarca), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            Icons.Rounded.LocationOn,
+            contentDescription = null,
+            tint = VerdeMarca,
+            modifier = Modifier.size(18.dp)
         )
     }
 }

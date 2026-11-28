@@ -28,6 +28,16 @@ data class UbicacionInicial(val punto: Punto, val origen: OrigenUbicacion) {
     val esDelUsuario: Boolean get() = origen != OrigenUbicacion.POR_DEFECTO
 }
 
+/** Cómo se dibuja al usuario en el mapa. Es un solo valor: nunca hay dos ubicaciones del usuario a la vez. */
+internal enum class MarcadorUsuario { PUNTO_GPS, UBICACION_ELEGIDA }
+
+/** El punto azul con GPS; el marcador "Tu ubicación elegida" con la manual; nada con Lima centro. */
+internal fun marcadorUsuario(origen: OrigenUbicacion): MarcadorUsuario? = when (origen) {
+    OrigenUbicacion.GPS -> MarcadorUsuario.PUNTO_GPS
+    OrigenUbicacion.MANUAL -> MarcadorUsuario.UBICACION_ELEGIDA
+    OrigenUbicacion.POR_DEFECTO -> null
+}
+
 /**
  * Dónde abre el mapa: el GPS si dio permiso y hubo ubicación; si no, la ubicación manual guardada;
  * si no hay ninguna, Lima centro.

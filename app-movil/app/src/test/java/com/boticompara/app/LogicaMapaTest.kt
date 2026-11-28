@@ -3,6 +3,7 @@ package com.boticompara.app
 import com.boticompara.app.data.remote.dto.ProductoResponse
 import com.boticompara.app.ui.busqueda.CENTRO_LIMA_PUNTO
 import com.boticompara.app.ui.busqueda.MarcadorBotica
+import com.boticompara.app.ui.busqueda.MarcadorUsuario
 import com.boticompara.app.ui.busqueda.OrigenUbicacion
 import com.boticompara.app.ui.busqueda.Punto
 import com.boticompara.app.ui.busqueda.boticasMasBaratas
@@ -11,6 +12,7 @@ import com.boticompara.app.ui.busqueda.elegirUbicacionInicial
 import com.boticompara.app.ui.busqueda.formatoDistancia
 import com.boticompara.app.ui.busqueda.formatoPrecio
 import com.boticompara.app.ui.busqueda.limitesCentrados
+import com.boticompara.app.ui.busqueda.marcadorUsuario
 import com.boticompara.app.ui.busqueda.puntosCercanos
 import com.boticompara.app.ui.busqueda.puntosVistaInicial
 import org.junit.Assert.assertEquals
@@ -179,5 +181,25 @@ class LogicaMapaTest {
         assertTrue(callao.lat in limites.first.lat..limites.second.lat)
         assertTrue(callao.lng in limites.first.lng..limites.second.lng)
         assertEquals(miraflores.lng, (limites.first.lng + limites.second.lng) / 2, 0.000001)
+    }
+
+    // ---- Una sola ubicación del usuario ----
+
+    @Test
+    fun conGpsSoloSeDibujaElPuntoAzulAunqueHayaUbicacionElegida() {
+        val inicial = elegirUbicacionInicial(gps = miraflores, manual = callao)
+        assertEquals(MarcadorUsuario.PUNTO_GPS, marcadorUsuario(inicial.origen))
+        assertEquals(miraflores, inicial.punto)   // y en el GPS, no en la elegida
+    }
+
+    @Test
+    fun sinGpsSoloSeDibujaLaUbicacionElegida() {
+        val inicial = elegirUbicacionInicial(gps = null, manual = callao)
+        assertEquals(MarcadorUsuario.UBICACION_ELEGIDA, marcadorUsuario(inicial.origen))
+    }
+
+    @Test
+    fun conLimaCentroNoSeDibujaNingunaUbicacionDelUsuario() {
+        assertNull(marcadorUsuario(elegirUbicacionInicial(gps = null, manual = null).origen))
     }
 }
