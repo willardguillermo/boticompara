@@ -39,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.boticompara.app.data.remote.dto.ProductoResponse
 import com.boticompara.app.ui.components.*
+import com.boticompara.app.ui.navigation.LocalEspacioBarra
 import com.boticompara.app.ui.theme.Dimens
 import java.util.Locale
 
@@ -49,6 +50,7 @@ private fun etiquetaRadio(radioKm: Double?): String =
 @Composable
 fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel = viewModel()) {
     val vm = searchViewModel
+    val espacioBarra = LocalEspacioBarra.current
 
     val permisoLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -368,8 +370,11 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                             MapaResultados(
                                 productos = vm.productos,
                                 onProductoClick = { productoId -> navController.navigate("detalle/$productoId") },
-                                modifier = Modifier.fillMaxSize(),
-                                ubicacionUsuario = vm.coordenadasUsuario
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(MaterialTheme.shapes.extraLarge),
+                                ubicacion = vm.ubicacionMapa,
+                                espacioInferior = espacioBarra
                             )
                         } else {
                             val precioMinimo = vm.productos.minOf { it.precio }
@@ -382,7 +387,7 @@ fun SearchScreen(navController: NavController, searchViewModel: SearchViewModel 
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
                                     verticalArrangement = Arrangement.spacedBy(Dimens.Space12),
-                                    contentPadding = PaddingValues(bottom = Dimens.Space24)
+                                    contentPadding = PaddingValues(bottom = Dimens.Space24 + espacioBarra)
                                 ) {
                                     itemsIndexed(vm.productos, key = { _, p -> p.productoId }) { indice, producto ->
                                         ProductoCard(

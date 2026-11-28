@@ -1,53 +1,83 @@
 package com.boticompara.app.ui.busqueda
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.boticompara.app.data.remote.dto.ProductoResponse
 import com.boticompara.app.ui.components.BotiButton
-import com.boticompara.app.ui.components.ProductoCard
+import com.boticompara.app.ui.components.animacionesApagadas
+import com.boticompara.app.ui.navigation.PausarDesenfoqueBarra
 import com.boticompara.app.ui.theme.Dimens
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.maps.android.compose.CameraMoveStartedReason
+import com.google.maps.android.compose.CameraPositionState
+import com.google.maps.android.compose.ComposeMapColorScheme
 import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberUpdatedMarkerState
-import java.util.Locale
 
-private val CENTRO_LIMA = LatLng(-12.0464, -77.0300)
-private const val ZOOM_LIMA = 12f
-private const val ZOOM_BOTICA = 15f
-private const val MARGEN_MAPA = 96
+private const val ZOOM_INICIAL = 12f
+private const val ZOOM_USUARIO = 15f
+private const val MARGEN_VISTA_DP = 56
+
+// Pines con colores fijos de la marca: se leen igual sobre el mapa claro y el oscuro
+private val VerdeMarca = Color(0xFF006A60)
+private val VerdeMarcaSeleccionado = Color(0xFF00433C)
+private val AzulUbicacion = Color(0xFF1A73E8)
 
 internal data class MarcadorBotica(
     val producto: ProductoResponse,
@@ -64,143 +94,376 @@ internal fun agruparPorBotica(productos: List<ProductoResponse>): List<MarcadorB
             MarcadorBotica(masBarato, masBarato.boticaLatitud!!, masBarato.boticaLongitud!!)
         }
 
+private fun Punto.aLatLng() = LatLng(lat, lng)
+
+/**
+ * H48 - Mapa de resultados. Abre centrado en el usuario (GPS, ubicación manual o Lima centro, ver
+ * [elegirUbicacionInicial]) con zoom ~15 y deja a la vista las boticas cercanas. Cada botica es un pin con
+ * su precio; la más barata va resaltada. Al tocar un pin aparece una tarjeta con la botica, el distrito,
+ * el precio, la distancia y el botón para ver el detalle.
+ * [espacioInferior] es lo que tapa la barra de navegación flotante: el mapa sigue debajo de ella,
+ * pero el logo de Google, el centro de la vista y la tarjeta quedan por encima.
+ */
 @Composable
 fun MapaResultados(
     productos: List<ProductoResponse>,
     onProductoClick: (productoId: Long) -> Unit,
     modifier: Modifier = Modifier,
-    ubicacionUsuario: Pair<Double, Double>? = null
+    ubicacion: UbicacionInicial? = null,
+    espacioInferior: Dp = 0.dp
 ) {
     val alTocar by rememberUpdatedState(onProductoClick)
+    // El mapa es un SurfaceView: con la pantalla grabada para el desenfoque de la barra no se vería
+    PausarDesenfoqueBarra()
+    val sinAnimacion = animacionesApagadas()
+    val densidad = LocalDensity.current
 
     val marcadores = remember(productos) { agruparPorBotica(productos) }
+    val masBaratas = remember(marcadores) { boticasMasBaratas(marcadores) }
     val sinUbicacion = remember(productos) {
         productos.map { it.boticaId }.distinct().size - marcadores.size
     }
 
-    var boticaSeleccionada by remember { mutableStateOf<MarcadorBotica?>(null) }
+    var seleccionadaId by remember { mutableStateOf<Long?>(null) }
+    val seleccionada = marcadores.firstOrNull { it.producto.boticaId == seleccionadaId }
     var tamanoMapa by remember { mutableStateOf(IntSize.Zero) }
+    // El usuario movió el mapa con el dedo: ya no se recentra solo (sí con el botón)
+    var movidoPorUsuario by remember { mutableStateOf(false) }
+    var pedidosDeCentrado by remember { mutableIntStateOf(0) }
 
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(CENTRO_LIMA, ZOOM_LIMA)
+    val camara = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(CENTRO_LIMA_PUNTO.aLatLng(), ZOOM_INICIAL)
     }
-    val estadoUbicacion = rememberUpdatedMarkerState(
-        position = ubicacionUsuario?.let { LatLng(it.first, it.second) } ?: CENTRO_LIMA
-    )
 
-    LaunchedEffect(marcadores, ubicacionUsuario, tamanoMapa) {
-        if (tamanoMapa.width == 0 || tamanoMapa.height == 0) return@LaunchedEffect
-        val puntos = marcadores.map { LatLng(it.lat, it.lng) } +
-            (ubicacionUsuario?.let { listOf(LatLng(it.first, it.second)) } ?: emptyList())
-        when {
-            puntos.isEmpty() ->
-                cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(CENTRO_LIMA, ZOOM_LIMA))
-
-            puntos.size == 1 ->
-                cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(puntos.first(), ZOOM_BOTICA))
-
-            else -> {
-                val limites = LatLngBounds.builder()
-                puntos.forEach { limites.include(it) }
-                cameraPositionState.move(
-                    CameraUpdateFactory.newLatLngBounds(limites.build(), MARGEN_MAPA)
-                )
-            }
+    LaunchedEffect(camara.isMoving) {
+        if (camara.isMoving && camara.cameraMoveStartedReason == CameraMoveStartedReason.GESTURE) {
+            movidoPorUsuario = true
         }
     }
 
+    var yaCentrado by remember { mutableStateOf(false) }
+    LaunchedEffect(ubicacion, marcadores, tamanoMapa, pedidosDeCentrado) {
+        val actual = ubicacion ?: return@LaunchedEffect
+        if (tamanoMapa.width == 0 || tamanoMapa.height == 0) return@LaunchedEffect
+        if (movidoPorUsuario) return@LaunchedEffect
+        val margenPx = with(densidad) { MARGEN_VISTA_DP.dp.roundToPx() }
+            .coerceAtMost(minOf(tamanoMapa.width, tamanoMapa.height) / 4)
+        centrar(
+            camara = camara,
+            usuario = actual.punto,
+            boticas = marcadores.map { Punto(it.lat, it.lng) },
+            margenPx = margenPx,
+            animar = yaCentrado && !sinAnimacion
+        )
+        yaCentrado = true
+    }
+
+    val oscuro = isSystemInDarkTheme()
     Box(modifier = modifier) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            GoogleMap(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .onGloballyPositioned { coordenadas ->
-                        if (coordenadas.size != tamanoMapa) tamanoMapa = coordenadas.size
-                    },
-                cameraPositionState = cameraPositionState,
-                onMapClick = { boticaSeleccionada = null }
-            ) {
-                marcadores.forEach { marcador ->
-                    // key + remember: cada marcador conserva su estado entre recomposiciones (lint, UnrememberedMutableState)
-                    key(marcador.producto.boticaId) {
-                    Marker(
+        GoogleMap(
+            modifier = Modifier
+                .matchParentSize()
+                .onSizeChanged { if (it != tamanoMapa) tamanoMapa = it },
+            cameraPositionState = camara,
+            // Arriba, el espacio de los avisos; abajo, el de la barra flotante
+            contentPadding = PaddingValues(top = 56.dp, bottom = espacioInferior),
+            mapColorScheme = if (oscuro) ComposeMapColorScheme.DARK else ComposeMapColorScheme.LIGHT,
+            uiSettings = MapUiSettings(zoomControlsEnabled = false, mapToolbarEnabled = false),
+            onMapClick = { seleccionadaId = null }
+        ) {
+            if (ubicacion?.esDelUsuario == true) {
+                MarkerComposable(
+                    ubicacion.origen,
+                    state = rememberUpdatedMarkerState(position = ubicacion.punto.aLatLng()),
+                    contentDescription = "Tu ubicación",
+                    title = "Tu ubicación",
+                    anchor = Offset(0.5f, 0.5f),
+                    // Encima de los pines: es pequeño y así nunca queda tapado por uno cercano
+                    zIndex = 4f,
+                    onClick = { true }
+                ) {
+                    PuntoUbicacion()
+                }
+            }
+            marcadores.forEach { marcador ->
+                val id = marcador.producto.boticaId
+                val barata = id in masBaratas
+                val elegida = id == seleccionadaId
+                val precio = formatoPrecio(marcador.producto.precio)
+                key(id) {
+                    MarkerComposable(
+                        precio, barata, elegida,
                         state = rememberUpdatedMarkerState(position = LatLng(marcador.lat, marcador.lng)),
+                        contentDescription = buildString {
+                            append(marcador.producto.boticaNombre).append(", ").append(precio)
+                            if (barata) append(", más barato")
+                        },
                         title = marcador.producto.boticaNombre,
-                        snippet = "S/ ${String.format(Locale.US, "%.2f", marcador.producto.precio)}",
+                        zIndex = when {
+                            elegida -> 3f
+                            barata -> 2f
+                            else -> 1f
+                        },
                         onClick = {
-                            boticaSeleccionada = marcador
+                            seleccionadaId = id
                             true
                         }
-                    )
+                    ) {
+                        PinPrecio(precio = precio, masBarato = barata, seleccionado = elegida)
                     }
                 }
-                if (ubicacionUsuario != null) {
-                    Marker(
-                        state = estadoUbicacion,
-                        title = "Tu ubicación"
-                    )
-                }
             }
+        }
+
+        // Arriba: de dónde salió la ubicación y cuántas boticas no salen en el mapa
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(Dimens.Space12)
+                .padding(end = 56.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            ubicacion?.let { AvisoMapa(textoOrigen(it.origen)) }
             if (sinUbicacion > 0) {
-                Text(
-                    if (sinUbicacion == 1) {
-                        "1 botica no tiene ubicación registrada y no aparece en el mapa"
-                    } else {
-                        "$sinUbicacion boticas no tienen ubicación registrada y no aparecen en el mapa"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(12.dp)
+                AvisoMapa(
+                    if (sinUbicacion == 1) "1 botica sin ubicación registrada no aparece en el mapa"
+                    else "$sinUbicacion boticas sin ubicación registrada no aparecen en el mapa"
                 )
             }
         }
 
-        boticaSeleccionada?.let { seleccion ->
-            Box(
+        if (ubicacion != null) {
+            SmallFloatingActionButton(
+                onClick = {
+                    movidoPorUsuario = false
+                    pedidosDeCentrado++
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(Dimens.Space12),
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Rounded.MyLocation, contentDescription = "Centrar el mapa en tu ubicación")
+            }
+        }
+
+        seleccionada?.let { marcador ->
+            val distancia = if (ubicacion?.esDelUsuario == true) {
+                distanciaKm(ubicacion.punto, Punto(marcador.lat, marcador.lng))
+            } else {
+                marcador.producto.distanciaKm
+            }
+            TarjetaBotica(
+                producto = marcador.producto,
+                distanciaKm = distancia,
+                masBarato = marcador.producto.boticaId in masBaratas,
+                onVerDetalle = { alTocar(marcador.producto.productoId) },
+                onCerrar = { seleccionadaId = null },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(Dimens.Space16)
+                    .padding(horizontal = Dimens.Space12)
+                    .padding(bottom = espacioInferior + Dimens.Space12)
+            )
+        }
+    }
+}
+
+/**
+ * Centra en el usuario con zoom [ZOOM_USUARIO] y, si hay boticas cercanas, abre la vista lo justo para
+ * que entren, sin pasar de ese zoom y sin dejar de estar centrada en el usuario.
+ */
+private suspend fun centrar(
+    camara: CameraPositionState,
+    usuario: Punto,
+    boticas: List<Punto>,
+    margenPx: Int,
+    animar: Boolean
+) {
+    val limites = limitesCentrados(usuario, puntosCercanos(usuario, boticas))
+    val cambio = if (limites == null) {
+        CameraUpdateFactory.newLatLngZoom(usuario.aLatLng(), ZOOM_USUARIO)
+    } else {
+        CameraUpdateFactory.newLatLngBounds(
+            LatLngBounds(limites.first.aLatLng(), limites.second.aLatLng()),
+            margenPx
+        )
+    }
+    if (animar) camara.animate(cambio, 600) else camara.move(cambio)
+    if (camara.position.zoom > ZOOM_USUARIO) {
+        camara.move(CameraUpdateFactory.newLatLngZoom(usuario.aLatLng(), ZOOM_USUARIO))
+    }
+}
+
+private fun textoOrigen(origen: OrigenUbicacion) = when (origen) {
+    OrigenUbicacion.GPS -> "Tu ubicación (GPS)"
+    OrigenUbicacion.MANUAL -> "Tu ubicación elegida"
+    OrigenUbicacion.POR_DEFECTO -> "Lima centro: elige tu ubicación para ver las más cercanas"
+}
+
+@Composable
+private fun AvisoMapa(texto: String) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        shadowElevation = 2.dp
+    ) {
+        Text(
+            texto,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        )
+    }
+}
+
+/** El punto azul de "Tu ubicación": centro azul con borde blanco y un halo suave. */
+@Composable
+private fun PuntoUbicacion() {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .background(AzulUbicacion.copy(alpha = 0.22f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(16.dp)
+                .background(Color.White, CircleShape)
+                .padding(3.dp)
+                .background(AzulUbicacion, CircleShape)
+        )
+    }
+}
+
+/**
+ * Pin con el precio. Normal: píldora verde azulado con texto blanco. El más barato: tono invertido
+ * (blanco con borde y texto verde) y la etiqueta "Más barato" encima. El seleccionado, más oscuro.
+ */
+@Composable
+private fun PinPrecio(precio: String, masBarato: Boolean, seleccionado: Boolean) {
+    val fondo = when {
+        seleccionado -> VerdeMarcaSeleccionado
+        masBarato -> Color.White
+        else -> VerdeMarca
+    }
+    val texto = if (masBarato && !seleccionado) VerdeMarca else Color.White
+    val borde = if (masBarato) VerdeMarca else Color.White
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (masBarato) {
+            Row(
+                modifier = Modifier
+                    .background(VerdeMarca, RoundedCornerShape(50))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Column(modifier = Modifier.padding(Dimens.Space16)) {
-                        ProductoCard(
-                            nombre = seleccion.producto.nombreComercial,
-                            presentacion = seleccion.producto.presentacion,
-                            principioActivo = seleccion.producto.principioActivo,
-                            precio = seleccion.producto.precio,
-                            stock = seleccion.producto.stock,
-                            boticaNombre = seleccion.producto.boticaNombre,
-                            boticaDireccion = seleccion.producto.boticaDireccion,
-                            boticaDistrito = seleccion.producto.boticaDistrito,
-                            distanciaKm = seleccion.producto.distanciaKm,
-                            esMasBarato = false,
-                            onClick = { alTocar(seleccion.producto.productoId) },
-                            condicionVenta = seleccion.producto.condicionVenta
-                        )
-                        Spacer(Modifier.height(Dimens.Space12))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(Dimens.Space8),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            BotiButton(
-                                text = "Ver detalle",
-                                onClick = { alTocar(seleccion.producto.productoId) },
-                                modifier = Modifier.weight(1f)
-                            )
-                            IconButton(onClick = { boticaSeleccionada = null }) {
-                                Icon(Icons.Rounded.Close, contentDescription = "Cerrar")
-                            }
-                        }
-                    }
+                Icon(
+                    Icons.Rounded.Savings,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(11.dp)
+                )
+                Spacer(Modifier.width(3.dp))
+                Text("Más barato", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(2.dp))
+        }
+        Box(
+            modifier = Modifier
+                .background(fondo, RoundedCornerShape(50))
+                .border(BorderStroke(if (masBarato) 2.dp else 1.5.dp, borde), RoundedCornerShape(50))
+                .padding(horizontal = if (seleccionado) 12.dp else 10.dp, vertical = if (seleccionado) 6.dp else 4.dp)
+        ) {
+            Text(
+                precio,
+                color = texto,
+                fontSize = if (seleccionado) 15.sp else 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        // La punta del pin, apuntando a la botica
+        val colorPunta = if (masBarato && !seleccionado) VerdeMarca else fondo
+        Canvas(modifier = Modifier.size(width = 12.dp, height = 7.dp)) {
+            val punta = Path().apply {
+                moveTo(0f, 0f)
+                lineTo(size.width, 0f)
+                lineTo(size.width / 2, size.height)
+                close()
+            }
+            drawPath(punta, colorPunta)
+        }
+    }
+}
+
+@Composable
+private fun TarjetaBotica(
+    producto: ProductoResponse,
+    distanciaKm: Double?,
+    masBarato: Boolean,
+    onVerDetalle: () -> Unit,
+    onCerrar: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(Dimens.Space16)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        producto.boticaNombre,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        listOfNotNull(producto.boticaDistrito, distanciaKm?.let { "a ${formatoDistancia(it)}" })
+                            .joinToString(" · "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onCerrar) {
+                    Icon(Icons.Rounded.Close, contentDescription = "Cerrar")
                 }
             }
+            Spacer(Modifier.height(Dimens.Space8))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "${producto.nombreComercial} · ${producto.presentacion}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (masBarato) {
+                        Text(
+                            "Más barato",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Spacer(Modifier.width(Dimens.Space12))
+                Text(
+                    formatoPrecio(producto.precio),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(Dimens.Space12))
+            BotiButton(
+                text = "Ver detalle",
+                onClick = onVerDetalle,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
