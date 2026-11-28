@@ -19,8 +19,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -37,6 +39,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +61,7 @@ import com.boticompara.app.ui.components.BotiButton
 import com.boticompara.app.ui.components.animacionesApagadas
 import com.boticompara.app.ui.navigation.PausarDesenfoqueBarra
 import com.boticompara.app.ui.theme.Dimens
+import com.google.android.gms.maps.CameraUpdate
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -69,10 +74,13 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberUpdatedMarkerState
+import kotlinx.coroutines.launch
 
 private const val ZOOM_INICIAL = 12f
 private const val ZOOM_USUARIO = 15f
-private const val MARGEN_VISTA_DP = 56
+// Margen alrededor de los puntos de la vista inicial: el pin se dibuja hacia arriba desde la botica
+// (con la etiqueta "Más barato" mide ~60 dp) y hacia los lados (~45 dp), así que el margen debe cubrirlo
+private const val MARGEN_VISTA_DP = 72
 
 // Pines con colores fijos de la marca: se leen igual sobre el mapa claro y el oscuro
 private val VerdeMarca = Color(0xFF006A60)
@@ -152,6 +160,7 @@ fun MapaResultados(
             camara = camara,
             usuario = actual.punto,
             boticas = marcadores.map { Punto(it.lat, it.lng) },
+            masBaratas = marcadores.filter { it.producto.boticaId in masBaratas }.map { Punto(it.lat, it.lng) },
             margenPx = margenPx,
             animar = yaCentrado && !sinAnimacion
         )
@@ -165,8 +174,9 @@ fun MapaResultados(
                 .matchParentSize()
                 .onSizeChanged { if (it != tamanoMapa) tamanoMapa = it },
             cameraPositionState = camara,
-            // Arriba, el espacio de los avisos; abajo, el de la barra flotante
-            contentPadding = PaddingValues(top = 56.dp, bottom = espacioInferior),
+            // Arriba, los avisos; a la derecha, la columna de botones; abajo, la barra flotante.
+            // La vista inicial se ajusta dentro de ese hueco, así nada de eso tapa un pin.
+            contentPadding = PaddingValues(top = 56.dp, end = 60.dp, bottom = espacioInferior),
             mapColorScheme = if (oscuro) ComposeMapColorScheme.DARK else ComposeMapColorScheme.LIGHT,
             uiSettings = MapUiSettings(zoomControlsEnabled = false, mapToolbarEnabled = false),
             onMapClick = { seleccionadaId = null }
@@ -178,8 +188,8 @@ fun MapaResultados(
                     contentDescription = "Tu ubicación",
                     title = "Tu ubicación",
                     anchor = Offset(0.5f, 0.5f),
-                    // Encima de los pines: es pequeño y así nunca queda tapado por uno cercano
-                    zIndex = 4f,
+                    // Debajo de los pines: si se superponen, el precio siempre se lee
+                    zIndex = 0f,
                     onClick = { true }
                 ) {
                     PuntoUbicacion()
@@ -232,20 +242,26 @@ fun MapaResultados(
             }
         }
 
-        if (ubicacion != null) {
-            SmallFloatingActionButton(
-                onClick = {
+        // Centrar, acercar y alejar, en una columna (el pellizco y el doble toque siguen funcionando)
+        val alcance = rememberCoroutineScope()
+        fun zoom(cambio: CameraUpdate) {
+            movidoPorUsuario = true
+            alcance.launch { if (sinAnimacion) camara.move(cambio) else camara.animate(cambio, 250) }
+        }
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(Dimens.Space12),
+            verticalArrangement = Arrangement.spacedBy(Dimens.Space8)
+        ) {
+            if (ubicacion != null) {
+                BotonMapa(Icons.Rounded.MyLocation, "Centrar el mapa en tu ubicación") {
                     movidoPorUsuario = false
                     pedidosDeCentrado++
-                },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(Dimens.Space12),
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Rounded.MyLocation, contentDescription = "Centrar el mapa en tu ubicación")
+                }
             }
+            BotonMapa(Icons.Rounded.Add, "Acercar") { zoom(CameraUpdateFactory.zoomIn()) }
+            BotonMapa(Icons.Rounded.Remove, "Alejar") { zoom(CameraUpdateFactory.zoomOut()) }
         }
 
         seleccionada?.let { marcador ->
@@ -270,25 +286,25 @@ fun MapaResultados(
 }
 
 /**
- * Centra en el usuario con zoom [ZOOM_USUARIO] y, si hay boticas cercanas, abre la vista lo justo para
- * que entren, sin pasar de ese zoom y sin dejar de estar centrada en el usuario.
+ * Centra en el usuario con zoom [ZOOM_USUARIO] y abre la vista lo justo para que entren completas las
+ * boticas cercanas y la más barata, sin pasar de ese zoom y sin dejar de estar centrada en el usuario.
  */
 private suspend fun centrar(
     camara: CameraPositionState,
     usuario: Punto,
     boticas: List<Punto>,
+    masBaratas: List<Punto>,
     margenPx: Int,
     animar: Boolean
 ) {
-    val limites = limitesCentrados(usuario, puntosCercanos(usuario, boticas))
-    val cambio = if (limites == null) {
-        CameraUpdateFactory.newLatLngZoom(usuario.aLatLng(), ZOOM_USUARIO)
-    } else {
+    fun cambioPara(puntos: List<Punto>) = limitesCentrados(usuario, puntos)?.let { limites ->
         CameraUpdateFactory.newLatLngBounds(
             LatLngBounds(limites.first.aLatLng(), limites.second.aLatLng()),
             margenPx
         )
-    }
+    } ?: CameraUpdateFactory.newLatLngZoom(usuario.aLatLng(), ZOOM_USUARIO)
+
+    val cambio = cambioPara(puntosVistaInicial(usuario, boticas, masBaratas))
     if (animar) camara.animate(cambio, 600) else camara.move(cambio)
     if (camara.position.zoom > ZOOM_USUARIO) {
         camara.move(CameraUpdateFactory.newLatLngZoom(usuario.aLatLng(), ZOOM_USUARIO))
@@ -299,6 +315,17 @@ private fun textoOrigen(origen: OrigenUbicacion) = when (origen) {
     OrigenUbicacion.GPS -> "Tu ubicación (GPS)"
     OrigenUbicacion.MANUAL -> "Tu ubicación elegida"
     OrigenUbicacion.POR_DEFECTO -> "Lima centro: elige tu ubicación para ver las más cercanas"
+}
+
+@Composable
+private fun BotonMapa(icono: ImageVector, descripcion: String, onClick: () -> Unit) {
+    SmallFloatingActionButton(
+        onClick = onClick,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.primary
+    ) {
+        Icon(icono, contentDescription = descripcion)
+    }
 }
 
 @Composable

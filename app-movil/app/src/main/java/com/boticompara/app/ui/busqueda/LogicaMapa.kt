@@ -89,3 +89,10 @@ internal fun limitesCentrados(usuario: Punto, puntos: List<Punto>): Pair<Punto, 
     val dLng = puntos.maxOf { kotlin.math.abs(it.lng - usuario.lng) }
     return Punto(usuario.lat - dLat, usuario.lng - dLng) to Punto(usuario.lat + dLat, usuario.lng + dLng)
 }
+
+/**
+ * Los puntos que deben verse completos al abrir el mapa: las boticas cercanas ([puntosCercanos]) y,
+ * aunque esté lejos, siempre la más barata (o las más baratas si empatan).
+ */
+internal fun puntosVistaInicial(usuario: Punto, boticas: List<Punto>, masBaratas: List<Punto>): List<Punto> =
+    (puntosCercanos(usuario, boticas) + masBaratas).distinct()

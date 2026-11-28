@@ -12,6 +12,7 @@ import com.boticompara.app.ui.busqueda.formatoDistancia
 import com.boticompara.app.ui.busqueda.formatoPrecio
 import com.boticompara.app.ui.busqueda.limitesCentrados
 import com.boticompara.app.ui.busqueda.puntosCercanos
+import com.boticompara.app.ui.busqueda.puntosVistaInicial
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -157,5 +158,26 @@ class LogicaMapaTest {
     @Test
     fun sinBoticasNoHayLimitesYSeUsaElZoomFijo() {
         assertNull(limitesCentrados(miraflores, emptyList()))
+    }
+
+    @Test
+    fun laVistaInicialSiempreIncluyeLaMasBarataAunqueEsteLejos() {
+        // Callao está a más de 3 km de Miraflores, pero es la más barata
+        val vista = puntosVistaInicial(miraflores, listOf(sanIsidro, callao), masBaratas = listOf(callao))
+        assertEquals(listOf(sanIsidro, callao), vista)
+    }
+
+    @Test
+    fun siLaMasBarataYaEsCercanaNoSeRepite() {
+        val vista = puntosVistaInicial(miraflores, listOf(sanIsidro, callao), masBaratas = listOf(sanIsidro))
+        assertEquals(listOf(sanIsidro), vista)
+    }
+
+    @Test
+    fun losLimitesConLaMasBarataLejanaSiguenCentradosYLaIncluyen() {
+        val limites = limitesCentrados(miraflores, puntosVistaInicial(miraflores, listOf(sanIsidro), listOf(callao)))!!
+        assertTrue(callao.lat in limites.first.lat..limites.second.lat)
+        assertTrue(callao.lng in limites.first.lng..limites.second.lng)
+        assertEquals(miraflores.lng, (limites.first.lng + limites.second.lng) / 2, 0.000001)
     }
 }
