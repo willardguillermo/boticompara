@@ -43,7 +43,7 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberUpdatedMarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 
 private val CENTRO_LIMA = LatLng(-12.0464, -77.0300)
@@ -188,7 +188,7 @@ private fun SelectorMapa(
         ) {
             punto?.let { ubicacion ->
                 Marker(
-                    state = MarkerState(position = ubicacion),
+                    state = rememberUpdatedMarkerState(position = ubicacion),
                     title = "Punto seleccionado",
                     onClick = { true }
                 )

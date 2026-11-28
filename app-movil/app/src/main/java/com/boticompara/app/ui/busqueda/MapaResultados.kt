@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -39,7 +40,6 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberUpdatedMarkerState
 import java.util.Locale
@@ -122,8 +122,10 @@ fun MapaResultados(
                 onMapClick = { boticaSeleccionada = null }
             ) {
                 marcadores.forEach { marcador ->
+                    // key + remember: cada marcador conserva su estado entre recomposiciones (lint, UnrememberedMutableState)
+                    key(marcador.producto.boticaId) {
                     Marker(
-                        state = MarkerState(position = LatLng(marcador.lat, marcador.lng)),
+                        state = rememberUpdatedMarkerState(position = LatLng(marcador.lat, marcador.lng)),
                         title = marcador.producto.boticaNombre,
                         snippet = "S/ ${String.format(Locale.US, "%.2f", marcador.producto.precio)}",
                         onClick = {
@@ -131,6 +133,7 @@ fun MapaResultados(
                             true
                         }
                     )
+                    }
                 }
                 if (ubicacionUsuario != null) {
                     Marker(
