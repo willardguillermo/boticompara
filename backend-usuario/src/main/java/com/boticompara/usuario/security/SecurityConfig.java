@@ -75,6 +75,8 @@ public class SecurityConfig {
                 .toList());
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Los 429 traen los segundos de espera en Retry-After: sin exponerlo, el navegador no deja leerlo a la web
+        cfg.setExposedHeaders(List.of("Retry-After"));
         cfg.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);

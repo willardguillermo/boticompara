@@ -120,6 +120,8 @@ public class RecuperacionService {
         }
 
         u.setPasswordHash(encoder.encode(nuevaPassword));
+        // H20: el código llegó a este correo, así que también queda verificado
+        u.setCorreoVerificado(true);
         usuarios.save(u);
         pendientes.forEach(t -> t.setUsado(true));
         tokens.saveAll(pendientes);

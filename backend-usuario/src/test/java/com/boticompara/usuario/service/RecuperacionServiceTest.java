@@ -227,6 +227,8 @@ class RecuperacionServiceTest {
 
         assertEquals("HASH_NUEVO", u.getPasswordHash());
         assertTrue(t.isUsado());
+        // H20: el código llegó a ese correo, así que también queda verificado
+        assertTrue(u.isCorreoVerificado());
         verify(usuarios).save(u);
     }
 

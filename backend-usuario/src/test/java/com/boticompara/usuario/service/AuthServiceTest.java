@@ -63,6 +63,7 @@ class AuthServiceTest {
         u.setRol("COMPRADOR");
         u.setActivo(true);
         u.setPasswordHash(encoder.encode(CLAVE));
+        u.setCorreoVerificado(true);
         return u;
     }
 
@@ -162,6 +163,46 @@ class AuthServiceTest {
 
     private GoogleIdentidad googleDe(String uid, String correo) {
         return new GoogleIdentidad(uid, correo, "Ana Pérez", true);
+    }
+
+    // ---------- H20: correo sin verificar (cuentas antiguas) ----------
+
+    @Test
+    void correoSinVerificarConClaveCorrectaResponde403ConCodigo() {
+        Usuario u = cuentaActiva();
+        u.setCorreoVerificado(false);
+        existe(u);
+
+        ApiException ex = assertThrows(ApiException.class, login());
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+        assertEquals("Verifica tu correo para entrar", ex.getMessage());
+        assertEquals("CORREO_NO_VERIFICADO", ex.getCodigo());
+        // La contraseña era correcta: no cuenta como intento fallido
+        verify(limitador).limpiar(CORREO, "desconocida");
+        verify(limitador, never()).registrarFallo(any(), any());
+    }
+
+    @Test
+    void correoSinVerificarConClaveIncorrectaResponde401SinRevelarNada() {
+        Usuario u = cuentaActiva();
+        u.setCorreoVerificado(false);
+        existe(u);
+
+        assertNoAutoriza(() -> service.login(new LoginRequest(CORREO, "otra-clave")));
+    }
+
+    @Test
+    void correoSinVerificarYSuspendidaDaPrimeroLaSuspension() {
+        Usuario u = cuentaActiva();
+        u.setCorreoVerificado(false);
+        u.setSuspendidoHasta(Instant.now().plus(3, ChronoUnit.DAYS));
+        existe(u);
+
+        ApiException ex = assertThrows(ApiException.class, login());
+
+        assertTrue(ex.getMessage().startsWith("Tu cuenta está suspendida hasta"));
+        assertNull(ex.getCodigo());
     }
 
     @Test

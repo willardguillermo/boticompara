@@ -48,13 +48,20 @@ public class CuotaSunat {
      * Pide permiso para una consulta. Primero el límite del usuario y después el global; si cualquiera rechaza,
      * la consulta no cuenta en ninguno.
      */
-    public synchronized Permiso pedir(Long usuarioId) {
+    public Permiso pedir(Long usuarioId) {
+        return pedir(String.valueOf(usuarioId));
+    }
+
+    /**
+     * Igual, con cualquier clave para el límite "por usuario". Durante el registro (H20) la cuenta aún no existe y la
+     * clave es el token de verificación ({@code registro-<id>}): nunca choca con el id numérico de un usuario.
+     */
+    public synchronized Permiso pedir(String clave) {
         LocalDate hoy = LocalDate.ofInstant(reloj.instant(), LIMA);
         if (!hoy.equals(dia)) {
             dia = hoy;
             enElDia = 0;
         }
-        String clave = String.valueOf(usuarioId);
         long espera = porUsuario.consumir(clave);
         if (espera > 0) {
             return new Permiso(Resultado.LIMITE_USUARIO, espera);

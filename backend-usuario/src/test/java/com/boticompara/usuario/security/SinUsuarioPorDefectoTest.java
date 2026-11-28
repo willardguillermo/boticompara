@@ -69,6 +69,7 @@ class SinUsuarioPorDefectoTest {
         carlos.setCorreo(CORREO);
         carlos.setRol("COMPRADOR");
         carlos.setPasswordHash(encoder.encode("Clave-de-prueba-1"));
+        carlos.setCorreoVerificado(true);
         when(usuarios.findByCorreoIgnoreCase(CORREO)).thenReturn(Optional.of(carlos));
         when(usuarios.findByGoogleUid("uid-carlos")).thenReturn(Optional.of(carlos));
         when(google.verificar("token-de-google"))
