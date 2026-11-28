@@ -7,17 +7,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import com.boticompara.app.ui.navigation.DESENFOQUE_DISPONIBLE
+import com.boticompara.app.ui.navigation.LocalEspacioBarra
+import com.boticompara.app.ui.navigation.LocalPausasDesenfoque
+import com.boticompara.app.ui.navigation.espacioBarra
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -88,24 +95,52 @@ class MainActivity : ComponentActivity() {
                         else if (rutaActual in RUTAS_CON_BARRA) alertasViewModel.actualizarResumen()
                     }
 
-                    // Scaffold principal: la barra inferior solo aparece en Buscar, Favoritos y Perfil
-                    Scaffold(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
-                        bottomBar = {
-                            if (mostrarBarra) BarraNavegacion(navController, rutaActual, alertasViewModel.noLeidas)
-                        }
-                    ) { paddingValues ->
-                        val inferior = paddingValues.calculateBottomPadding()
+                    // La barra flota sobre el contenido (H20, vidrio): el contenido llega hasta abajo y cada
+                    // pantalla con barra suma LocalEspacioBarra a su padding inferior para no quedar tapada.
+                    val espacio = if (mostrarBarra) espacioBarra() else 0.dp
+                    // Android 12+: la pantalla se graba en esta capa y la barra la dibuja desenfocada
+                    val capaFondo = rememberGraphicsLayer()
+                    val pausasDesenfoque = remember { mutableIntStateOf(0) }
+                    val grabarFondo = mostrarBarra && DESENFOQUE_DISPONIBLE && pausasDesenfoque.intValue == 0
 
-                        AppNav(
-                            navController = navController,
-                            startDestination = startDestination!!,
-                            alertasViewModel = alertasViewModel,
-                            modifier = Modifier
-                                .padding(bottom = inferior)
-                                .consumeWindowInsets(PaddingValues(bottom = inferior))
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        CompositionLocalProvider(
+                            LocalEspacioBarra provides espacio,
+                            LocalPausasDesenfoque provides pausasDesenfoque
+                        ) {
+                            AppNav(
+                                navController = navController,
+                                startDestination = startDestination!!,
+                                alertasViewModel = alertasViewModel,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    // Los Scaffold de las pantallas ya no suman la barra del sistema por abajo
+                                    .consumeWindowInsets(PaddingValues(bottom = espacio))
+                                    .then(
+                                        if (grabarFondo) {
+                                            Modifier.drawWithContent {
+                                                capaFondo.record { this@drawWithContent.drawContent() }
+                                                drawLayer(capaFondo)
+                                            }
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
+                            )
+                        }
+                        if (mostrarBarra) {
+                            BarraNavegacion(
+                                navController = navController,
+                                rutaActual = rutaActual,
+                                alertasNoLeidas = alertasViewModel.noLeidas,
+                                modifier = Modifier.align(Alignment.BottomCenter),
+                                fondo = if (grabarFondo) capaFondo else null
+                            )
+                        }
                     }
                 }
             }

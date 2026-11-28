@@ -1,5 +1,6 @@
 package com.boticompara.app.ui.perfil
 
+import com.boticompara.app.ui.navigation.LocalEspacioBarra
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -62,7 +63,7 @@ fun ProfileScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Dimens.Space20)
-                .padding(top = Dimens.Space12, bottom = Dimens.Space48),
+                .padding(top = Dimens.Space12, bottom = Dimens.Space48 + LocalEspacioBarra.current),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
